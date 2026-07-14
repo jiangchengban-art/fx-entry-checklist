@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>もちぽよアラート式 エントリーチェックリスト＆トレード記録</title>
+<style>
+  /* ============ テーマトークン ============ */
+  :root[data-theme="dark"] {
+    --page:        #0d0d0d;
+    --surface:     #1a1a19;
+    --surface-2:   #232322;
+    --ink:         #ffffff;
+    --ink-2:       #c3c2b7;
+    --ink-muted:   #898781;
+    --border:      rgba(255,255,255,0.10);
+    --hairline:    #2c2c2a;
+    --accent:      #3987e5;
+    --accent-soft: rgba(57,135,229,0.14);
+    --good:        #0ca30c;
+    --good-soft:   rgba(12,163,12,0.14);
+    --bad:         #e66767;
+    --bad-soft:    rgba(230,103,103,0.13);
+    --warn:        #fab219;
+    --warn-soft:   rgba(250,178,25,0.12);
+  }
+  :root[data-theme="light"] {
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --surface-2:   #f0efec;
+    --ink:         #0b0b0b;
+    --ink-2:       #52514e;
+    --ink-muted:   #898781;
+    --border:      rgba(11,11,11,0.10);
+    --hairline:    #e1e0d9;
+    --accent:      #2a78d6;
+    --accent-soft: rgba(42,120,214,0.10);
+    --good:        #006300;
+    --good-soft:   rgba(12,163,12,0.10);
+    --bad:         #d03b3b;
+    --bad-soft:    rgba(208,59,59,0.08);
+    --warn:        #b97900;
+    --warn-soft:   rgba(250,178,25,0.14);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    background: var(--page);
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 24px 16px 100px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+
+  /* ============ ヘッダー ============ */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.02em; }
+  header .subtitle { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .theme-toggle {
+    background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+
+  /* ============ 共通カード ============ */
+  section.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  section.card > h2 {
+    font-size: 15px; font-weight: 700; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  section.card > .section-note {
+    font-size: 12px; color: var(--ink-muted); margin-bottom: 18px;
+  }
+  .step-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+
+  /* ============ 統計サマリー ============ */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .stat-tile {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .stat-tile .label { font-size: 12px; color: var(--ink-muted); }
+  .stat-tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+  .stat-tile .value .unit { font-size: 13px; font-weight: 400; color: var(--ink-2); margin-left: 2px; }
+  .stat-tile .value.pos { color: var(--good); }
+  .stat-tile .value.neg { color: var(--bad); }
+
+  /* ============ チェックリスト ============ */
+  .check-progress {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .progress-track {
+    flex: 1; height: 8px; border-radius: 4px; background: var(--surface-2);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 4px; background: var(--accent);
+    width: 0%; transition: width 0.25s, background 0.25s;
+  }
+  .progress-fill.complete { background: var(--good); }
+  .check-count { font-size: 13px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  ul.checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  ul.checklist li label {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  ul.checklist li label:hover { border-color: var(--accent); }
+  ul.checklist li input:checked + .check-body { opacity: 0.75; }
+  ul.checklist li input:checked ~ .check-mark-bg { border-color: var(--good); }
+  ul.checklist li:has(input:checked) label { border-color: var(--good); background: var(--good-soft); }
+  ul.checklist input[type="checkbox"] {
+    width: 20px; height: 20px; margin-top: 3px; accent-color: var(--good);
+    cursor: pointer; flex-shrink: 0;
+  }
+  .check-body .check-tag {
+    display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border-radius: 4px; padding: 1px 8px;
+    margin-bottom: 3px;
+  }
+  .check-body .check-text { font-size: 13.5px; color: var(--ink-2); }
+  ul.checklist li:has(input:checked) .check-text { color: var(--ink-2); }
+  .check-actions { margin-top: 14px; display: flex; gap: 10px; }
+  .btn-ghost {
+    background: none; border: 1px solid var(--border); color: var(--ink-muted);
+    border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--ink-2); background: var(--surface-2); }
+
+  /* ============ フォーム ============ */
+  .form-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .form-field { display: flex; flex-direction: column; gap: 5px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .form-field label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .form-field label .req { color: var(--bad); margin-left: 2px; }
+  .form-field label .opt { color: var(--ink-muted); font-weight: 400; margin-left: 4px; font-size: 11px; }
+  .form-field input, .form-field select, .form-field textarea {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; font-family: inherit;
+    width: 100%;
+  }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+    outline: 2px solid var(--accent); outline-offset: -1px;
+  }
+  .form-field textarea { resize: vertical; min-height: 90px; }
+  #pairCustom { margin-top: 6px; display: none; }
+  #pairCustom.show { display: block; }
+  .form-footer { margin-top: 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 12px 28px; font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .save-hint { font-size: 12px; color: var(--ink-muted); }
+  .save-hint.ok { color: var(--good); }
+
+  /* ============ 記録一覧 ============ */
+  .list-toolbar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .list-toolbar .spacer { flex: 1; }
+  .record-card {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 12px;
+  }
+  .record-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .record-head .datetime { font-size: 12px; color: var(--ink-muted); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 10px;
+  }
+  .badge.pair { background: var(--accent-soft); color: var(--accent); }
+  .badge.long { background: var(--good-soft); color: var(--good); }
+  .badge.short { background: var(--bad-soft); color: var(--bad); }
+  .badge.style { background: var(--surface); color: var(--ink-2); border: 1px solid var(--border); }
+  .badge.checks-full { background: var(--good-soft); color: var(--good); }
+  .badge.checks-part { background: var(--warn-soft); color: var(--warn); }
+  .record-head .spacer { flex: 1; }
+  .btn-delete {
+    background: none; border: 1px solid var(--border); color: var(--ink-muted);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn-delete:hover { color: var(--bad); border-color: var(--bad); }
+  .record-body {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px 16px; font-size: 13px;
+  }
+  .record-body .kv .k { font-size: 11px; color: var(--ink-muted); }
+  .record-body .kv .v { font-variant-numeric: tabular-nums; }
+  .record-body .kv .v.pos { color: var(--good); font-weight: 700; }
+  .record-body .kv .v.neg { color: var(--bad); font-weight: 700; }
+  .record-notes {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline);
+    font-size: 13px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word;
+  }
+  .record-checks-detail {
+    margin-top: 8px; font-size: 11.5px; color: var(--ink-muted);
+    display: flex; flex-wrap: wrap; gap: 4px 10px;
+  }
+  .record-checks-detail .miss { color: var(--warn); }
+  .empty-state {
+    text-align: center; color: var(--ink-muted); font-size: 13px;
+    padding: 32px 0;
+  }
+
+  /* ============ モーダル ============ */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+    padding: 16px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 440px; width: 100%; padding: 24px;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .modal h3 .warn-icon { color: var(--warn); }
+  .modal p { font-size: 13px; color: var(--ink-2); margin-bottom: 10px; }
+  .modal ul { list-style: none; margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .modal ul li {
+    font-size: 12.5px; color: var(--warn); background: var(--warn-soft);
+    border-radius: 6px; padding: 5px 10px;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-secondary {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 8px; padding: 9px 18px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .btn-danger-solid {
+    background: var(--bad); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+
+  /* ============ トースト ============ */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: var(--page); font-size: 13px; font-weight: 600;
+    border-radius: 8px; padding: 10px 20px; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s; z-index: 60; max-width: 90vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ============ タブ ============ */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .tab-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; justify-content: center;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 6px max(6px, env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+  }
+  .tab-bar .tab-btn {
+    flex: 1; max-width: 220px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--ink-muted); padding: 8px 4px 6px; border-radius: 10px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .tab-bar .tab-btn .tab-icon { font-size: 20px; line-height: 1; }
+  .tab-bar .tab-btn .tab-label { font-size: 11px; font-weight: 600; }
+  .tab-bar .tab-btn:hover { background: var(--surface-2); }
+  .tab-bar .tab-btn.active { color: var(--accent); }
+  .tab-bar .tab-btn.active .tab-icon { transform: translateY(-1px); }
+
+  @media (max-width: 520px) {
+    body { padding: 16px 10px 96px; }
+    section.card { padding: 16px; }
+    .stat-tile .value { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div>
+      <h1>📋 もちぽよアラート式 トレード管理</h1>
+      <div class="subtitle">エントリーチェックリスト ＆ トレード記録（ローカル保存）</div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
+  </header>
+
+  <!-- ============ 統計サマリー ============ -->
+  <section class="card">
+    <h2>📊 統計サマリー</h2>
+    <div class="section-note">決済済み（pips入力済み）のトレードを対象に集計しています。</div>
+    <div class="stats-grid" id="statsGrid"></div>
+  </section>
+
+  <!-- ============ ① チェックリスト ============ -->
+  <section class="card tab-panel" id="tabPanel-checklist">
+    <h2><span class="step-badge">1</span> エントリーチェックリスト</h2>
+    <div class="section-note">エントリー前に、感情ではなく根拠で判断できているかを1つずつ確認してください。チェック状態は記録と一緒に保存されます。</div>
+    <div class="check-progress">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="check-count" id="checkCount">0 / 8</div>
+    </div>
+    <ul class="checklist" id="checklist"></ul>
+    <div class="check-actions">
+      <button class="btn-ghost" type="button" id="resetChecks">チェックをリセット</button>
+    </div>
+  </section>
+
+  <!-- ============ ② トレード記録フォーム ============ -->
+  <section class="card tab-panel" id="tabPanel-form">
+    <h2><span class="step-badge">2</span> トレード記録フォーム</h2>
+    <div class="section-note">決済価格・獲得pipsは未確定なら空欄のままで保存できます。</div>
+    <form id="tradeForm" autocomplete="off">
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="fDatetime">日時<span class="req">*</span></label>
+          <input type="datetime-local" id="fDatetime" required>
+        </div>
+        <div class="form-field">
+          <label for="fPair">通貨ペア<span class="req">*</span></label>
+          <select id="fPair" required>
+            <option value="">選択してください</option>
+            <option>USD/JPY</option>
+            <option>EUR/JPY</option>
+            <option>GBP/JPY</option>
+            <option>AUD/JPY</option>
+            <option>EUR/USD</option>
+            <option>GBP/USD</option>
+            <option>AUD/USD</option>
+            <option>GOLD (XAU/USD)</option>
+            <option value="__custom__">その他（自由入力）</option>
+          </select>
+          <input type="text" id="pairCustom" placeholder="例: CAD/JPY">
+        </div>
+        <div class="form-field">
+          <label for="fStyle">トレードスタイル<span class="req">*</span></label>
+          <select id="fStyle" required>
+            <option value="">選択してください</option>
+            <option>スキャルピング</option>
+            <option>デイトレード</option>
+            <option>スイング</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="fTfHigher">上位足<span class="req">*</span></label>
+          <input type="text" id="fTfHigher" list="tfList" placeholder="例: 1時間足" required>
+        </div>
+        <div class="form-field">
+          <label for="fTfEntry">エントリー足<span class="req">*</span></label>
+          <input type="text" id="fTfEntry" list="tfList" placeholder="例: 5分足" required>
+        </div>
+        <datalist id="tfList">
+          <option value="日足"></option>
+          <option value="4時間足"></option>
+          <option value="1時間足"></option>
+          <option value="15分足"></option>
+          <option value="5分足"></option>
+          <option value="1分足"></option>
+        </datalist>
+        <div class="form-field">
+          <label for="fDirection">売買方向<span class="req">*</span></label>
+          <select id="fDirection" required>
+            <option value="">選択してください</option>
+            <option value="long">ロング</option>
+            <option value="short">ショート</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="fEntryPrice">エントリー価格<span class="req">*</span></label>
+          <input type="number" id="fEntryPrice" step="any" placeholder="例: 150.250" required>
+        </div>
+        <div class="form-field">
+          <label for="fSlPrice">損切り価格（逆指値）<span class="req">*</span></label>
+          <input type="number" id="fSlPrice" step="any" placeholder="例: 150.000" required>
+        </div>
+        <div class="form-field">
+          <label for="fExitPrice">決済価格<span class="opt">任意（後で確定可）</span></label>
+          <input type="number" id="fExitPrice" step="any" placeholder="未決済なら空欄">
+        </div>
+        <div class="form-field">
+          <label for="fPips">獲得pips / 損益<span class="opt">任意</span></label>
+          <input type="number" id="fPips" step="any" placeholder="例: +25.3 / -10">
+        </div>
+        <div class="form-field full">
+          <label for="fNotes">振り返り・備考</label>
+          <textarea id="fNotes" placeholder="勝った/負けた原因、ルールの遵守状況、感情の状態など"></textarea>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn-primary" type="submit">💾 記録を保存</button>
+        <span class="save-hint" id="saveHint">チェックリスト: 0 / 8</span>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============ ③ 過去の記録一覧 ============ -->
+  <section class="card tab-panel" id="tabPanel-list">
+    <h2><span class="step-badge">3</span> 過去のトレード記録</h2>
+    <div class="section-note">新しい記録が上に表示されます。</div>
+    <div class="list-toolbar">
+      <button class="btn-ghost" type="button" id="exportCsv">⬇ CSVエクスポート</button>
+      <button class="btn-ghost" type="button" id="importCsvBtn">⬆ CSVインポート</button>
+      <input type="file" id="importCsvFile" accept=".csv,text/csv" style="display:none">
+      <div class="spacer"></div>
+      <span class="check-count" id="recordTotal"></span>
+    </div>
+    <div id="recordList"></div>
+  </section>
+
+</div>
+
+<!-- ============ 下部タブバー ============ -->
+<nav class="tab-bar" id="tabBar">
+  <button class="tab-btn" type="button" data-tab="checklist">
+    <span class="tab-icon">✅</span><span class="tab-label">チェック</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="form">
+    <span class="tab-icon">📝</span><span class="tab-label">記録する</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="list">
+    <span class="tab-icon">📚</span><span class="tab-label">履歴</span>
+  </button>
+</nav>
+
+<!-- 未チェック警告モーダル -->
+<div class="modal-backdrop" id="warnModal">
+  <div class="modal">
+    <h3><span class="warn-icon">⚠</span> 根拠が不足しています</h3>
+    <p>以下の項目が未チェックです。ルール外エントリーの可能性があります。それでも記録しますか？</p>
+    <ul id="warnList"></ul>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="warnCancel">戻って確認する</button>
+      <button class="btn-danger-solid" type="button" id="warnProceed">それでも記録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div class="modal-backdrop" id="deleteModal">
+  <div class="modal">
+    <h3>🗑 記録の削除</h3>
+    <p id="deleteModalText">この記録を削除しますか？この操作は取り消せません。</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="deleteCancel">キャンセル</button>
+      <button class="btn-danger-solid" type="button" id="deleteConfirm">削除する</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ============ 定数 ============ */
+const STORAGE_KEY = 'mochipoyo_trades_v1';
+const THEME_KEY   = 'mochipoyo_theme';
+
+const CHECK_ITEMS = [
+  { tag: '環境認識',   text: '上位足（日足・4時間足・1時間足など）のトレンド方向を確認したか？' },
+  { tag: 'ボラティリティ', text: '相場に十分なボラティリティ（勢いや値幅）があり、もみ合い（レンジ）相場ではないか？' },
+  { tag: '上位足指標', text: '上位足のRCIやMACDの状態（上限/下限、ダイバージェンス等）を把握しているか？' },
+  { tag: 'EMA確認',    text: 'エントリー足のEMA（20・30・40）が順に並んでおり、方向性を示しているか？（横ばいや密集状態ではないか？）' },
+  { tag: 'MACD確認',   text: 'エントリー足のMACDで、ダイバージェンスまたはヒドゥンダイバージェンスが発生しているか？' },
+  { tag: 'RCI確認',    text: 'エントリー足のRCI（短期または短期＋中期）が±70ライン、または過去の反転ラインに到達し、反転の兆しがあるか？' },
+  { tag: '損切り位置', text: '直近の高値または安値付近など、明確な損切りラインを事前に決めているか？' },
+  { tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
+];
+
+/* ============ ストレージ ============ */
+function loadTrades() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    console.error('localStorage 読み込みエラー:', e);
+    return [];
+  }
+}
+function saveTrades(trades) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+    return true;
+  } catch (e) {
+    alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
+    return false;
+  }
+}
+
+/* ============ テーマ ============ */
+const themeToggle = document.getElementById('themeToggle');
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  themeToggle.textContent = theme === 'dark' ? '☀️ ライト' : '🌙 ダーク';
+  localStorage.setItem(THEME_KEY, theme);
+}
+themeToggle.addEventListener('click', () => {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+
+/* ============ チェックリスト描画 ============ */
+const checklistEl = document.getElementById('checklist');
+CHECK_ITEMS.forEach((item, i) => {
+  const li = document.createElement('li');
+  li.innerHTML =
+    '<label>' +
+      '<input type="checkbox" data-idx="' + i + '">' +
+      '<span class="check-body">' +
+        '<span class="check-tag">' + item.tag + '</span><br>' +
+        '<span class="check-text">' + item.text + '</span>' +
+      '</span>' +
+    '</label>';
+  checklistEl.appendChild(li);
+});
+const checkboxes = Array.from(checklistEl.querySelectorAll('input[type="checkbox"]'));
+
+function getCheckStates() { return checkboxes.map(cb => cb.checked); }
+function updateCheckUI() {
+  const n = getCheckStates().filter(Boolean).length;
+  const total = CHECK_ITEMS.length;
+  document.getElementById('checkCount').textContent = n + ' / ' + total;
+  const fill = document.getElementById('progressFill');
+  fill.style.width = (n / total * 100) + '%';
+  fill.classList.toggle('complete', n === total);
+  const hint = document.getElementById('saveHint');
+  hint.textContent = n === total
+    ? '✔ 全項目チェック済み — 根拠は揃っています'
+    : 'チェックリスト: ' + n + ' / ' + total;
+  hint.classList.toggle('ok', n === total);
+}
+checkboxes.forEach(cb => cb.addEventListener('change', updateCheckUI));
+document.getElementById('resetChecks').addEventListener('click', () => {
+  checkboxes.forEach(cb => cb.checked = false);
+  updateCheckUI();
+});
+updateCheckUI();
+
+/* ============ フォーム補助 ============ */
+const pairSelect = document.getElementById('fPair');
+const pairCustom = document.getElementById('pairCustom');
+pairSelect.addEventListener('change', () => {
+  const isCustom = pairSelect.value === '__custom__';
+  pairCustom.classList.toggle('show', isCustom);
+  pairCustom.required = isCustom;
+  if (isCustom) pairCustom.focus();
+});
+
+function setDatetimeNow() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  document.getElementById('fDatetime').value = d.toISOString().slice(0, 16);
+}
+setDatetimeNow();
+
+/* ============ 保存フロー ============ */
+const warnModal = document.getElementById('warnModal');
+let pendingSave = null;
+
+document.getElementById('tradeForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const checks = getCheckStates();
+  const unchecked = CHECK_ITEMS.filter((_, i) => !checks[i]);
+  if (unchecked.length > 0) {
+    const ul = document.getElementById('warnList');
+    ul.innerHTML = '';
+    unchecked.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = '□ 【' + item.tag + '】' + item.text;
+      ul.appendChild(li);
+    });
+    pendingSave = checks;
+    warnModal.classList.add('show');
+  } else {
+    doSave(checks);
+  }
+});
+document.getElementById('warnCancel').addEventListener('click', () => {
+  warnModal.classList.remove('show');
+  pendingSave = null;
+});
+document.getElementById('warnProceed').addEventListener('click', () => {
+  warnModal.classList.remove('show');
+  if (pendingSave) { doSave(pendingSave); pendingSave = null; }
+});
+
+function numOrNull(id) {
+  const v = document.getElementById(id).value.trim();
+  return v === '' ? null : Number(v);
+}
+
+function doSave(checks) {
+  const pair = pairSelect.value === '__custom__'
+    ? pairCustom.value.trim()
+    : pairSelect.value;
+  const trade = {
+    id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    datetime:   document.getElementById('fDatetime').value,
+    pair:       pair,
+    style:      document.getElementById('fStyle').value,
+    tfHigher:   document.getElementById('fTfHigher').value.trim(),
+    tfEntry:    document.getElementById('fTfEntry').value.trim(),
+    direction:  document.getElementById('fDirection').value,
+    entryPrice: numOrNull('fEntryPrice'),
+    slPrice:    numOrNull('fSlPrice'),
+    exitPrice:  numOrNull('fExitPrice'),
+    pips:       numOrNull('fPips'),
+    notes:      document.getElementById('fNotes').value.trim(),
+    checks:     checks.slice(),
+    createdAt:  new Date().toISOString(),
+  };
+  const trades = loadTrades();
+  trades.push(trade);
+  if (!saveTrades(trades)) return;
+
+  document.getElementById('tradeForm').reset();
+  pairCustom.classList.remove('show');
+  pairCustom.required = false;
+  setDatetimeNow();
+  checkboxes.forEach(cb => cb.checked = false);
+  updateCheckUI();
+  renderAll();
+  showToast('✔ トレードを記録しました（チェック ' + checks.filter(Boolean).length + '/' + CHECK_ITEMS.length + '）');
+}
+
+/* ============ 統計サマリー ============ */
+function renderStats() {
+  const trades = loadTrades();
+  const closed = trades.filter(t => typeof t.pips === 'number' && !Number.isNaN(t.pips));
+  const wins = closed.filter(t => t.pips > 0).length;
+  const decided = closed.filter(t => t.pips !== 0).length;
+  const totalPips = closed.reduce((s, t) => s + t.pips, 0);
+  const avgPips = closed.length ? totalPips / closed.length : 0;
+  const checkRates = trades.map(t =>
+    Array.isArray(t.checks) ? t.checks.filter(Boolean).length / CHECK_ITEMS.length : 1);
+  const avgCheck = checkRates.length
+    ? checkRates.reduce((s, r) => s + r, 0) / checkRates.length * 100 : 0;
+
+  const tiles = [
+    { label: 'トレード数', value: String(trades.length), unit: '件' },
+    { label: '勝率（決済済）', value: decided ? (wins / decided * 100).toFixed(1) : '–', unit: '%' },
+    { label: '合計pips', value: closed.length ? (totalPips > 0 ? '+' : '') + round2(totalPips) : '–',
+      cls: !closed.length ? '' : totalPips > 0 ? 'pos' : totalPips < 0 ? 'neg' : '' },
+    { label: '平均pips', value: closed.length ? (avgPips > 0 ? '+' : '') + round2(avgPips) : '–',
+      cls: !closed.length ? '' : avgPips > 0 ? 'pos' : avgPips < 0 ? 'neg' : '' },
+    { label: 'チェック遵守率', value: trades.length ? avgCheck.toFixed(0) : '–', unit: '%' },
+  ];
+  document.getElementById('statsGrid').innerHTML = tiles.map(t =>
+    '<div class="stat-tile">' +
+      '<div class="label">' + t.label + '</div>' +
+      '<div class="value ' + (t.cls || '') + '">' + t.value +
+        (t.unit ? '<span class="unit">' + t.unit + '</span>' : '') +
+      '</div>' +
+    '</div>').join('');
+}
+function round2(n) { return Math.round(n * 100) / 100; }
+
+/* ============ 記録一覧 ============ */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function fmtDatetime(v) {
+  if (!v) return '(日時なし)';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return esc(v);
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) +
+    ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function fmtNum(v) { return (v === null || v === undefined || Number.isNaN(v)) ? '—' : String(v); }
+
+function renderList() {
+  const trades = loadTrades().slice().sort((a, b) =>
+    (b.datetime || b.createdAt || '').localeCompare(a.datetime || a.createdAt || ''));
+  const listEl = document.getElementById('recordList');
+  document.getElementById('recordTotal').textContent = trades.length + ' 件';
+
+  if (trades.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">まだ記録がありません。最初のトレードを記録しましょう。</div>';
+    return;
+  }
+
+  listEl.innerHTML = trades.map(t => {
+    const nChecks = Array.isArray(t.checks) ? t.checks.filter(Boolean).length : null;
+    const full = nChecks === CHECK_ITEMS.length;
+    const missed = Array.isArray(t.checks)
+      ? CHECK_ITEMS.filter((_, i) => !t.checks[i]).map(c => c.tag) : [];
+    const pipsCls = typeof t.pips === 'number' ? (t.pips > 0 ? 'pos' : t.pips < 0 ? 'neg' : '') : '';
+    const pipsStr = typeof t.pips === 'number' ? (t.pips > 0 ? '+' : '') + t.pips : '未確定';
+    return (
+      '<div class="record-card">' +
+        '<div class="record-head">' +
+          '<span class="datetime">' + fmtDatetime(t.datetime) + '</span>' +
+          '<span class="badge pair">' + esc(t.pair) + '</span>' +
+          '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
+            (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>' +
+          '<span class="badge style">' + esc(t.style) + '</span>' +
+          (nChecks !== null
+            ? '<span class="badge ' + (full ? 'checks-full' : 'checks-part') + '">' +
+              (full ? '✔ ' : '⚠ ') + nChecks + '/' + CHECK_ITEMS.length + '</span>'
+            : '') +
+          '<span class="spacer"></span>' +
+          '<button class="btn-delete" type="button" data-delete="' + esc(t.id) + '">削除</button>' +
+        '</div>' +
+        '<div class="record-body">' +
+          kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
+          kv('エントリー', fmtNum(t.entryPrice)) +
+          kv('損切り', fmtNum(t.slPrice)) +
+          kv('決済', fmtNum(t.exitPrice)) +
+          '<div class="kv"><div class="k">pips / 損益</div><div class="v ' + pipsCls + '">' + esc(pipsStr) + '</div></div>' +
+        '</div>' +
+        (missed.length
+          ? '<div class="record-checks-detail">未チェック: ' +
+            missed.map(m => '<span class="miss">' + esc(m) + '</span>').join('') + '</div>'
+          : '') +
+        (t.notes ? '<div class="record-notes">' + esc(t.notes) + '</div>' : '') +
+      '</div>');
+  }).join('');
+}
+function kv(k, v) {
+  return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+}
+
+/* ---- 削除（確認モーダル経由） ---- */
+const deleteModal = document.getElementById('deleteModal');
+let pendingDeleteId = null;
+document.getElementById('recordList').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-delete]');
+  if (!btn) return;
+  pendingDeleteId = btn.dataset.delete;
+  const t = loadTrades().find(x => x.id === pendingDeleteId);
+  document.getElementById('deleteModalText').textContent = t
+    ? fmtDatetime(t.datetime) + ' の ' + t.pair + ' の記録を削除しますか？この操作は取り消せません。'
+    : 'この記録を削除しますか？この操作は取り消せません。';
+  deleteModal.classList.add('show');
+});
+document.getElementById('deleteCancel').addEventListener('click', () => {
+  deleteModal.classList.remove('show');
+  pendingDeleteId = null;
+});
+document.getElementById('deleteConfirm').addEventListener('click', () => {
+  deleteModal.classList.remove('show');
+  if (!pendingDeleteId) return;
+  const trades = loadTrades().filter(t => t.id !== pendingDeleteId);
+  saveTrades(trades);
+  pendingDeleteId = null;
+  renderAll();
+  showToast('記録を削除しました');
+});
+
+/* ============ CSV ============ */
+const CSV_HEADERS = [
+  'id', 'datetime', 'pair', 'style', 'tfHigher', 'tfEntry', 'direction',
+  'entryPrice', 'slPrice', 'exitPrice', 'pips', 'notes',
+  ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
+  'createdAt',
+];
+
+function csvField(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+document.getElementById('exportCsv').addEventListener('click', () => {
+  const trades = loadTrades();
+  if (trades.length === 0) { showToast('エクスポートする記録がありません'); return; }
+  const rows = [CSV_HEADERS.join(',')];
+  trades.forEach(t => {
+    const checks = Array.isArray(t.checks) ? t.checks : [];
+    rows.push([
+      t.id, t.datetime, t.pair, t.style, t.tfHigher, t.tfEntry, t.direction,
+      t.entryPrice, t.slPrice, t.exitPrice, t.pips, t.notes,
+      ...CHECK_ITEMS.map((_, i) => checks[i] ? 1 : 0),
+      t.createdAt,
+    ].map(csvField).join(','));
+  });
+  const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mochipoyo_trades_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('CSVをエクスポートしました（' + trades.length + '件）');
+});
+
+/* ---- CSVパーサ（引用符・改行対応） ---- */
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r.length === 1 && r[0] !== ''));
+}
+
+document.getElementById('importCsvBtn').addEventListener('click', () => {
+  document.getElementById('importCsvFile').click();
+});
+document.getElementById('importCsvFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      let text = reader.result;
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const rows = parseCsv(text);
+      if (rows.length < 2) { showToast('データ行がありません'); return; }
+      const header = rows[0];
+      const idx = {};
+      CSV_HEADERS.forEach(h => { idx[h] = header.indexOf(h); });
+      if (idx.id === -1 || idx.datetime === -1 || idx.pair === -1) {
+        showToast('⚠ ヘッダーが一致しません。このツールでエクスポートしたCSVを使用してください');
+        return;
+      }
+      const numOf = v => (v === '' || v == null) ? null : (Number.isNaN(Number(v)) ? null : Number(v));
+      const get = (r, key) => idx[key] >= 0 ? (r[idx[key]] ?? '') : '';
+      const trades = loadTrades();
+      const existing = new Set(trades.map(t => t.id));
+      let added = 0, skipped = 0;
+      rows.slice(1).forEach(r => {
+        const id = get(r, 'id');
+        if (!id) return;
+        if (existing.has(id)) { skipped++; return; }
+        trades.push({
+          id,
+          datetime:   get(r, 'datetime'),
+          pair:       get(r, 'pair'),
+          style:      get(r, 'style'),
+          tfHigher:   get(r, 'tfHigher'),
+          tfEntry:    get(r, 'tfEntry'),
+          direction:  get(r, 'direction'),
+          entryPrice: numOf(get(r, 'entryPrice')),
+          slPrice:    numOf(get(r, 'slPrice')),
+          exitPrice:  numOf(get(r, 'exitPrice')),
+          pips:       numOf(get(r, 'pips')),
+          notes:      get(r, 'notes'),
+          checks:     CHECK_ITEMS.map((_, i) => get(r, 'check' + (i + 1)) === '1'),
+          createdAt:  get(r, 'createdAt') || new Date().toISOString(),
+        });
+        existing.add(id);
+        added++;
+      });
+      if (added > 0) saveTrades(trades);
+      renderAll();
+      showToast('インポート完了: ' + added + '件追加' + (skipped ? '（重複 ' + skipped + '件スキップ）' : ''));
+    } catch (err) {
+      console.error(err);
+      showToast('⚠ インポートに失敗しました: ' + err.message);
+    } finally {
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+});
+
+/* ============ トースト ============ */
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ============ タブ切替 ============ */
+const TAB_KEY = 'mochipoyo_active_tab';
+const tabBar = document.getElementById('tabBar');
+const tabButtons = Array.from(tabBar.querySelectorAll('.tab-btn'));
+const tabPanels = {
+  checklist: document.getElementById('tabPanel-checklist'),
+  form:      document.getElementById('tabPanel-form'),
+  list:      document.getElementById('tabPanel-list'),
+};
+function setActiveTab(name) {
+  if (!tabPanels[name]) name = 'checklist';
+  Object.entries(tabPanels).forEach(([key, panel]) => {
+    panel.classList.toggle('active', key === name);
+  });
+  tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+  localStorage.setItem(TAB_KEY, name);
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+tabBar.addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  setActiveTab(btn.dataset.tab);
+});
+setActiveTab(localStorage.getItem(TAB_KEY) || 'checklist');
+
+/* ============ 初期描画 ============ */
+function renderAll() { renderStats(); renderList(); }
+renderAll();
+</script>
+</body>
+</html>
