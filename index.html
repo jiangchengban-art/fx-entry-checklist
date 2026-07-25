@@ -120,6 +120,28 @@
   .progress-fill.complete { background: var(--good); }
   .check-count { font-size: 13px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+  .checklist-groups { display: flex; flex-direction: column; gap: 10px; }
+  details.checklist-group {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  details.checklist-group summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; cursor: pointer; list-style: none;
+    font-size: 13.5px; font-weight: 700; color: var(--ink);
+  }
+  details.checklist-group summary::-webkit-details-marker { display: none; }
+  details.checklist-group summary::before {
+    content: '▸'; color: var(--ink-muted); margin-right: 8px; transition: transform 0.15s;
+  }
+  details.checklist-group[open] summary::before { transform: rotate(90deg); }
+  details.checklist-group summary .group-name { flex: 1; }
+  details.checklist-group summary .group-count {
+    font-size: 12px; font-weight: 600; color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  details.checklist-group ul.checklist { padding: 0 14px 14px; }
+
   ul.checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   ul.checklist li label {
     display: flex; align-items: flex-start; gap: 12px;
@@ -127,21 +149,24 @@
     border-radius: 10px; padding: 12px 14px; cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
   }
-  ul.checklist li label:hover { border-color: var(--accent); }
-  ul.checklist li input:checked + .check-body { opacity: 0.75; }
-  ul.checklist li input:checked ~ .check-mark-bg { border-color: var(--good); }
-  ul.checklist li:has(input:checked) label { border-color: var(--good); background: var(--good-soft); }
-  ul.checklist input[type="checkbox"] {
-    width: 20px; height: 20px; margin-top: 3px; accent-color: var(--good);
-    cursor: pointer; flex-shrink: 0;
-  }
+  ul.checklist li label { flex-direction: column; align-items: stretch; gap: 10px; cursor: default; }
+  ul.checklist li[data-state="ok"] label { border-color: var(--good); background: var(--good-soft); }
+  ul.checklist li[data-state="ng"] label { border-color: var(--bad); background: var(--bad-soft); }
   .check-body .check-tag {
     display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent);
     background: var(--accent-soft); border-radius: 4px; padding: 1px 8px;
     margin-bottom: 3px;
   }
   .check-body .check-text { font-size: 13.5px; color: var(--ink-2); }
-  ul.checklist li:has(input:checked) .check-text { color: var(--ink-2); }
+  .check-okng { display: flex; gap: 8px; }
+  .check-okng .check-btn {
+    flex: 1; border-radius: 8px; padding: 8px 0; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink-muted); transition: all 0.15s;
+  }
+  .check-okng .check-btn:hover { background: var(--surface-2); }
+  .check-okng .check-btn.ok.active { background: var(--good); border-color: var(--good); color: #fff; }
+  .check-okng .check-btn.ng.active { background: var(--bad); border-color: var(--bad); color: #fff; }
   .check-actions { margin-top: 14px; display: flex; gap: 10px; }
   .btn-ghost {
     background: none; border: 1px solid var(--border); color: var(--ink-muted);
@@ -311,13 +336,6 @@
     <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
   </header>
 
-  <!-- ============ 統計サマリー ============ -->
-  <section class="card">
-    <h2>📊 統計サマリー</h2>
-    <div class="section-note">決済済み（pips入力済み）のトレードを対象に集計しています。</div>
-    <div class="stats-grid" id="statsGrid"></div>
-  </section>
-
   <!-- ============ ① チェックリスト ============ -->
   <section class="card tab-panel" id="tabPanel-checklist">
     <h2><span class="step-badge">1</span> エントリーチェックリスト</h2>
@@ -326,7 +344,7 @@
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       <div class="check-count" id="checkCount">0 / 8</div>
     </div>
-    <ul class="checklist" id="checklist"></ul>
+    <div class="checklist-groups" id="checklist"></div>
     <div class="check-actions">
       <button class="btn-ghost" type="button" id="resetChecks">チェックをリセット</button>
     </div>
@@ -338,6 +356,16 @@
     <div class="section-note">決済価格・獲得pipsは未確定なら空欄のままで保存できます。</div>
     <form id="tradeForm" autocomplete="off">
       <div class="form-grid">
+        <div class="form-field">
+          <label for="fEntryPattern">エントリーパターン<span class="req">*</span></label>
+          <select id="fEntryPattern" required>
+            <option value="">選択してください</option>
+            <option>15分足×4時間足</option>
+            <option>1時間足×日足</option>
+            <option>4時間足(8時間足)×週足</option>
+            <option>日足×週足(月足)</option>
+          </select>
+        </div>
         <div class="form-field">
           <label for="fDatetime">日時<span class="req">*</span></label>
           <input type="datetime-local" id="fDatetime" required>
@@ -433,6 +461,13 @@
     <div id="recordList"></div>
   </section>
 
+  <!-- ============ ④ 統計サマリー ============ -->
+  <section class="card tab-panel" id="tabPanel-stats">
+    <h2><span class="step-badge">4</span> 統計サマリー</h2>
+    <div class="section-note">決済済み（pips入力済み）のトレードを対象に集計しています。</div>
+    <div class="stats-grid" id="statsGrid"></div>
+  </section>
+
 </div>
 
 <!-- ============ 下部タブバー ============ -->
@@ -445,6 +480,9 @@
   </button>
   <button class="tab-btn" type="button" data-tab="list">
     <span class="tab-icon">📚</span><span class="tab-label">履歴</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="stats">
+    <span class="tab-icon">📊</span><span class="tab-label">統計</span>
   </button>
 </nav>
 
@@ -483,15 +521,23 @@ const STORAGE_KEY = 'mochipoyo_trades_v1';
 const THEME_KEY   = 'mochipoyo_theme';
 
 const CHECK_ITEMS = [
-  { tag: '環境認識',   text: '上位足（日足・4時間足・1時間足など）のトレンド方向を確認したか？' },
-  { tag: 'ボラティリティ', text: '相場に十分なボラティリティ（勢いや値幅）があり、もみ合い（レンジ）相場ではないか？' },
-  { tag: '上位足指標', text: '上位足のRCIやMACDの状態（上限/下限、ダイバージェンス等）を把握しているか？' },
-  { tag: 'EMA確認',    text: 'エントリー足のEMA（20・30・40）が順に並んでおり、方向性を示しているか？（横ばいや密集状態ではないか？）' },
-  { tag: 'MACD確認',   text: 'エントリー足のMACDで、ダイバージェンスまたはヒドゥンダイバージェンスが発生しているか？' },
-  { tag: 'RCI確認',    text: 'エントリー足のRCI（短期または短期＋中期）が±70ライン、または過去の反転ラインに到達し、反転の兆しがあるか？' },
-  { tag: '損切り位置', text: '直近の高値または安値付近など、明確な損切りラインを事前に決めているか？' },
-  { tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
+  { group: '上位足',     tag: '環境認識',   text: '上位足（日足・4時間足・1時間足など）のトレンド方向を確認したか？' },
+  { group: '上位足',     tag: 'ボラティリティ', text: '相場に十分なボラティリティ（勢いや値幅）があり、もみ合い（レンジ）相場ではないか？' },
+  { group: '上位足',     tag: '上位足トレンド', text: '上位足は上昇トレンド／下降トレンド／レンジ／もみ合いのどれか把握しているか？' },
+  { group: '上位足',     tag: '上位足値動き', text: '直近の値動きの推移（どういう流れで今の価格に到達してきたか）を確認したか？' },
+  { group: '上位足',     tag: '上位足RCI',    text: '上位足のRCIの状態（上限か下限か中間か、向き、短期〜長期どの線が到達しているか）を確認したか？' },
+  { group: '上位足',     tag: '上位足MACD',   text: '上位足のMACDの状態（ダイバージェンス・ヒドゥンダイバージェンスの有無）を確認したか？' },
+  { group: '上位足',     tag: '上位足高安ライン', text: '上位足の高値安値ライン（過去に反発したポイントや、大きく値が動いたきっかけになったポイント）を確認したか？' },
+  { group: 'エントリー足', tag: 'EMA確認',    text: 'エントリー足のEMA（20・30・40）が順に並んでおり、方向性を示しているか？（横ばいや密集状態ではないか？）' },
+  { group: 'エントリー足', tag: 'エントリー足トレンド勢い', text: 'エントリー足の上昇／下降トレンドの勢い（ボラティリティやトレンドの角度・進み方）は十分か？' },
+  { group: 'エントリー足', tag: 'MACD確認',   text: 'エントリー足のMACDで、ダイバージェンスまたはヒドゥンダイバージェンスが発生しているか？' },
+  { group: 'エントリー足', tag: 'RCI確認',    text: 'エントリー足のRCI（短期または短期＋中期）が±70ライン、または過去の反転ラインに到達し、反転の兆しがあるか？' },
+  { group: 'エントリー足', tag: 'ロールリバーサル', text: '直近高値／安値を抜けた後、その付近が支持線・抵抗帯として機能する「ロールリバーサル」の兆候があるか？' },
+  { group: 'エントリー足', tag: 'ラウンドナンバー', text: 'エントリー価格付近に「.00」「.50」などキリの良い価格（ラウンドナンバー）がないか確認したか？' },
+  { group: 'その他',     tag: '損切り位置', text: '直近の高値または安値付近など、明確な損切りラインを事前に決めているか？' },
+  { group: 'その他',     tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
 ];
+const CHECK_GROUPS = ['上位足', 'エントリー足', 'その他'];
 
 /* ============ ストレージ ============ */
 function loadTrades() {
@@ -526,39 +572,99 @@ themeToggle.addEventListener('click', () => {
 });
 applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 
-/* ============ チェックリスト描画 ============ */
+/* ============ チェックリスト描画（グループ別アコーディオン） ============ */
 const checklistEl = document.getElementById('checklist');
-CHECK_ITEMS.forEach((item, i) => {
-  const li = document.createElement('li');
-  li.innerHTML =
-    '<label>' +
-      '<input type="checkbox" data-idx="' + i + '">' +
-      '<span class="check-body">' +
-        '<span class="check-tag">' + item.tag + '</span><br>' +
-        '<span class="check-text">' + item.text + '</span>' +
-      '</span>' +
-    '</label>';
-  checklistEl.appendChild(li);
-});
-const checkboxes = Array.from(checklistEl.querySelectorAll('input[type="checkbox"]'));
+CHECK_GROUPS.forEach(groupName => {
+  const items = CHECK_ITEMS
+    .map((item, i) => ({ item, i }))
+    .filter(x => x.item.group === groupName);
+  if (items.length === 0) return;
 
-function getCheckStates() { return checkboxes.map(cb => cb.checked); }
-function updateCheckUI() {
-  const n = getCheckStates().filter(Boolean).length;
-  const total = CHECK_ITEMS.length;
-  document.getElementById('checkCount').textContent = n + ' / ' + total;
-  const fill = document.getElementById('progressFill');
-  fill.style.width = (n / total * 100) + '%';
-  fill.classList.toggle('complete', n === total);
-  const hint = document.getElementById('saveHint');
-  hint.textContent = n === total
-    ? '✔ 全項目チェック済み — 根拠は揃っています'
-    : 'チェックリスト: ' + n + ' / ' + total;
-  hint.classList.toggle('ok', n === total);
+  const details = document.createElement('details');
+  details.className = 'checklist-group';
+  details.open = true;
+
+  const summary = document.createElement('summary');
+  summary.innerHTML =
+    '<span class="group-name">' + groupName + '</span>' +
+    '<span class="group-count" data-group-count="' + groupName + '">0 / ' + items.length + '</span>';
+  details.appendChild(summary);
+
+  const ul = document.createElement('ul');
+  ul.className = 'checklist';
+  items.forEach(({ item, i }) => {
+    const li = document.createElement('li');
+    li.dataset.idx = i;
+    li.innerHTML =
+      '<label>' +
+        '<span class="check-body">' +
+          '<span class="check-tag">' + item.tag + '</span><br>' +
+          '<span class="check-text">' + item.text + '</span>' +
+        '</span>' +
+        '<span class="check-okng">' +
+          '<button type="button" class="check-btn ok" data-idx="' + i + '" data-value="ok">OK</button>' +
+          '<button type="button" class="check-btn ng" data-idx="' + i + '" data-value="ng">NG</button>' +
+        '</span>' +
+      '</label>';
+    ul.appendChild(li);
+  });
+  details.appendChild(ul);
+  checklistEl.appendChild(details);
+});
+
+/* 各項目の状態: 'ok' | 'ng' | null（未選択） */
+let checkStates = CHECK_ITEMS.map(() => null);
+
+function getCheckStates() { return checkStates.slice(); }
+function setCheckState(idx, value) {
+  checkStates[idx] = checkStates[idx] === value ? null : value;
+  const li = checklistEl.querySelector('li[data-idx="' + idx + '"]');
+  if (li) {
+    li.dataset.state = checkStates[idx] || '';
+    li.querySelectorAll('.check-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === checkStates[idx]);
+    });
+  }
+  updateCheckUI();
 }
-checkboxes.forEach(cb => cb.addEventListener('change', updateCheckUI));
+checklistEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.check-btn');
+  if (!btn) return;
+  setCheckState(Number(btn.dataset.idx), btn.dataset.value);
+});
+
+function updateCheckUI() {
+  const states = getCheckStates();
+  const okCount = states.filter(s => s === 'ok').length;
+  const ngCount = states.filter(s => s === 'ng').length;
+  const total = CHECK_ITEMS.length;
+  document.getElementById('checkCount').textContent = okCount + ' / ' + total +
+    (ngCount ? '（NG ' + ngCount + '）' : '');
+  CHECK_GROUPS.forEach(groupName => {
+    const idxs = CHECK_ITEMS.map((item, i) => ({ item, i })).filter(x => x.item.group === groupName);
+    const done = idxs.filter(x => states[x.i] === 'ok').length;
+    const el = checklistEl.querySelector('[data-group-count="' + groupName + '"]');
+    if (el) el.textContent = done + ' / ' + idxs.length;
+  });
+  const fill = document.getElementById('progressFill');
+  fill.style.width = (okCount / total * 100) + '%';
+  fill.classList.toggle('complete', okCount === total);
+  const hint = document.getElementById('saveHint');
+  if (ngCount > 0) {
+    hint.textContent = '⚠ NG項目: ' + ngCount + ' 件';
+  } else if (okCount === total) {
+    hint.textContent = '✔ 全項目OK — 根拠は揃っています';
+  } else {
+    hint.textContent = 'チェックリスト: OK ' + okCount + ' / ' + total;
+  }
+  hint.classList.toggle('ok', okCount === total);
+}
 document.getElementById('resetChecks').addEventListener('click', () => {
-  checkboxes.forEach(cb => cb.checked = false);
+  checkStates = CHECK_ITEMS.map(() => null);
+  checklistEl.querySelectorAll('li[data-idx]').forEach(li => {
+    li.dataset.state = '';
+    li.querySelectorAll('.check-btn').forEach(btn => btn.classList.remove('active'));
+  });
   updateCheckUI();
 });
 updateCheckUI();
@@ -587,13 +693,13 @@ let pendingSave = null;
 document.getElementById('tradeForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const checks = getCheckStates();
-  const unchecked = CHECK_ITEMS.filter((_, i) => !checks[i]);
-  if (unchecked.length > 0) {
+  const ngItems = CHECK_ITEMS.filter((_, i) => checks[i] === 'ng');
+  if (ngItems.length > 0) {
     const ul = document.getElementById('warnList');
     ul.innerHTML = '';
-    unchecked.forEach(item => {
+    ngItems.forEach(item => {
       const li = document.createElement('li');
-      li.textContent = '□ 【' + item.tag + '】' + item.text;
+      li.textContent = '✕ 【' + item.tag + '】' + item.text;
       ul.appendChild(li);
     });
     pendingSave = checks;
@@ -622,6 +728,7 @@ function doSave(checks) {
     : pairSelect.value;
   const trade = {
     id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    entryPattern: document.getElementById('fEntryPattern').value,
     datetime:   document.getElementById('fDatetime').value,
     pair:       pair,
     style:      document.getElementById('fStyle').value,
@@ -644,10 +751,9 @@ function doSave(checks) {
   pairCustom.classList.remove('show');
   pairCustom.required = false;
   setDatetimeNow();
-  checkboxes.forEach(cb => cb.checked = false);
-  updateCheckUI();
+  document.getElementById('resetChecks').click();
   renderAll();
-  showToast('✔ トレードを記録しました（チェック ' + checks.filter(Boolean).length + '/' + CHECK_ITEMS.length + '）');
+  showToast('✔ トレードを記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
 }
 
 /* ============ 統計サマリー ============ */
@@ -659,7 +765,7 @@ function renderStats() {
   const totalPips = closed.reduce((s, t) => s + t.pips, 0);
   const avgPips = closed.length ? totalPips / closed.length : 0;
   const checkRates = trades.map(t =>
-    Array.isArray(t.checks) ? t.checks.filter(Boolean).length / CHECK_ITEMS.length : 1);
+    Array.isArray(t.checks) ? t.checks.filter(v => v === 'ok').length / CHECK_ITEMS.length : 1);
   const avgCheck = checkRates.length
     ? checkRates.reduce((s, r) => s + r, 0) / checkRates.length * 100 : 0;
 
@@ -710,10 +816,10 @@ function renderList() {
   }
 
   listEl.innerHTML = trades.map(t => {
-    const nChecks = Array.isArray(t.checks) ? t.checks.filter(Boolean).length : null;
+    const nChecks = Array.isArray(t.checks) ? t.checks.filter(v => v === 'ok').length : null;
     const full = nChecks === CHECK_ITEMS.length;
     const missed = Array.isArray(t.checks)
-      ? CHECK_ITEMS.filter((_, i) => !t.checks[i]).map(c => c.tag) : [];
+      ? CHECK_ITEMS.filter((_, i) => t.checks[i] === 'ng').map(c => c.tag) : [];
     const pipsCls = typeof t.pips === 'number' ? (t.pips > 0 ? 'pos' : t.pips < 0 ? 'neg' : '') : '';
     const pipsStr = typeof t.pips === 'number' ? (t.pips > 0 ? '+' : '') + t.pips : '未確定';
     return (
@@ -721,6 +827,7 @@ function renderList() {
         '<div class="record-head">' +
           '<span class="datetime">' + fmtDatetime(t.datetime) + '</span>' +
           '<span class="badge pair">' + esc(t.pair) + '</span>' +
+          (t.entryPattern ? '<span class="badge style">' + esc(t.entryPattern) + '</span>' : '') +
           '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
             (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>' +
           '<span class="badge style">' + esc(t.style) + '</span>' +
@@ -739,7 +846,7 @@ function renderList() {
           '<div class="kv"><div class="k">pips / 損益</div><div class="v ' + pipsCls + '">' + esc(pipsStr) + '</div></div>' +
         '</div>' +
         (missed.length
-          ? '<div class="record-checks-detail">未チェック: ' +
+          ? '<div class="record-checks-detail">NG項目: ' +
             missed.map(m => '<span class="miss">' + esc(m) + '</span>').join('') + '</div>'
           : '') +
         (t.notes ? '<div class="record-notes">' + esc(t.notes) + '</div>' : '') +
@@ -779,7 +886,7 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
 
 /* ============ CSV ============ */
 const CSV_HEADERS = [
-  'id', 'datetime', 'pair', 'style', 'tfHigher', 'tfEntry', 'direction',
+  'id', 'entryPattern', 'datetime', 'pair', 'style', 'tfHigher', 'tfEntry', 'direction',
   'entryPrice', 'slPrice', 'exitPrice', 'pips', 'notes',
   ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
   'createdAt',
@@ -797,9 +904,9 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   trades.forEach(t => {
     const checks = Array.isArray(t.checks) ? t.checks : [];
     rows.push([
-      t.id, t.datetime, t.pair, t.style, t.tfHigher, t.tfEntry, t.direction,
+      t.id, t.entryPattern, t.datetime, t.pair, t.style, t.tfHigher, t.tfEntry, t.direction,
       t.entryPrice, t.slPrice, t.exitPrice, t.pips, t.notes,
-      ...CHECK_ITEMS.map((_, i) => checks[i] ? 1 : 0),
+      ...CHECK_ITEMS.map((_, i) => checks[i] === 'ok' ? 'ok' : checks[i] === 'ng' ? 'ng' : ''),
       t.createdAt,
     ].map(csvField).join(','));
   });
@@ -868,6 +975,7 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
         if (existing.has(id)) { skipped++; return; }
         trades.push({
           id,
+          entryPattern: get(r, 'entryPattern'),
           datetime:   get(r, 'datetime'),
           pair:       get(r, 'pair'),
           style:      get(r, 'style'),
@@ -879,7 +987,12 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           exitPrice:  numOf(get(r, 'exitPrice')),
           pips:       numOf(get(r, 'pips')),
           notes:      get(r, 'notes'),
-          checks:     CHECK_ITEMS.map((_, i) => get(r, 'check' + (i + 1)) === '1'),
+          checks:     CHECK_ITEMS.map((_, i) => {
+            const v = get(r, 'check' + (i + 1));
+            if (v === 'ok' || v === '1') return 'ok';
+            if (v === 'ng') return 'ng';
+            return null;
+          }),
           createdAt:  get(r, 'createdAt') || new Date().toISOString(),
         });
         existing.add(id);
@@ -916,6 +1029,7 @@ const tabPanels = {
   checklist: document.getElementById('tabPanel-checklist'),
   form:      document.getElementById('tabPanel-form'),
   list:      document.getElementById('tabPanel-list'),
+  stats:     document.getElementById('tabPanel-stats'),
 };
 function setActiveTab(name) {
   if (!tabPanels[name]) name = 'checklist';
