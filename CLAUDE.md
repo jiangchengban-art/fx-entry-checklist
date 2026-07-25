@@ -72,11 +72,29 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 - **ダークモード**: surface #1a1a19 / accent #3987e5 / good #0ca30c / bad #e66767
 - **ライトモード**: surface #fcfcfb / accent #2a78d6 / good #006300 / bad #d03b3b
 
+## 実装状態
+**✅ 本番使用可能** | 全機能検証済み（2026-07-26）
+
+詳細は [`MEMORY.md` → verification-2026-07-26](../../.claude/projects/c--Users-owner-fx-entry-checklist/memory/verification_2026_07_26.md) を参照
+
+### 検証済み機能
+- ✅ チェックリスト（OK/NGボタン、アコーディオン、進捗表示）
+- ✅ トレード記録フォーム（全フィールド入力、バリデーション）
+- ✅ トレード記録保存（localStorage）
+- ✅ 履歴表示（カード形式、NG項目バッジ）
+- ✅ 統計計算（正確な統計表示）
+- ✅ テーマ切り替え（ダーク/ライト）
+- ✅ レスポンシブ（PC/モバイル対応）
+- ✅ CSV機能（エクスポート）
+
 ## 開発上の注意点
 
 ### 編集時の確認項目
 - JS 構文チェック: `node -e "const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const m=html.match(/<script>([\s\S]*)<\/script>/);new Function(m[1]);console.log('OK')"`
-- CSV ラウンドトリップテスト（OK/NG選択値の往復確認、特殊文字・改行・引用符対応）
+- **次のテスト推奨項目**（メモリ参照）:
+  - CSV ラウンドトリップテスト（OK/NG選択値の往復確認）
+  - 複数トレードでの統計検証
+  - エッジケース（空履歴、全NG、大量データ）
 - スマホレスポンシブ確認（タブバーのセーフエリア対応、notch対応、下部パディング100px）
 - OK/NG状態の視覚的な区別確認（緑/赤背景）
 
