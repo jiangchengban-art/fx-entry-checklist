@@ -174,6 +174,27 @@
   }
   .btn-ghost:hover { color: var(--ink-2); background: var(--surface-2); }
 
+  /* ============ インジケーター解説 ============ */
+  .guide-groups { display: flex; flex-direction: column; gap: 10px; }
+  .guide-groups ul.guide-list { list-style: none; padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .guide-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .guide-item .guide-name {
+    font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .guide-block { margin-top: 10px; }
+  .guide-block:first-of-type { margin-top: 0; }
+  .guide-block .guide-label {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    border-radius: 4px; padding: 2px 8px; margin-bottom: 5px;
+  }
+  .guide-block.method .guide-label { color: var(--good); background: var(--good-soft); }
+  .guide-block.basics .guide-label { color: var(--accent); background: var(--accent-soft); }
+  .guide-block .guide-text { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
+
   /* ============ フォーム ============ */
   .form-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -353,7 +374,7 @@
   <!-- ============ ② トレード記録フォーム ============ -->
   <section class="card tab-panel" id="tabPanel-form">
     <h2><span class="step-badge">2</span> トレード記録フォーム</h2>
-    <div class="section-note">決済価格・獲得pipsは未確定なら空欄のままで保存できます。</div>
+    <div class="section-note">エグジット日時は未確定なら空欄のままで保存できます。</div>
     <form id="tradeForm" autocomplete="off">
       <div class="form-grid">
         <div class="form-field">
@@ -367,7 +388,7 @@
           </select>
         </div>
         <div class="form-field">
-          <label for="fDatetime">日時<span class="req">*</span></label>
+          <label for="fDatetime">エントリー日時<span class="req">*</span></label>
           <input type="datetime-local" id="fDatetime" required>
         </div>
         <div class="form-field">
@@ -387,30 +408,33 @@
           <input type="text" id="pairCustom" placeholder="例: CAD/JPY">
         </div>
         <div class="form-field">
-          <label for="fStyle">トレードスタイル<span class="req">*</span></label>
-          <select id="fStyle" required>
-            <option value="">選択してください</option>
-            <option>スキャルピング</option>
-            <option>デイトレード</option>
-            <option>スイング</option>
-          </select>
+          <label for="fExitDatetime">エグジット日時</label>
+          <input type="datetime-local" id="fExitDatetime">
         </div>
         <div class="form-field">
           <label for="fTfHigher">上位足<span class="req">*</span></label>
-          <input type="text" id="fTfHigher" list="tfList" placeholder="例: 1時間足" required>
+          <select id="fTfHigher" required>
+            <option value="">選択してください</option>
+            <option>日足</option>
+            <option>4時間足</option>
+            <option>1時間足</option>
+            <option>15分足</option>
+            <option>5分足</option>
+            <option>1分足</option>
+          </select>
         </div>
         <div class="form-field">
           <label for="fTfEntry">エントリー足<span class="req">*</span></label>
-          <input type="text" id="fTfEntry" list="tfList" placeholder="例: 5分足" required>
+          <select id="fTfEntry" required>
+            <option value="">選択してください</option>
+            <option>日足</option>
+            <option>4時間足</option>
+            <option>1時間足</option>
+            <option>15分足</option>
+            <option>5分足</option>
+            <option>1分足</option>
+          </select>
         </div>
-        <datalist id="tfList">
-          <option value="日足"></option>
-          <option value="4時間足"></option>
-          <option value="1時間足"></option>
-          <option value="15分足"></option>
-          <option value="5分足"></option>
-          <option value="1分足"></option>
-        </datalist>
         <div class="form-field">
           <label for="fDirection">売買方向<span class="req">*</span></label>
           <select id="fDirection" required>
@@ -418,22 +442,6 @@
             <option value="long">ロング</option>
             <option value="short">ショート</option>
           </select>
-        </div>
-        <div class="form-field">
-          <label for="fEntryPrice">エントリー価格<span class="req">*</span></label>
-          <input type="number" id="fEntryPrice" step="any" placeholder="例: 150.250" required>
-        </div>
-        <div class="form-field">
-          <label for="fSlPrice">損切り価格（逆指値）<span class="req">*</span></label>
-          <input type="number" id="fSlPrice" step="any" placeholder="例: 150.000" required>
-        </div>
-        <div class="form-field">
-          <label for="fExitPrice">決済価格<span class="opt">任意（後で確定可）</span></label>
-          <input type="number" id="fExitPrice" step="any" placeholder="未決済なら空欄">
-        </div>
-        <div class="form-field">
-          <label for="fPips">獲得pips / 損益<span class="opt">任意</span></label>
-          <input type="number" id="fPips" step="any" placeholder="例: +25.3 / -10">
         </div>
         <div class="form-field full">
           <label for="fNotes">振り返り・備考</label>
@@ -464,8 +472,15 @@
   <!-- ============ ④ 統計サマリー ============ -->
   <section class="card tab-panel" id="tabPanel-stats">
     <h2><span class="step-badge">4</span> 統計サマリー</h2>
-    <div class="section-note">決済済み（pips入力済み）のトレードを対象に集計しています。</div>
+    <div class="section-note">記録したトレードのチェックリスト遵守状況を集計しています。</div>
     <div class="stats-grid" id="statsGrid"></div>
+  </section>
+
+  <!-- ============ ⑤ インジケーター解説 ============ -->
+  <section class="card tab-panel" id="tabPanel-guide">
+    <h2>📖 インジケーター解説</h2>
+    <div class="section-note">チェック作業中に指標や相場概念の見方を確認できます。各項目は「この手法での確認ポイント」→「基礎知識」の順で表示します。</div>
+    <div class="guide-groups" id="guideList"></div>
   </section>
 
 </div>
@@ -483,6 +498,9 @@
   </button>
   <button class="tab-btn" type="button" data-tab="stats">
     <span class="tab-icon">📊</span><span class="tab-label">統計</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="guide">
+    <span class="tab-icon">📖</span><span class="tab-label">解説</span>
   </button>
 </nav>
 
@@ -538,6 +556,84 @@ const CHECK_ITEMS = [
   { group: 'その他',     tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
 ];
 const CHECK_GROUPS = ['上位足', 'エントリー足', 'その他'];
+
+/* ============ インジケーター解説データ ============ */
+/* method = この手法での確認ポイント（チェック項目の判断基準が土台）
+   basics = 一般的な指標・概念の基礎知識 */
+const INDICATOR_GROUPS = [
+  'トレンド系インジケーター',
+  'オシレーター系インジケーター',
+  'プライスアクション・チャート概念',
+  'リスク管理・メンタル',
+];
+const INDICATOR_INFO = [
+  {
+    group: 'トレンド系インジケーター',
+    name: 'EMA（20・30・40）',
+    method: 'エントリー足のEMA（20・30・40）が「20 → 30 → 40」の順に並び（パーフェクトオーダー）、方向性を示しているかを確認する。3本が密集・横ばいの状態はトレンドが不明瞭なので見送る。',
+    basics: 'EMA（指数平滑移動平均線）は直近の価格に大きな比重を置いた移動平均で、単純移動平均（SMA）より値動きへの反応が速い。短期・中期・長期の順に上から並べば上昇、下から並べば下降トレンドと判断でき、線同士の間隔が広がるほど勢いが強い。価格がEMAに近づいた「押し目・戻り」がエントリーの候補になりやすい。',
+  },
+  {
+    group: 'オシレーター系インジケーター',
+    name: 'RCI（順位相関指数）',
+    method: '上位足では RCI が上限・下限・中間のどこにあるか、向き、短期〜長期どの線が到達しているかを確認する。エントリー足では短期（または短期＋中期）が ±70 ライン、または過去に反転した水準に到達し、反転の兆しが出ているかを見る。',
+    basics: 'RCI（Rank Correlation Index）は「時間」と「価格」の順位相関を -100〜+100 で表す指標。+80 前後で買われすぎ、-80 前後で売られすぎとされ、天井・底の目安になる。短期・中期・長期の複数期間を重ねて表示し、短期が先行して反転→中期・長期が追随する流れでトレンド転換を読む。曲線の「向き」と「到達位置」の両方を見るのがポイント。',
+  },
+  {
+    group: 'オシレーター系インジケーター',
+    name: 'MACD',
+    method: '上位足・エントリー足それぞれで、ダイバージェンス（逆行）またはヒドゥンダイバージェンスが発生しているかを確認する。ダイバージェンスは転換、ヒドゥンダイバージェンスはトレンド継続の根拠になる。',
+    basics: 'MACD は2本の移動平均の差（MACDライン）とその平滑線（シグナル）、両者の差（ヒストグラム）で構成される。MACDがシグナルを上抜け／下抜けするクロスが基本シグナル。価格が高値を更新したのにMACDが切り下がる「ダイバージェンス」は転換の予兆、価格が安値を切り上げる中でMACDが安値を切り下げる「ヒドゥンダイバージェンス」は既存トレンドの継続を示唆する。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: 'トレンド／レンジ認識',
+    method: '上位足が上昇トレンド・下降トレンド・レンジ・もみ合いのどれに当たるかを把握する。トレンド方向に沿ったエントリーを基本とし、方向が曖昧なもみ合いは避ける。',
+    basics: 'ダウ理論では、高値・安値がともに切り上がっていれば上昇トレンド、ともに切り下がっていれば下降トレンド、一定の値幅で往復していればレンジと判断する。トレンドは明確な転換サインが出るまで継続すると考えるのが基本。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: '環境認識・値動きの推移',
+    method: '直近の値動きが「どういう流れで今の価格に到達してきたか」を確認し、上位足のトレンド方向を把握してから下位足のエントリーを検討する。',
+    basics: 'マルチタイムフレーム分析では、上位足で相場の大きな方向（環境）を把握し、下位足でエントリーのタイミングを計る。上位足の流れに逆らわないことで、優位性の高い方向にだけ仕掛けられる。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: '高値安値ライン（サポート・レジスタンス）',
+    method: '上位足で、過去に反発したポイントや大きく値が動くきっかけになった高値・安値のラインを引いて確認する。反発ポイント付近は利確・損切り・反転の判断材料になる。',
+    basics: '過去に何度も反発した価格帯は、多くの市場参加者が意識するサポート（下値支持）・レジスタンス（上値抵抗）として機能する。一度抜けると、サポートがレジスタンスに（またはその逆に）役割が入れ替わる「レジサポ転換」が起きやすい。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: 'ロールリバーサル',
+    method: '直近の高値／安値を抜けた後、そのブレイクした水準付近が今度は支持線・抵抗帯として機能する兆候（＝ロールリバーサル）があるかを確認する。',
+    basics: 'ロールリバーサルは、ブレイクした水準まで一度戻って（リテストして）反発する動きで、レジサポ転換の一種。ブレイクの「だまし」でないことを確認できるため、順張りエントリーの根拠として使われる。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: 'ラウンドナンバー',
+    method: 'エントリー価格の付近に「.00」「.50」などキリの良い価格（ラウンドナンバー）がないかを確認する。近くにある場合は反発・跳ね返りに注意する。',
+    basics: 'ラウンドナンバーは心理的な節目として意識されやすく、指値・逆指値注文が集中する傾向がある。そのため反発や一時的な足踏みが起きやすく、利確目標や損切りの置き所としても機能する。',
+  },
+  {
+    group: 'プライスアクション・チャート概念',
+    name: 'ボラティリティ',
+    method: '相場に十分な勢いや値幅（ボラティリティ）があり、もみ合い（レンジ）相場になっていないかを確認する。値動きが乏しい時間帯・局面ではエントリーを見送る。',
+    basics: 'ボラティリティは価格変動の大きさを指す。ボラティリティが低いと値幅が取りづらく、だましやレンジに巻き込まれやすい。取引が活発になる時間帯（東京・ロンドン・NY時間の重なりなど）や、経済指標前後の急変動にも注意する。',
+  },
+  {
+    group: 'リスク管理・メンタル',
+    name: '損切り位置',
+    method: '直近の高値または安値付近など、明確な損切りライン（逆指値）をエントリー前に決めておく。損切り位置が曖昧なままエントリーしない。',
+    basics: '損切りは資金を守る最優先のルール。「どこまで逆行したら手法の前提が崩れるか」を基準に、根拠のある水準（直近高安やサポレジの外側）に置く。1トレードの損失を資金の一定割合（例：1〜2%）以内に抑えると、連敗しても致命傷を避けられる。',
+  },
+  {
+    group: 'リスク管理・メンタル',
+    name: 'マインド',
+    method: '焦って毎日稼ごうとしていないか、自信のあるパターンが来るまで待てたかを確認する。ルール外の衝動的なエントリーを避ける。',
+    basics: 'トレードの成績は手法だけでなくメンタルに大きく左右される。「取り返そう」とするリベンジトレードや、機会損失を恐れた飛び乗りは負けにつながりやすい。優位性のある場面だけを待つ「待つも相場」の姿勢が、長期的な安定につながる。',
+  },
+];
 
 /* ============ ストレージ ============ */
 function loadTrades() {
@@ -610,6 +706,42 @@ CHECK_GROUPS.forEach(groupName => {
   });
   details.appendChild(ul);
   checklistEl.appendChild(details);
+});
+
+/* ============ インジケーター解説描画（グループ別アコーディオン） ============ */
+const guideEl = document.getElementById('guideList');
+INDICATOR_GROUPS.forEach(groupName => {
+  const items = INDICATOR_INFO.filter(x => x.group === groupName);
+  if (items.length === 0) return;
+
+  const details = document.createElement('details');
+  details.className = 'checklist-group';
+
+  const summary = document.createElement('summary');
+  summary.innerHTML =
+    '<span class="group-name">' + esc(groupName) + '</span>' +
+    '<span class="group-count">' + items.length + ' 項目</span>';
+  details.appendChild(summary);
+
+  const ul = document.createElement('ul');
+  ul.className = 'guide-list';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'guide-item';
+    li.innerHTML =
+      '<div class="guide-name">' + esc(item.name) + '</div>' +
+      '<div class="guide-block method">' +
+        '<span class="guide-label">この手法での確認ポイント</span>' +
+        '<div class="guide-text">' + esc(item.method) + '</div>' +
+      '</div>' +
+      '<div class="guide-block basics">' +
+        '<span class="guide-label">基礎知識</span>' +
+        '<div class="guide-text">' + esc(item.basics) + '</div>' +
+      '</div>';
+    ul.appendChild(li);
+  });
+  details.appendChild(ul);
+  guideEl.appendChild(details);
 });
 
 /* 各項目の状態: 'ok' | 'ng' | null（未選択） */
@@ -717,11 +849,6 @@ document.getElementById('warnProceed').addEventListener('click', () => {
   if (pendingSave) { doSave(pendingSave); pendingSave = null; }
 });
 
-function numOrNull(id) {
-  const v = document.getElementById(id).value.trim();
-  return v === '' ? null : Number(v);
-}
-
 function doSave(checks) {
   const pair = pairSelect.value === '__custom__'
     ? pairCustom.value.trim()
@@ -730,15 +857,11 @@ function doSave(checks) {
     id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
     entryPattern: document.getElementById('fEntryPattern').value,
     datetime:   document.getElementById('fDatetime').value,
+    exitDatetime: document.getElementById('fExitDatetime').value,
     pair:       pair,
-    style:      document.getElementById('fStyle').value,
-    tfHigher:   document.getElementById('fTfHigher').value.trim(),
-    tfEntry:    document.getElementById('fTfEntry').value.trim(),
+    tfHigher:   document.getElementById('fTfHigher').value,
+    tfEntry:    document.getElementById('fTfEntry').value,
     direction:  document.getElementById('fDirection').value,
-    entryPrice: numOrNull('fEntryPrice'),
-    slPrice:    numOrNull('fSlPrice'),
-    exitPrice:  numOrNull('fExitPrice'),
-    pips:       numOrNull('fPips'),
     notes:      document.getElementById('fNotes').value.trim(),
     checks:     checks.slice(),
     createdAt:  new Date().toISOString(),
@@ -759,11 +882,6 @@ function doSave(checks) {
 /* ============ 統計サマリー ============ */
 function renderStats() {
   const trades = loadTrades();
-  const closed = trades.filter(t => typeof t.pips === 'number' && !Number.isNaN(t.pips));
-  const wins = closed.filter(t => t.pips > 0).length;
-  const decided = closed.filter(t => t.pips !== 0).length;
-  const totalPips = closed.reduce((s, t) => s + t.pips, 0);
-  const avgPips = closed.length ? totalPips / closed.length : 0;
   const checkRates = trades.map(t =>
     Array.isArray(t.checks) ? t.checks.filter(v => v === 'ok').length / CHECK_ITEMS.length : 1);
   const avgCheck = checkRates.length
@@ -771,11 +889,6 @@ function renderStats() {
 
   const tiles = [
     { label: 'トレード数', value: String(trades.length), unit: '件' },
-    { label: '勝率（決済済）', value: decided ? (wins / decided * 100).toFixed(1) : '–', unit: '%' },
-    { label: '合計pips', value: closed.length ? (totalPips > 0 ? '+' : '') + round2(totalPips) : '–',
-      cls: !closed.length ? '' : totalPips > 0 ? 'pos' : totalPips < 0 ? 'neg' : '' },
-    { label: '平均pips', value: closed.length ? (avgPips > 0 ? '+' : '') + round2(avgPips) : '–',
-      cls: !closed.length ? '' : avgPips > 0 ? 'pos' : avgPips < 0 ? 'neg' : '' },
     { label: 'チェック遵守率', value: trades.length ? avgCheck.toFixed(0) : '–', unit: '%' },
   ];
   document.getElementById('statsGrid').innerHTML = tiles.map(t =>
@@ -802,7 +915,6 @@ function fmtDatetime(v) {
   return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) +
     ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
-function fmtNum(v) { return (v === null || v === undefined || Number.isNaN(v)) ? '—' : String(v); }
 
 function renderList() {
   const trades = loadTrades().slice().sort((a, b) =>
@@ -820,8 +932,6 @@ function renderList() {
     const full = nChecks === CHECK_ITEMS.length;
     const missed = Array.isArray(t.checks)
       ? CHECK_ITEMS.filter((_, i) => t.checks[i] === 'ng').map(c => c.tag) : [];
-    const pipsCls = typeof t.pips === 'number' ? (t.pips > 0 ? 'pos' : t.pips < 0 ? 'neg' : '') : '';
-    const pipsStr = typeof t.pips === 'number' ? (t.pips > 0 ? '+' : '') + t.pips : '未確定';
     return (
       '<div class="record-card">' +
         '<div class="record-head">' +
@@ -830,7 +940,6 @@ function renderList() {
           (t.entryPattern ? '<span class="badge style">' + esc(t.entryPattern) + '</span>' : '') +
           '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
             (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>' +
-          '<span class="badge style">' + esc(t.style) + '</span>' +
           (nChecks !== null
             ? '<span class="badge ' + (full ? 'checks-full' : 'checks-part') + '">' +
               (full ? '✔ ' : '⚠ ') + nChecks + '/' + CHECK_ITEMS.length + '</span>'
@@ -840,10 +949,7 @@ function renderList() {
         '</div>' +
         '<div class="record-body">' +
           kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
-          kv('エントリー', fmtNum(t.entryPrice)) +
-          kv('損切り', fmtNum(t.slPrice)) +
-          kv('決済', fmtNum(t.exitPrice)) +
-          '<div class="kv"><div class="k">pips / 損益</div><div class="v ' + pipsCls + '">' + esc(pipsStr) + '</div></div>' +
+          (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
         '</div>' +
         (missed.length
           ? '<div class="record-checks-detail">NG項目: ' +
@@ -886,8 +992,8 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
 
 /* ============ CSV ============ */
 const CSV_HEADERS = [
-  'id', 'entryPattern', 'datetime', 'pair', 'style', 'tfHigher', 'tfEntry', 'direction',
-  'entryPrice', 'slPrice', 'exitPrice', 'pips', 'notes',
+  'id', 'entryPattern', 'datetime', 'exitDatetime', 'pair', 'tfHigher', 'tfEntry', 'direction',
+  'notes',
   ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
   'createdAt',
 ];
@@ -904,8 +1010,8 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   trades.forEach(t => {
     const checks = Array.isArray(t.checks) ? t.checks : [];
     rows.push([
-      t.id, t.entryPattern, t.datetime, t.pair, t.style, t.tfHigher, t.tfEntry, t.direction,
-      t.entryPrice, t.slPrice, t.exitPrice, t.pips, t.notes,
+      t.id, t.entryPattern, t.datetime, t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction,
+      t.notes,
       ...CHECK_ITEMS.map((_, i) => checks[i] === 'ok' ? 'ok' : checks[i] === 'ng' ? 'ng' : ''),
       t.createdAt,
     ].map(csvField).join(','));
@@ -964,7 +1070,6 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
         showToast('⚠ ヘッダーが一致しません。このツールでエクスポートしたCSVを使用してください');
         return;
       }
-      const numOf = v => (v === '' || v == null) ? null : (Number.isNaN(Number(v)) ? null : Number(v));
       const get = (r, key) => idx[key] >= 0 ? (r[idx[key]] ?? '') : '';
       const trades = loadTrades();
       const existing = new Set(trades.map(t => t.id));
@@ -977,15 +1082,11 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           id,
           entryPattern: get(r, 'entryPattern'),
           datetime:   get(r, 'datetime'),
+          exitDatetime: get(r, 'exitDatetime'),
           pair:       get(r, 'pair'),
-          style:      get(r, 'style'),
           tfHigher:   get(r, 'tfHigher'),
           tfEntry:    get(r, 'tfEntry'),
           direction:  get(r, 'direction'),
-          entryPrice: numOf(get(r, 'entryPrice')),
-          slPrice:    numOf(get(r, 'slPrice')),
-          exitPrice:  numOf(get(r, 'exitPrice')),
-          pips:       numOf(get(r, 'pips')),
           notes:      get(r, 'notes'),
           checks:     CHECK_ITEMS.map((_, i) => {
             const v = get(r, 'check' + (i + 1));
@@ -1030,6 +1131,7 @@ const tabPanels = {
   form:      document.getElementById('tabPanel-form'),
   list:      document.getElementById('tabPanel-list'),
   stats:     document.getElementById('tabPanel-stats'),
+  guide:     document.getElementById('tabPanel-guide'),
 };
 function setActiveTab(name) {
   if (!tabPanels[name]) name = 'checklist';
