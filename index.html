@@ -214,8 +214,30 @@
     outline: 2px solid var(--accent); outline-offset: -1px;
   }
   .form-field textarea { resize: vertical; min-height: 90px; }
-  #pairCustom { margin-top: 6px; display: none; }
-  #pairCustom.show { display: block; }
+  #pairCustom, #alertPairCustom { margin-top: 6px; display: none; }
+  #pairCustom.show, #alertPairCustom.show { display: block; }
+  .result-toggle { display: flex; gap: 8px; }
+  .result-btn {
+    flex: 1; border-radius: 8px; padding: 11px 0; font-size: 13.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink-muted); transition: all 0.15s;
+  }
+  .result-btn:hover { background: var(--surface-2); }
+  .result-btn.entered.active { background: var(--good); border-color: var(--good); color: #fff; }
+  .result-btn.through.active { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
+  .result-btn.demo.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .result-btn.real.active { background: var(--good); border-color: var(--good); color: #fff; }
+  #directionField.hidden { display: none; }
+  .type-filter { display: flex; gap: 8px; margin-bottom: 14px; }
+  .type-filter-btn {
+    border-radius: 8px; padding: 6px 14px; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink-muted); transition: all 0.15s;
+  }
+  .type-filter-btn:hover { background: var(--surface-2); }
+  .type-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .badge.demo { background: var(--accent-soft); color: var(--accent); }
+  .badge.real { background: var(--good-soft); color: var(--good); }
   .form-footer { margin-top: 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .btn-primary {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
@@ -249,6 +271,8 @@
   .badge.style { background: var(--surface); color: var(--ink-2); border: 1px solid var(--border); }
   .badge.checks-full { background: var(--good-soft); color: var(--good); }
   .badge.checks-part { background: var(--warn-soft); color: var(--warn); }
+  .badge.entered { background: var(--good-soft); color: var(--good); }
+  .badge.through { background: var(--surface-2); color: var(--ink-muted); border: 1px solid var(--border); }
   .record-head .spacer { flex: 1; }
   .btn-delete {
     background: none; border: 1px solid var(--border); color: var(--ink-muted);
@@ -377,6 +401,48 @@
     <div class="section-note">エグジット日時は未確定なら空欄のままで保存できます。</div>
     <form id="tradeForm" autocomplete="off">
       <div class="form-grid">
+        <div class="form-field full">
+          <label>区分<span class="req">*</span></label>
+          <div class="result-toggle" id="tradeTypeToggle">
+            <button type="button" class="result-btn demo" data-value="demo">🔬 検証</button>
+            <button type="button" class="result-btn real" data-value="real">💰 リアル</button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="fAlertPair">アラート発生通貨ペア<span class="req">*</span></label>
+          <select id="fAlertPair" required>
+            <option value="">選択してください</option>
+            <option>USD/JPY</option>
+            <option>EUR/JPY</option>
+            <option>GBP/JPY</option>
+            <option>AUD/JPY</option>
+            <option>EUR/USD</option>
+            <option>GBP/USD</option>
+            <option>AUD/USD</option>
+            <option>GOLD (XAU/USD)</option>
+            <option value="__custom__">その他（自由入力）</option>
+          </select>
+          <input type="text" id="alertPairCustom" placeholder="例: CAD/JPY">
+        </div>
+        <div class="form-field">
+          <label for="fAlertTf">アラート発生時間足<span class="req">*</span></label>
+          <select id="fAlertTf" required>
+            <option value="">選択してください</option>
+            <option>日足</option>
+            <option>4時間足</option>
+            <option>1時間足</option>
+            <option>15分足</option>
+            <option>5分足</option>
+            <option>1分足</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label>判定<span class="req">*</span></label>
+          <div class="result-toggle" id="resultToggle">
+            <button type="button" class="result-btn entered" data-value="entered">✅ エントリーした</button>
+            <button type="button" class="result-btn through" data-value="through">⏭ スルーした</button>
+          </div>
+        </div>
         <div class="form-field">
           <label for="fEntryPattern">エントリーパターン<span class="req">*</span></label>
           <select id="fEntryPattern" required>
@@ -435,7 +501,7 @@
             <option>1分足</option>
           </select>
         </div>
-        <div class="form-field">
+        <div class="form-field" id="directionField">
           <label for="fDirection">売買方向<span class="req">*</span></label>
           <select id="fDirection" required>
             <option value="">選択してください</option>
@@ -459,6 +525,11 @@
   <section class="card tab-panel" id="tabPanel-list">
     <h2><span class="step-badge">3</span> 過去のトレード記録</h2>
     <div class="section-note">新しい記録が上に表示されます。</div>
+    <div class="type-filter" id="listTypeFilter">
+      <button type="button" class="type-filter-btn active" data-type="all">全体</button>
+      <button type="button" class="type-filter-btn" data-type="demo">🔬 検証</button>
+      <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
+    </div>
     <div class="list-toolbar">
       <button class="btn-ghost" type="button" id="exportCsv">⬇ CSVエクスポート</button>
       <button class="btn-ghost" type="button" id="importCsvBtn">⬆ CSVインポート</button>
@@ -473,6 +544,11 @@
   <section class="card tab-panel" id="tabPanel-stats">
     <h2><span class="step-badge">4</span> 統計サマリー</h2>
     <div class="section-note">記録したトレードのチェックリスト遵守状況を集計しています。</div>
+    <div class="type-filter" id="statsTypeFilter">
+      <button type="button" class="type-filter-btn active" data-type="all">全体</button>
+      <button type="button" class="type-filter-btn" data-type="demo">🔬 検証</button>
+      <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
+    </div>
     <div class="stats-grid" id="statsGrid"></div>
   </section>
 
@@ -811,6 +887,52 @@ pairSelect.addEventListener('change', () => {
   if (isCustom) pairCustom.focus();
 });
 
+const alertPairSelect = document.getElementById('fAlertPair');
+const alertPairCustom = document.getElementById('alertPairCustom');
+alertPairSelect.addEventListener('change', () => {
+  const isCustom = alertPairSelect.value === '__custom__';
+  alertPairCustom.classList.toggle('show', isCustom);
+  alertPairCustom.required = isCustom;
+  if (isCustom) alertPairCustom.focus();
+});
+
+/* ---- 区分（検証／リアル） ---- */
+const tradeTypeToggle = document.getElementById('tradeTypeToggle');
+let tradeTypeState = null;
+function setTradeTypeState(value) {
+  tradeTypeState = value;
+  tradeTypeToggle.querySelectorAll('.result-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.value === value);
+  });
+}
+tradeTypeToggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('.result-btn');
+  if (!btn) return;
+  setTradeTypeState(btn.dataset.value);
+});
+function getTradeType(t) { return t.tradeType === 'demo' ? 'demo' : 'real'; }
+
+/* ---- 判定（エントリー／スルー） ---- */
+const resultToggle = document.getElementById('resultToggle');
+const directionField = document.getElementById('directionField');
+const fDirection = document.getElementById('fDirection');
+let resultState = null;
+function setResultState(value) {
+  resultState = value;
+  resultToggle.querySelectorAll('.result-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.value === value);
+  });
+  const isThrough = value === 'through';
+  directionField.classList.toggle('hidden', isThrough);
+  fDirection.required = !isThrough;
+  if (isThrough) fDirection.value = '';
+}
+resultToggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('.result-btn');
+  if (!btn) return;
+  setResultState(btn.dataset.value);
+});
+
 function setDatetimeNow() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -824,6 +946,14 @@ let pendingSave = null;
 
 document.getElementById('tradeForm').addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!tradeTypeState) {
+    showToast('⚠ 「検証／リアル」を選択してください');
+    return;
+  }
+  if (!resultState) {
+    showToast('⚠ 「エントリーした／スルーした」を選択してください');
+    return;
+  }
   const checks = getCheckStates();
   const ngItems = CHECK_ITEMS.filter((_, i) => checks[i] === 'ng');
   if (ngItems.length > 0) {
@@ -853,15 +983,22 @@ function doSave(checks) {
   const pair = pairSelect.value === '__custom__'
     ? pairCustom.value.trim()
     : pairSelect.value;
+  const alertPair = alertPairSelect.value === '__custom__'
+    ? alertPairCustom.value.trim()
+    : alertPairSelect.value;
   const trade = {
     id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    tradeType:  tradeTypeState,
+    alertPair:  alertPair,
+    alertTf:    document.getElementById('fAlertTf').value,
+    result:     resultState,
     entryPattern: document.getElementById('fEntryPattern').value,
     datetime:   document.getElementById('fDatetime').value,
     exitDatetime: document.getElementById('fExitDatetime').value,
     pair:       pair,
     tfHigher:   document.getElementById('fTfHigher').value,
     tfEntry:    document.getElementById('fTfEntry').value,
-    direction:  document.getElementById('fDirection').value,
+    direction:  resultState === 'through' ? '' : document.getElementById('fDirection').value,
     notes:      document.getElementById('fNotes').value.trim(),
     checks:     checks.slice(),
     createdAt:  new Date().toISOString(),
@@ -873,22 +1010,55 @@ function doSave(checks) {
   document.getElementById('tradeForm').reset();
   pairCustom.classList.remove('show');
   pairCustom.required = false;
+  alertPairCustom.classList.remove('show');
+  alertPairCustom.required = false;
+  setTradeTypeState(null);
+  setResultState(null);
   setDatetimeNow();
   document.getElementById('resetChecks').click();
   renderAll();
-  showToast('✔ トレードを記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
+  showToast('✔ ' + (trade.result === 'entered' ? 'エントリー' : 'スルー') + 'を記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
 }
 
 /* ============ 統計サマリー ============ */
+/* ---- 区分フィルター（履歴・統計 共用） ---- */
+const TYPE_FILTER_KEY = 'mochipoyo_type_filter';
+let typeFilter = localStorage.getItem(TYPE_FILTER_KEY) || 'all';
+function filterByType(trades) {
+  if (typeFilter === 'all') return trades;
+  return trades.filter(t => getTradeType(t) === typeFilter);
+}
+function setTypeFilter(value) {
+  typeFilter = value;
+  localStorage.setItem(TYPE_FILTER_KEY, value);
+  document.querySelectorAll('.type-filter').forEach(el => {
+    el.querySelectorAll('.type-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === value);
+    });
+  });
+  renderAll();
+}
+document.querySelectorAll('.type-filter').forEach(el => {
+  el.addEventListener('click', (e) => {
+    const btn = e.target.closest('.type-filter-btn');
+    if (!btn) return;
+    setTypeFilter(btn.dataset.type);
+  });
+});
+
 function renderStats() {
-  const trades = loadTrades();
+  const trades = filterByType(loadTrades());
   const checkRates = trades.map(t =>
     Array.isArray(t.checks) ? t.checks.filter(v => v === 'ok').length / CHECK_ITEMS.length : 1);
   const avgCheck = checkRates.length
     ? checkRates.reduce((s, r) => s + r, 0) / checkRates.length * 100 : 0;
+  const enteredCount = trades.filter(t => t.result === 'entered').length;
+  const throughCount = trades.filter(t => t.result === 'through').length;
 
   const tiles = [
     { label: 'トレード数', value: String(trades.length), unit: '件' },
+    { label: 'エントリー数', value: String(enteredCount), unit: '件' },
+    { label: 'スルー数', value: String(throughCount), unit: '件' },
     { label: 'チェック遵守率', value: trades.length ? avgCheck.toFixed(0) : '–', unit: '%' },
   ];
   document.getElementById('statsGrid').innerHTML = tiles.map(t =>
@@ -917,7 +1087,7 @@ function fmtDatetime(v) {
 }
 
 function renderList() {
-  const trades = loadTrades().slice().sort((a, b) =>
+  const trades = filterByType(loadTrades()).slice().sort((a, b) =>
     (b.datetime || b.createdAt || '').localeCompare(a.datetime || a.createdAt || ''));
   const listEl = document.getElementById('recordList');
   document.getElementById('recordTotal').textContent = trades.length + ' 件';
@@ -932,14 +1102,21 @@ function renderList() {
     const full = nChecks === CHECK_ITEMS.length;
     const missed = Array.isArray(t.checks)
       ? CHECK_ITEMS.filter((_, i) => t.checks[i] === 'ng').map(c => c.tag) : [];
+    const isThrough = t.result === 'through';
     return (
       '<div class="record-card">' +
         '<div class="record-head">' +
           '<span class="datetime">' + fmtDatetime(t.datetime) + '</span>' +
+          '<span class="badge ' + getTradeType(t) + '">' +
+            (getTradeType(t) === 'demo' ? '🔬 検証' : '💰 リアル') + '</span>' +
+          '<span class="badge ' + (isThrough ? 'through' : 'entered') + '">' +
+            (isThrough ? '⏭ スルー' : '✅ エントリー') + '</span>' +
           '<span class="badge pair">' + esc(t.pair) + '</span>' +
           (t.entryPattern ? '<span class="badge style">' + esc(t.entryPattern) + '</span>' : '') +
-          '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
-            (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>' +
+          (!isThrough
+            ? '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
+              (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>'
+            : '') +
           (nChecks !== null
             ? '<span class="badge ' + (full ? 'checks-full' : 'checks-part') + '">' +
               (full ? '✔ ' : '⚠ ') + nChecks + '/' + CHECK_ITEMS.length + '</span>'
@@ -948,6 +1125,7 @@ function renderList() {
           '<button class="btn-delete" type="button" data-delete="' + esc(t.id) + '">削除</button>' +
         '</div>' +
         '<div class="record-body">' +
+          (t.alertPair || t.alertTf ? kv('アラート', esc(t.alertPair) + ' / ' + esc(t.alertTf)) : '') +
           kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
           (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
         '</div>' +
@@ -992,8 +1170,8 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
 
 /* ============ CSV ============ */
 const CSV_HEADERS = [
-  'id', 'entryPattern', 'datetime', 'exitDatetime', 'pair', 'tfHigher', 'tfEntry', 'direction',
-  'notes',
+  'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
+  'pair', 'tfHigher', 'tfEntry', 'direction', 'notes',
   ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
   'createdAt',
 ];
@@ -1010,8 +1188,8 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   trades.forEach(t => {
     const checks = Array.isArray(t.checks) ? t.checks : [];
     rows.push([
-      t.id, t.entryPattern, t.datetime, t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction,
-      t.notes,
+      t.id, getTradeType(t), t.alertPair, t.alertTf, t.result, t.entryPattern, t.datetime,
+      t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.notes,
       ...CHECK_ITEMS.map((_, i) => checks[i] === 'ok' ? 'ok' : checks[i] === 'ng' ? 'ng' : ''),
       t.createdAt,
     ].map(csvField).join(','));
@@ -1080,6 +1258,10 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
         if (existing.has(id)) { skipped++; return; }
         trades.push({
           id,
+          tradeType: get(r, 'tradeType') === 'demo' ? 'demo' : 'real',
+          alertPair: get(r, 'alertPair'),
+          alertTf:   get(r, 'alertTf'),
+          result:    get(r, 'result') === 'through' ? 'through' : (get(r, 'result') === 'entered' ? 'entered' : ''),
           entryPattern: get(r, 'entryPattern'),
           datetime:   get(r, 'datetime'),
           exitDatetime: get(r, 'exitDatetime'),
@@ -1151,6 +1333,11 @@ setActiveTab(localStorage.getItem(TAB_KEY) || 'checklist');
 
 /* ============ 初期描画 ============ */
 function renderAll() { renderStats(); renderList(); }
+document.querySelectorAll('.type-filter').forEach(el => {
+  el.querySelectorAll('.type-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === typeFilter);
+  });
+});
 renderAll();
 </script>
 </body>
