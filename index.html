@@ -436,13 +436,6 @@
             <option>1分足</option>
           </select>
         </div>
-        <div class="form-field full">
-          <label>判定<span class="req">*</span></label>
-          <div class="result-toggle" id="resultToggle">
-            <button type="button" class="result-btn entered" data-value="entered">✅ エントリーした</button>
-            <button type="button" class="result-btn through" data-value="through">⏭ スルーした</button>
-          </div>
-        </div>
         <div class="form-field">
           <label for="fEntryPattern">エントリーパターン<span class="req">*</span></label>
           <select id="fEntryPattern" required>
@@ -476,6 +469,17 @@
         <div class="form-field">
           <label for="fExitDatetime">エグジット日時</label>
           <input type="datetime-local" id="fExitDatetime">
+        </div>
+        <div class="form-field" id="exitResultField">
+          <label for="fExitResult">利確</label>
+          <select id="fExitResult">
+            <option value="">未確定</option>
+            <option value="rr2">TP2 利確（RR 2:1）</option>
+            <option value="rr3">TP3 利確（RR 3:1）</option>
+            <option value="rr4">TP4 利確（RR 4:1）</option>
+            <option value="breakeven">建値決済</option>
+            <option value="stoploss">損切り</option>
+          </select>
         </div>
         <div class="form-field">
           <label for="fTfHigher">上位足<span class="req">*</span></label>
@@ -512,6 +516,13 @@
         <div class="form-field full">
           <label for="fNotes">振り返り・備考</label>
           <textarea id="fNotes" placeholder="勝った/負けた原因、ルールの遵守状況、感情の状態など"></textarea>
+        </div>
+        <div class="form-field full">
+          <label>判定<span class="req">*</span></label>
+          <div class="result-toggle" id="resultToggle">
+            <button type="button" class="result-btn entered" data-value="entered">✅ エントリーした</button>
+            <button type="button" class="result-btn through" data-value="through">⏭ スルーした</button>
+          </div>
         </div>
       </div>
       <div class="form-footer">
@@ -631,7 +642,7 @@ const CHECK_ITEMS = [
   { group: 'その他',     tag: '損切り位置', text: '直近の高値または安値付近など、明確な損切りラインを事前に決めているか？' },
   { group: 'その他',     tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
 ];
-const CHECK_GROUPS = ['上位足', 'エントリー足', 'その他'];
+const CHECK_GROUPS = ['エントリー足', '上位足', 'その他'];
 
 /* ============ インジケーター解説データ ============ */
 /* method = この手法での確認ポイント（チェック項目の判断基準が土台）
@@ -754,7 +765,7 @@ CHECK_GROUPS.forEach(groupName => {
 
   const details = document.createElement('details');
   details.className = 'checklist-group';
-  details.open = true;
+  details.open = false;
 
   const summary = document.createElement('summary');
   summary.innerHTML =
@@ -916,6 +927,8 @@ function getTradeType(t) { return t.tradeType === 'demo' ? 'demo' : 'real'; }
 const resultToggle = document.getElementById('resultToggle');
 const directionField = document.getElementById('directionField');
 const fDirection = document.getElementById('fDirection');
+const exitResultField = document.getElementById('exitResultField');
+const fExitResult = document.getElementById('fExitResult');
 let resultState = null;
 function setResultState(value) {
   resultState = value;
@@ -926,6 +939,8 @@ function setResultState(value) {
   directionField.classList.toggle('hidden', isThrough);
   fDirection.required = !isThrough;
   if (isThrough) fDirection.value = '';
+  exitResultField.classList.toggle('hidden', isThrough);
+  if (isThrough) fExitResult.value = '';
 }
 resultToggle.addEventListener('click', (e) => {
   const btn = e.target.closest('.result-btn');
@@ -999,6 +1014,7 @@ function doSave(checks) {
     tfHigher:   document.getElementById('fTfHigher').value,
     tfEntry:    document.getElementById('fTfEntry').value,
     direction:  resultState === 'through' ? '' : document.getElementById('fDirection').value,
+    exitResult: resultState === 'through' ? '' : document.getElementById('fExitResult').value,
     notes:      document.getElementById('fNotes').value.trim(),
     checks:     checks.slice(),
     createdAt:  new Date().toISOString(),
@@ -1128,6 +1144,7 @@ function renderList() {
           (t.alertPair || t.alertTf ? kv('アラート', esc(t.alertPair) + ' / ' + esc(t.alertTf)) : '') +
           kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
           (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
+          (t.exitResult && EXIT_RESULT_LABELS[t.exitResult] ? kv('利確', esc(EXIT_RESULT_LABELS[t.exitResult])) : '') +
         '</div>' +
         (missed.length
           ? '<div class="record-checks-detail">NG項目: ' +
@@ -1171,10 +1188,14 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
 /* ============ CSV ============ */
 const CSV_HEADERS = [
   'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
-  'pair', 'tfHigher', 'tfEntry', 'direction', 'notes',
+  'pair', 'tfHigher', 'tfEntry', 'direction', 'exitResult', 'notes',
   ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
   'createdAt',
 ];
+const EXIT_RESULT_LABELS = {
+  rr2: 'TP2 利確（RR 2:1）', rr3: 'TP3 利確（RR 3:1）', rr4: 'TP4 利確（RR 4:1）',
+  breakeven: '建値決済', stoploss: '損切り',
+};
 
 function csvField(v) {
   const s = String(v == null ? '' : v);
@@ -1189,7 +1210,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
     const checks = Array.isArray(t.checks) ? t.checks : [];
     rows.push([
       t.id, getTradeType(t), t.alertPair, t.alertTf, t.result, t.entryPattern, t.datetime,
-      t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.notes,
+      t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.exitResult, t.notes,
       ...CHECK_ITEMS.map((_, i) => checks[i] === 'ok' ? 'ok' : checks[i] === 'ng' ? 'ng' : ''),
       t.createdAt,
     ].map(csvField).join(','));
@@ -1269,6 +1290,7 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           tfHigher:   get(r, 'tfHigher'),
           tfEntry:    get(r, 'tfEntry'),
           direction:  get(r, 'direction'),
+          exitResult: get(r, 'exitResult'),
           notes:      get(r, 'notes'),
           checks:     CHECK_ITEMS.map((_, i) => {
             const v = get(r, 'check' + (i + 1));
