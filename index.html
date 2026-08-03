@@ -224,6 +224,7 @@
     outline: 2px solid var(--accent); outline-offset: -1px;
   }
   .form-field textarea { resize: vertical; min-height: 90px; }
+  .field-note { font-size: 11.5px; color: var(--ink-muted); line-height: 1.6; }
   #pairCustom, #alertPairCustom { margin-top: 6px; display: none; }
   #pairCustom.show, #alertPairCustom.show { display: block; }
   .result-toggle { display: flex; gap: 8px; }
@@ -271,6 +272,7 @@
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
   }
   .record-head .datetime { font-size: 12px; color: var(--ink-muted); }
+  .record-head .recorded-at { font-size: 11px; color: var(--ink-muted); opacity: 0.75; }
   .badge {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 10px;
@@ -339,6 +341,98 @@
     background: var(--bad); color: #fff; border: none; border-radius: 8px;
     padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
   }
+  .btn-accent-solid {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+
+  /* ============ 利確ポイント記録モーダル ============ */
+  .modal.wide { max-width: 560px; max-height: 88vh; overflow-y: auto; }
+  .exit-meta {
+    font-size: 12.5px; color: var(--ink-muted); margin-bottom: 14px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  .exit-basis-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px;
+  }
+  .exit-basis-grid label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
+  .exit-basis-grid input {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; font-family: inherit;
+    width: 100%; font-variant-numeric: tabular-nums;
+  }
+  .exit-basis-grid input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .exit-risk {
+    font-size: 12px; color: var(--ink-muted); margin-bottom: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .exit-risk.warn { color: var(--warn); }
+  .exit-list-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    padding-top: 14px; border-top: 1px solid var(--hairline);
+  }
+  .exit-list-head .t { font-size: 13px; font-weight: 700; }
+  .exit-list-head .spacer { flex: 1; }
+  .btn-add-exit {
+    background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
+    border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .exit-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .exit-row .actual { flex: none; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .exit-row select, .exit-row input {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+  }
+  .exit-row select { flex: 1 1 auto; min-width: 0; }
+  .exit-row input { flex: 0 1 110px; min-width: 0; font-variant-numeric: tabular-nums; }
+  .exit-row .rr {
+    flex: none; width: 66px; text-align: right; font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--ink-muted);
+  }
+  .exit-row .rr.pos { color: var(--good); }
+  .exit-row .rr.neg { color: var(--bad); }
+  .exit-row .del {
+    flex: none; background: none; border: none; color: var(--ink-muted);
+    cursor: pointer; font-size: 15px; padding: 2px 4px; line-height: 1;
+  }
+  .exit-row .del:hover { color: var(--bad); }
+  .exit-empty { font-size: 12.5px; color: var(--ink-muted); padding: 10px 0 4px; }
+  .exit-hint { font-size: 11.5px; color: var(--ink-muted); margin: 10px 0 16px; line-height: 1.6; }
+  @media (max-width: 480px) {
+    .exit-basis-grid { grid-template-columns: 1fr; }
+    .exit-row { flex-wrap: wrap; }
+    .exit-row select { flex: 1 1 100%; }
+  }
+  .btn-exit {
+    background: none; border: 1px solid var(--border); color: var(--ink-muted);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-exit:hover { color: var(--accent); border-color: var(--accent); }
+  .exit-summary { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .exit-summary .item { font-variant-numeric: tabular-nums; }
+  .exit-summary .item .rr { font-weight: 700; }
+  .exit-summary .item .rr.pos { color: var(--good); }
+  .exit-summary .item .rr.neg { color: var(--bad); }
+
+  /* ============ 根拠別の平均RR（統計タブ） ============ */
+  .basis-rr { margin-top: 20px; }
+  .basis-rr h3 { font-size: 13px; margin-bottom: 10px; }
+  .basis-rr .row {
+    display: flex; align-items: center; gap: 10px; font-size: 13px;
+    padding: 7px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .basis-rr .row .name { flex: 1; }
+  .basis-rr .row .n { font-size: 11.5px; color: var(--ink-muted); }
+  .basis-rr .row .rr {
+    width: 68px; text-align: right; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .basis-rr .row .rr.pos { color: var(--good); }
+  .basis-rr .row .rr.neg { color: var(--bad); }
 
   /* ============ トースト ============ */
   #toast {
@@ -480,16 +574,12 @@
           <label for="fExitDatetime">エグジット日時</label>
           <input type="datetime-local" id="fExitDatetime">
         </div>
+        <!-- 利確はエントリー時点では未確定のため、履歴タブの「💰 利確」から後日追記する。
+             fExitResult は旧記録（セッション9以前）との互換のため空値で残す。 -->
         <div class="form-field" id="exitResultField">
-          <label for="fExitResult">利確</label>
-          <select id="fExitResult">
-            <option value="">未確定</option>
-            <option value="rr2">TP2 利確（RR 2:1）</option>
-            <option value="rr3">TP3 利確（RR 3:1）</option>
-            <option value="rr4">TP4 利確（RR 4:1）</option>
-            <option value="breakeven">建値決済</option>
-            <option value="stoploss">損切り</option>
-          </select>
+          <label>利確</label>
+          <p class="field-note">決済後に 📚履歴 の「💰 利確」から根拠と到達価格を追記すると、RRが自動計算されます。</p>
+          <input type="hidden" id="fExitResult" value="">
         </div>
         <div class="form-field">
           <label for="fTfHigher">上位足<span class="req">*</span></label>
@@ -571,6 +661,7 @@
       <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
     </div>
     <div class="stats-grid" id="statsGrid"></div>
+    <div class="basis-rr" id="basisRr"></div>
   </section>
 
   <!-- ============ ⑤ インジケーター解説 ============ -->
@@ -626,6 +717,42 @@
   </div>
 </div>
 
+<!-- 利確ポイント記録モーダル -->
+<div class="modal-backdrop" id="exitModal">
+  <div class="modal wide">
+    <h3>💰 利確ポイントを記録</h3>
+    <div class="exit-meta" id="exitMeta"></div>
+
+    <div class="exit-basis-grid">
+      <div>
+        <label for="exEntryPrice">エントリー価格</label>
+        <input type="text" inputmode="decimal" id="exEntryPrice" placeholder="例: 157.230">
+      </div>
+      <div>
+        <label for="exSlPrice">損切り価格</label>
+        <input type="text" inputmode="decimal" id="exSlPrice" placeholder="例: 156.900">
+      </div>
+    </div>
+    <div class="exit-risk" id="exitRisk"></div>
+
+    <div class="exit-list-head">
+      <span class="t">利確ポイント</span>
+      <span class="spacer"></span>
+      <button class="btn-add-exit" type="button" id="exitAddRow">＋ ポイント追加</button>
+    </div>
+    <div id="exitRows"></div>
+    <p class="exit-hint">
+      ◎ は実際に決済したポイントです（勝率・平均RRの集計対象）。<br>
+      到達しただけのポイントも記録すると「持っていたらどこまで伸びたか」を根拠別に比較できます。
+    </p>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="exitCancel">キャンセル</button>
+      <button class="btn-accent-solid" type="button" id="exitSave">保存する</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -655,6 +782,41 @@ const CHECK_ITEMS = [
   { group: 'その他',     tag: 'マインド',   text: '焦って毎日稼ごうとしていないか？自信のあるパターンが来るまで待てたか？' },
 ];
 const CHECK_GROUPS = ['エントリー足', '上位足', 'その他'];
+
+/* ============ 利確ポイント（RR分析） ============ */
+/* 利確の根拠。1行追加するだけで選択肢・統計集計の両方に反映される */
+const EXIT_BASIS = [
+  { v: 'rci_upper',    label: 'RCI上限到達' },
+  { v: 'rci_lower',    label: 'RCI下限到達' },
+  { v: 'swing_high',   label: '直近高値到達' },
+  { v: 'swing_low',    label: '直近安値到達' },
+  { v: 'round_number', label: 'ラウンドナンバー' },
+  { v: 'ema_touch',    label: 'EMAタッチ' },
+  { v: 'macd_cross',   label: 'MACDクロス' },
+  { v: 'breakeven',    label: '建値決済' },
+  { v: 'stoploss',     label: '損切り' },
+  { v: 'other',        label: 'その他' },
+];
+const EXIT_BASIS_LABELS = Object.fromEntries(EXIT_BASIS.map(b => [b.v, b.label]));
+
+/* 符号付きRR。損切り = -1.00 / 建値 = 0.00 / 利確 = 正の値。
+   ショートは値動きの向きが逆になるため符号を反転する。 */
+function calcRR(entryPrice, slPrice, exitPrice, direction) {
+  const e = parseFloat(entryPrice), s = parseFloat(slPrice), x = parseFloat(exitPrice);
+  if (![e, s, x].every(Number.isFinite)) return null;
+  const risk = Math.abs(e - s);
+  if (risk === 0) return null;
+  const sign = direction === 'short' ? -1 : 1;
+  return round2(((x - e) * sign) / risk);
+}
+function fmtRR(rr) { return rr == null ? '–' : (rr > 0 ? '+' : '') + rr.toFixed(2); }
+/* トレードの全利確ポイントを {basis, price, actual, rr} に正規化 */
+function tradeExits(t) {
+  if (!Array.isArray(t.exits)) return [];
+  return t.exits.map(x => Object.assign({}, x, {
+    rr: calcRR(t.entryPrice, t.slPrice, x.price, t.direction),
+  }));
+}
 
 /* ============ インジケーター解説データ ============ */
 /* method = この手法での確認ポイント（チェック項目の判断基準が土台）
@@ -1064,6 +1226,10 @@ function doSave(checks) {
     direction:  resultState === 'through' ? '' : document.getElementById('fDirection').value,
     exitResult: resultState === 'through' ? '' : document.getElementById('fExitResult').value,
     notes:      document.getElementById('fNotes').value.trim(),
+    /* 利確は決済後に履歴タブの「💰 利確」から追記する */
+    entryPrice: '',
+    slPrice:    '',
+    exits:      [],
     checks:     checks.slice(),
     createdAt:  new Date().toISOString(),
   };
@@ -1119,11 +1285,39 @@ function renderStats() {
   const enteredCount = trades.filter(t => t.result === 'entered').length;
   const throughCount = trades.filter(t => t.result === 'through').length;
 
+  /* ---- RR 集計 ---- */
+  /* actualRRs = 実際に決済したポイントのRR（平均RR・勝率の母数） */
+  const actualRRs = [];
+  /* maxRRs = 1トレードで到達した最大RR＝「持っていたらどこまで伸びたか」 */
+  const maxRRs = [];
+  /* byBasis = 根拠別の集計。到達しただけのポイントも含めて比較する */
+  const byBasis = {};
+  trades.forEach(t => {
+    const exits = tradeExits(t).filter(x => x.rr != null);
+    if (!exits.length) return;
+    const actual = exits.find(x => x.actual);
+    if (actual) actualRRs.push(actual.rr);
+    maxRRs.push(Math.max(...exits.map(x => x.rr)));
+    exits.forEach(x => {
+      const k = x.basis || 'other';
+      (byBasis[k] || (byBasis[k] = [])).push(x.rr);
+    });
+  });
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const avgRR  = actualRRs.length ? mean(actualRRs) : null;
+  const winPct = actualRRs.length
+    ? actualRRs.filter(r => r > 0).length / actualRRs.length * 100 : null;
+  const avgMax = maxRRs.length ? mean(maxRRs) : null;
+
   const tiles = [
     { label: 'トレード数', value: String(trades.length), unit: '件' },
     { label: 'エントリー数', value: String(enteredCount), unit: '件' },
     { label: 'スルー数', value: String(throughCount), unit: '件' },
     { label: 'チェック遵守率', value: trades.length ? avgCheck.toFixed(0) : '–', unit: '%' },
+    { label: '平均RR', value: avgRR == null ? '–' : fmtRR(round2(avgRR)), cls: rrCls(avgRR) },
+    { label: '勝率', value: winPct == null ? '–' : winPct.toFixed(0), unit: '%',
+      cls: winPct == null ? '' : winPct >= 50 ? 'pos' : 'neg' },
+    { label: '最大到達RR', value: avgMax == null ? '–' : fmtRR(round2(avgMax)), cls: rrCls(avgMax) },
   ];
   document.getElementById('statsGrid').innerHTML = tiles.map(t =>
     '<div class="stat-tile">' +
@@ -1132,6 +1326,20 @@ function renderStats() {
         (t.unit ? '<span class="unit">' + t.unit + '</span>' : '') +
       '</div>' +
     '</div>').join('');
+
+  /* ---- 根拠別の平均RR（どの利確ルールが最も伸びるかの比較） ---- */
+  const rows = Object.keys(byBasis)
+    .map(k => ({ k, avg: mean(byBasis[k]), n: byBasis[k].length }))
+    .sort((a, b) => b.avg - a.avg);
+  document.getElementById('basisRr').innerHTML = rows.length
+    ? '<h3>利確根拠別の平均RR</h3>' + rows.map(r =>
+        '<div class="row">' +
+          '<span class="name">' + esc(EXIT_BASIS_LABELS[r.k] || r.k) + '</span>' +
+          '<span class="n">' + r.n + '件</span>' +
+          '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
+        '</div>').join('')
+    : '<h3>利確根拠別の平均RR</h3><div class="empty-state">' +
+      '利確ポイントがまだありません。📚履歴の「💰 利確」から追記してください。</div>';
 }
 function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -1151,8 +1359,11 @@ function fmtDatetime(v) {
 }
 
 function renderList() {
+  /* エントリー日時は「分」までのため、同じ分に複数記録すると順序が決まらない。
+     同着のときは記録時刻（createdAt）で新しい順に並べる。 */
   const trades = filterByType(loadTrades()).slice().sort((a, b) =>
-    (b.datetime || b.createdAt || '').localeCompare(a.datetime || a.createdAt || ''));
+    (b.datetime || b.createdAt || '').localeCompare(a.datetime || a.createdAt || '') ||
+    (b.createdAt || '').localeCompare(a.createdAt || ''));
   const listEl = document.getElementById('recordList');
   document.getElementById('recordTotal').textContent = trades.length + ' 件';
 
@@ -1167,10 +1378,12 @@ function renderList() {
     const missed = Array.isArray(t.checks)
       ? CHECK_ITEMS.filter((_, i) => t.checks[i] === 'ng').map(c => c.tag) : [];
     const isThrough = t.result === 'through';
+    const exits = tradeExits(t);
     return (
       '<div class="record-card">' +
         '<div class="record-head">' +
           '<span class="datetime">' + fmtDatetime(t.datetime) + '</span>' +
+          (t.createdAt ? '<span class="recorded-at">（記録: ' + fmtDatetime(t.createdAt) + '）</span>' : '') +
           '<span class="badge ' + getTradeType(t) + '">' +
             (getTradeType(t) === 'demo' ? '🔬 検証' : '💰 リアル') + '</span>' +
           '<span class="badge ' + (isThrough ? 'through' : 'entered') + '">' +
@@ -1186,13 +1399,19 @@ function renderList() {
               (full ? '✔ ' : '⚠ ') + nChecks + '/' + CHECK_ITEMS.length + '</span>'
             : '') +
           '<span class="spacer"></span>' +
+          (!isThrough
+            ? '<button class="btn-exit" type="button" data-exit="' + esc(t.id) + '">💰 利確</button>'
+            : '') +
           '<button class="btn-delete" type="button" data-delete="' + esc(t.id) + '">削除</button>' +
         '</div>' +
         '<div class="record-body">' +
           (t.alertPair || t.alertTf ? kv('アラート', esc(t.alertPair) + ' / ' + esc(t.alertTf)) : '') +
           kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
           (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
-          (t.exitResult && EXIT_RESULT_LABELS[t.exitResult] ? kv('利確', esc(EXIT_RESULT_LABELS[t.exitResult])) : '') +
+          (exits.length ? kv('利確', exitSummaryHtml(exits)) : '') +
+          /* 旧記録（セッション9以前）の固定RRプリセットは従来通り表示する */
+          (!exits.length && t.exitResult && EXIT_RESULT_LABELS[t.exitResult]
+            ? kv('利確', esc(EXIT_RESULT_LABELS[t.exitResult])) : '') +
         '</div>' +
         (missed.length
           ? '<div class="record-checks-detail">NG項目: ' +
@@ -1205,6 +1424,17 @@ function renderList() {
 function kv(k, v) {
   return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
 }
+/* 実際に決済したポイント（◎）を先頭に、RR降順で並べる */
+function exitSummaryHtml(exits) {
+  const sorted = exits.slice().sort((a, b) =>
+    (b.actual ? 1 : 0) - (a.actual ? 1 : 0) || (b.rr ?? -Infinity) - (a.rr ?? -Infinity));
+  return '<div class="exit-summary">' + sorted.map(x =>
+    '<span class="item">' + (x.actual ? '◎ ' : '') +
+      esc(EXIT_BASIS_LABELS[x.basis] || x.basis || '(根拠なし)') + ' ' +
+      '<span class="rr ' + rrCls(x.rr) + '">RR ' + fmtRR(x.rr) + '</span>' +
+    '</span>').join('') + '</div>';
+}
+function rrCls(rr) { return rr == null ? '' : rr > 0 ? 'pos' : rr < 0 ? 'neg' : ''; }
 
 /* ---- 削除（確認モーダル経由） ---- */
 const deleteModal = document.getElementById('deleteModal');
@@ -1233,10 +1463,143 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
   showToast('記録を削除しました');
 });
 
+/* ---- 利確ポイントの記録（モーダル経由・後日追記） ---- */
+const exitModal = document.getElementById('exitModal');
+const exEntryPrice = document.getElementById('exEntryPrice');
+const exSlPrice = document.getElementById('exSlPrice');
+const exitRowsEl = document.getElementById('exitRows');
+let exitTrade = null;   // 編集中のトレード
+let exitDraft = [];     // 編集中の利確ポイント配列（DOMではなくこの配列が唯一の真実）
+
+document.getElementById('recordList').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-exit]');
+  if (!btn) return;
+  const t = loadTrades().find(x => x.id === btn.dataset.exit);
+  if (!t) return;
+  openExitModal(t);
+});
+
+function openExitModal(t) {
+  exitTrade = t;
+  exitDraft = Array.isArray(t.exits) && t.exits.length
+    ? t.exits.map(x => ({ basis: x.basis || '', price: x.price || '', actual: !!x.actual }))
+    : [{ basis: '', price: '', actual: true }];
+  exEntryPrice.value = t.entryPrice || '';
+  exSlPrice.value = t.slPrice || '';
+  document.getElementById('exitMeta').innerHTML =
+    '<span>' + fmtDatetime(t.datetime) + '</span>' +
+    '<span class="badge pair">' + esc(t.pair) + '</span>' +
+    '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
+      (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>';
+  renderExitRows();
+  exitModal.classList.add('show');
+}
+
+function renderExitRows() {
+  /* リスク幅（RRの分母） */
+  const e = parseFloat(exEntryPrice.value), s = parseFloat(exSlPrice.value);
+  const riskEl = document.getElementById('exitRisk');
+  if (Number.isFinite(e) && Number.isFinite(s)) {
+    const risk = Math.abs(e - s);
+    riskEl.textContent = risk === 0
+      ? '⚠ エントリー価格と損切り価格が同じためRRを計算できません'
+      : '↳ リスク幅 ' + round2(risk * 1000) / 1000;
+    riskEl.classList.toggle('warn', risk === 0);
+  } else {
+    riskEl.textContent = '↳ 2つの価格を入れるとRRが自動計算されます';
+    riskEl.classList.remove('warn');
+  }
+
+  if (exitDraft.length === 0) {
+    exitRowsEl.innerHTML = '<div class="exit-empty">利確ポイントがありません。「＋ ポイント追加」で追加してください。</div>';
+    return;
+  }
+  const dir = exitTrade ? exitTrade.direction : '';
+  exitRowsEl.innerHTML = exitDraft.map((x, i) => {
+    const rr = calcRR(exEntryPrice.value, exSlPrice.value, x.price, dir);
+    return '<div class="exit-row">' +
+      '<input class="actual" type="radio" name="exitActual" data-i="' + i + '"' +
+        (x.actual ? ' checked' : '') + ' title="実際に決済したポイント">' +
+      '<select data-field="basis" data-i="' + i + '">' +
+        '<option value="">根拠を選択</option>' +
+        EXIT_BASIS.map(b =>
+          '<option value="' + b.v + '"' + (x.basis === b.v ? ' selected' : '') + '>' +
+          b.label + '</option>').join('') +
+      '</select>' +
+      '<input type="text" inputmode="decimal" data-field="price" data-i="' + i + '"' +
+        ' value="' + esc(x.price) + '" placeholder="到達価格">' +
+      '<span class="rr ' + rrCls(rr) + '">' + (rr == null ? '–' : fmtRR(rr)) + '</span>' +
+      '<button class="del" type="button" data-del="' + i + '" title="この行を削除">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+/* 入力 → exitDraft を更新 → 再描画（単方向）。
+   再描画でフォーカスが飛ばないよう、価格入力中はRR表示だけ差し替える */
+exitRowsEl.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-field]');
+  if (!el) return;
+  const i = Number(el.dataset.i);
+  exitDraft[i][el.dataset.field] = el.value;
+  if (el.dataset.field === 'price') {
+    const rr = calcRR(exEntryPrice.value, exSlPrice.value, el.value,
+      exitTrade ? exitTrade.direction : '');
+    const rrEl = el.parentNode.querySelector('.rr');
+    rrEl.textContent = rr == null ? '–' : fmtRR(rr);
+    rrEl.className = 'rr ' + rrCls(rr);
+  }
+});
+exitRowsEl.addEventListener('change', (e) => {
+  const radio = e.target.closest('.actual');
+  if (!radio) return;
+  const i = Number(radio.dataset.i);
+  exitDraft.forEach((x, j) => { x.actual = (j === i); });
+});
+exitRowsEl.addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del]');
+  if (!del) return;
+  const i = Number(del.dataset.del);
+  const wasActual = exitDraft[i].actual;
+  exitDraft.splice(i, 1);
+  if (wasActual && exitDraft.length) exitDraft[0].actual = true;
+  renderExitRows();
+});
+[exEntryPrice, exSlPrice].forEach(el => el.addEventListener('input', renderExitRows));
+document.getElementById('exitAddRow').addEventListener('click', () => {
+  exitDraft.push({ basis: '', price: '', actual: exitDraft.length === 0 });
+  renderExitRows();
+});
+document.getElementById('exitCancel').addEventListener('click', () => {
+  exitModal.classList.remove('show');
+  exitTrade = null;
+});
+document.getElementById('exitSave').addEventListener('click', () => {
+  if (!exitTrade) return;
+  /* 価格が未入力の行は捨てる */
+  const exits = exitDraft
+    .filter(x => Number.isFinite(parseFloat(x.price)))
+    .map(x => ({ basis: x.basis, price: x.price, actual: !!x.actual }));
+  if (exits.length && !exits.some(x => x.actual)) exits[0].actual = true;
+
+  const trades = loadTrades();
+  const target = trades.find(t => t.id === exitTrade.id);
+  if (!target) { showToast('⚠ 対象の記録が見つかりませんでした'); return; }
+  target.entryPrice = exEntryPrice.value.trim();
+  target.slPrice = exSlPrice.value.trim();
+  target.exits = exits;
+  if (!saveTrades(trades)) return;
+
+  exitModal.classList.remove('show');
+  exitTrade = null;
+  renderAll();
+  showToast('✔ 利確ポイントを保存しました（' + exits.length + '件）');
+});
+
 /* ============ CSV ============ */
 const CSV_HEADERS = [
   'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
   'pair', 'tfHigher', 'tfEntry', 'direction', 'exitResult', 'notes',
+  'entryPrice', 'slPrice', 'exits',
   ...CHECK_ITEMS.map((_, i) => 'check' + (i + 1)),
   'createdAt',
 ];
@@ -1244,6 +1607,20 @@ const EXIT_RESULT_LABELS = {
   rr2: 'TP2 利確（RR 2:1）', rr3: 'TP3 利確（RR 3:1）', rr4: 'TP4 利確（RR 4:1）',
   breakeven: '建値決済', stoploss: '損切り',
 };
+
+/* exits 列（JSON文字列）を復元。旧CSVには列自体が無いので '' → [] になる */
+function parseExitsCsv(s) {
+  if (!s) return [];
+  try {
+    const a = JSON.parse(s);
+    if (!Array.isArray(a)) return [];
+    return a.map(x => ({
+      basis:  typeof x.basis === 'string' ? x.basis : '',
+      price:  x.price == null ? '' : String(x.price),
+      actual: !!x.actual,
+    }));
+  } catch (e) { return []; }
+}
 
 function csvField(v) {
   const s = String(v == null ? '' : v);
@@ -1259,6 +1636,9 @@ document.getElementById('exportCsv').addEventListener('click', () => {
     rows.push([
       t.id, getTradeType(t), t.alertPair, t.alertTf, t.result, t.entryPattern, t.datetime,
       t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.exitResult, t.notes,
+      /* 配列はJSON文字列で1列に格納。csvField() が " を "" にエスケープし、
+         parseCsv() が復元するためそのまま往復できる */
+      t.entryPrice, t.slPrice, JSON.stringify(Array.isArray(t.exits) ? t.exits : []),
       ...CHECK_ITEMS.map((_, i) => checks[i] === 'ok' ? 'ok' : checks[i] === 'ng' ? 'ng' : ''),
       t.createdAt,
     ].map(csvField).join(','));
@@ -1340,6 +1720,9 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           direction:  get(r, 'direction'),
           exitResult: get(r, 'exitResult'),
           notes:      get(r, 'notes'),
+          entryPrice: get(r, 'entryPrice'),
+          slPrice:    get(r, 'slPrice'),
+          exits:      parseExitsCsv(get(r, 'exits')),
           checks:     CHECK_ITEMS.map((_, i) => {
             const v = get(r, 'check' + (i + 1));
             if (v === 'ok' || v === '1') return 'ok';
