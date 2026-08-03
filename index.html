@@ -239,6 +239,7 @@
   .result-btn.demo.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .result-btn.real.active { background: var(--good); border-color: var(--good); color: #fff; }
   #directionField.hidden { display: none; }
+  .hidden { display: none !important; }
   .type-filter { display: flex; gap: 8px; margin-bottom: 14px; }
   .type-filter-btn {
     border-radius: 8px; padding: 6px 14px; font-size: 12.5px; font-weight: 700;
@@ -501,7 +502,7 @@
 
   <!-- ============ ② トレード記録フォーム ============ -->
   <section class="card tab-panel" id="tabPanel-form">
-    <h2><span class="step-badge">2</span> トレード記録フォーム</h2>
+    <h2><span class="step-badge">2</span> トレード記録フォーム<span id="editModeBadge" class="badge demo hidden" style="margin-left:8px;">✎ 編集中</span></h2>
     <div class="section-note">エグジット日時は未確定なら空欄のままで保存できます。</div>
     <form id="tradeForm" autocomplete="off">
       <div class="form-grid">
@@ -626,7 +627,8 @@
         </div>
       </div>
       <div class="form-footer">
-        <button class="btn-primary" type="submit">💾 記録を保存</button>
+        <button class="btn-primary" type="submit" id="formSubmitBtn">💾 記録を保存</button>
+        <button class="btn-ghost hidden" type="button" id="cancelEditBtn">編集をキャンセル</button>
         <span class="save-hint" id="saveHint">チェックリスト: 0 / 8</span>
       </div>
     </form>
@@ -1211,8 +1213,11 @@ function doSave(checks) {
   const alertPair = alertPairSelect.value === '__custom__'
     ? alertPairCustom.value.trim()
     : alertPairSelect.value;
+  const trades = loadTrades();
+  const existing = editingId ? trades.find(x => x.id === editingId) : null;
+
   const trade = {
-    id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    id: existing ? existing.id : (Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)),
     tradeType:  tradeTypeState,
     alertPair:  alertPair,
     alertTf:    document.getElementById('fAlertTf').value,
@@ -1226,17 +1231,24 @@ function doSave(checks) {
     direction:  resultState === 'through' ? '' : document.getElementById('fDirection').value,
     exitResult: resultState === 'through' ? '' : document.getElementById('fExitResult').value,
     notes:      document.getElementById('fNotes').value.trim(),
-    /* 利確は決済後に履歴タブの「💰 利確」から追記する */
-    entryPrice: '',
-    slPrice:    '',
-    exits:      [],
+    /* 利確データは履歴タブの「💰 利確」で管理するため、編集時は既存値を引き継ぐ */
+    entryPrice: existing ? existing.entryPrice : '',
+    slPrice:    existing ? existing.slPrice : '',
+    exits:      existing ? existing.exits : [],
     checks:     checks.slice(),
-    createdAt:  new Date().toISOString(),
+    createdAt:  existing ? existing.createdAt : new Date().toISOString(),
   };
-  const trades = loadTrades();
-  trades.push(trade);
+
+  if (existing) {
+    const idx = trades.findIndex(x => x.id === existing.id);
+    trades[idx] = trade;
+  } else {
+    trades.push(trade);
+  }
   if (!saveTrades(trades)) return;
 
+  const wasEditing = !!existing;
+  exitEditMode();
   document.getElementById('tradeForm').reset();
   pairCustom.classList.remove('show');
   pairCustom.required = false;
@@ -1247,7 +1259,9 @@ function doSave(checks) {
   setDatetimeNow();
   document.getElementById('resetChecks').click();
   renderAll();
-  showToast('✔ ' + (trade.result === 'entered' ? 'エントリー' : 'スルー') + 'を記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
+  showToast(wasEditing
+    ? '✔ 記録を更新しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）'
+    : '✔ ' + (trade.result === 'entered' ? 'エントリー' : 'スルー') + 'を記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
 }
 
 /* ============ 統計サマリー ============ */
@@ -1402,6 +1416,7 @@ function renderList() {
           (!isThrough
             ? '<button class="btn-exit" type="button" data-exit="' + esc(t.id) + '">💰 利確</button>'
             : '') +
+          '<button class="btn-ghost" type="button" data-edit="' + esc(t.id) + '">✎ 編集</button>' +
           '<button class="btn-delete" type="button" data-delete="' + esc(t.id) + '">削除</button>' +
         '</div>' +
         '<div class="record-body">' +
@@ -1461,6 +1476,87 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
   pendingDeleteId = null;
   renderAll();
   showToast('記録を削除しました');
+});
+
+/* ---- 記録の編集 ---- */
+let editingId = null;
+const editModeBadge = document.getElementById('editModeBadge');
+const formSubmitBtn = document.getElementById('formSubmitBtn');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+document.getElementById('recordList').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-edit]');
+  if (!btn) return;
+  const t = loadTrades().find(x => x.id === btn.dataset.edit);
+  if (!t) return;
+  loadTradeIntoForm(t);
+});
+
+function applyCheckStates(states) {
+  checkStates = CHECK_ITEMS.map((_, i) => states[i] || null);
+  checklistEl.querySelectorAll('li[data-idx]').forEach(li => {
+    const idx = Number(li.dataset.idx);
+    li.dataset.state = checkStates[idx] || '';
+    li.querySelectorAll('.check-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === checkStates[idx]);
+    });
+  });
+  updateCheckUI();
+}
+
+function loadTradeIntoForm(t) {
+  editingId = t.id;
+
+  setTradeTypeState(getTradeType(t));
+  setResultState(t.result === 'through' ? 'through' : 'entered');
+
+  const alertPairKnown = Array.from(alertPairSelect.options).some(o => o.value === t.alertPair);
+  alertPairSelect.value = alertPairKnown ? (t.alertPair || '') : '__custom__';
+  alertPairCustom.classList.toggle('show', !alertPairKnown && !!t.alertPair);
+  alertPairCustom.value = alertPairKnown ? '' : (t.alertPair || '');
+
+  document.getElementById('fAlertTf').value = t.alertTf || '';
+  document.getElementById('fEntryPattern').value = t.entryPattern || '';
+  document.getElementById('fDatetime').value = t.datetime || '';
+  document.getElementById('fExitDatetime').value = t.exitDatetime || '';
+
+  const pairKnown = Array.from(pairSelect.options).some(o => o.value === t.pair);
+  pairSelect.value = pairKnown ? (t.pair || '') : '__custom__';
+  pairCustom.classList.toggle('show', !pairKnown && !!t.pair);
+  pairCustom.value = pairKnown ? '' : (t.pair || '');
+
+  document.getElementById('fTfHigher').value = t.tfHigher || '';
+  document.getElementById('fTfEntry').value = t.tfEntry || '';
+  document.getElementById('fDirection').value = t.direction || '';
+  document.getElementById('fNotes').value = t.notes || '';
+
+  applyCheckStates(Array.isArray(t.checks) ? t.checks : CHECK_ITEMS.map(() => null));
+
+  editModeBadge.classList.remove('hidden');
+  formSubmitBtn.textContent = '💾 更新を保存';
+  cancelEditBtn.classList.remove('hidden');
+  setActiveTab('form');
+  showToast('編集モード: 内容を変更して保存してください');
+}
+
+function exitEditMode() {
+  editingId = null;
+  editModeBadge.classList.add('hidden');
+  formSubmitBtn.textContent = '💾 記録を保存';
+  cancelEditBtn.classList.add('hidden');
+}
+
+cancelEditBtn.addEventListener('click', () => {
+  exitEditMode();
+  document.getElementById('tradeForm').reset();
+  pairCustom.classList.remove('show');
+  pairCustom.required = false;
+  alertPairCustom.classList.remove('show');
+  alertPairCustom.required = false;
+  setTradeTypeState(null);
+  setResultState(null);
+  setDatetimeNow();
+  document.getElementById('resetChecks').click();
 });
 
 /* ---- 利確ポイントの記録（モーダル経由・後日追記） ---- */
