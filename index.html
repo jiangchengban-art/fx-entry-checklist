@@ -468,10 +468,109 @@
   .tab-bar .tab-btn.active { color: var(--accent); }
   .tab-bar .tab-btn.active .tab-icon { transform: translateY(-1px); }
 
+  /* ============ 環境認識ボード ============ */
+  .mv-toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--hairline);
+  }
+  .mv-toolbar select, .mv-toolbar input {
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .mv-toolbar .spacer { flex: 1; }
+
+  .mv-card {
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface-2); padding: 14px; margin-bottom: 12px;
+  }
+  .mv-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .mv-card-head .pair { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+  .mv-card-head .at { font-size: 11px; color: var(--ink-muted); }
+  .mv-card-head .spacer { flex: 1; }
+
+  .mv-tf-row {
+    display: grid; grid-template-columns: 64px auto 1fr; gap: 10px;
+    align-items: center; padding: 7px 0;
+  }
+  .mv-tf-row + .mv-tf-row { border-top: 1px solid var(--hairline); }
+  .mv-tf-row .tf { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+  .mv-tf-row .note { font-size: 12px; color: var(--ink-2); word-break: break-word; }
+  .mv-tf-row .note.empty { color: var(--ink-muted); }
+
+  .mv-state {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid transparent; white-space: nowrap; justify-self: start;
+  }
+  .mv-state.up    { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+  .mv-state.down  { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
+  .mv-state.range { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .mv-state.none  { background: transparent; color: var(--ink-muted); border-color: var(--border); }
+
+  /* 状態選択（3択トグル） */
+  .mv-choice { display: flex; gap: 6px; }
+  .mv-choice button {
+    flex: 1; padding: 7px 6px; font-size: 12px; font-weight: 700; font-family: inherit;
+    background: var(--surface-2); color: var(--ink-muted);
+    border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mv-choice button:hover { background: var(--surface); }
+  .mv-choice button.on[data-state="up"]    { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+  .mv-choice button.on[data-state="down"]  { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
+  .mv-choice button.on[data-state="range"] { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+
+  .mv-edit-row { padding: 10px 0; }
+  .mv-edit-row + .mv-edit-row { border-top: 1px solid var(--hairline); }
+  .mv-edit-row .tf-label { font-size: 12px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
+  .mv-edit-row input.memo {
+    width: 100%; margin-top: 6px; background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+    font-size: 13px; font-family: inherit;
+  }
+
+  .mv-ai {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
+  }
+  .mv-ai .ai-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .mv-ai .ai-head .t { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+  .mv-ai .ai-body {
+    font-size: 12px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; max-height: 200px; overflow-y: auto;
+  }
+  .mv-ai textarea {
+    width: 100%; min-height: 110px; resize: vertical;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font-size: 13px; font-family: inherit; line-height: 1.5;
+  }
+  .mv-hint { font-size: 11px; color: var(--ink-muted); margin-top: 6px; line-height: 1.5; }
+
+  .mv-history { margin-top: 10px; }
+  .mv-history > summary {
+    cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-muted);
+    padding: 6px 0; list-style: none;
+  }
+  .mv-history > summary::-webkit-details-marker { display: none; }
+  .mv-history > summary::before { content: '▸ '; }
+  .mv-history[open] > summary::before { content: '▾ '; }
+  .mv-hist-item {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 6px 0; border-top: 1px solid var(--hairline); font-size: 12px;
+  }
+  .mv-hist-item .at { color: var(--ink-muted); font-size: 11px; min-width: 96px; }
+  .mv-hist-item .spacer { flex: 1; }
+
   @media (max-width: 520px) {
     body { padding: 16px 10px 96px; }
     section.card { padding: 16px; }
     .stat-tile .value { font-size: 21px; }
+    .tab-bar .tab-btn { padding: 8px 2px 6px; }
+    .tab-bar .tab-btn .tab-label { font-size: 10px; }
+    .mv-tf-row { grid-template-columns: 52px auto; row-gap: 2px; }
+    .mv-tf-row .note { grid-column: 1 / -1; }
   }
 </style>
 </head>
@@ -485,6 +584,32 @@
     </div>
     <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
   </header>
+
+  <!-- ============ ⓪ 環境認識ボード ============ -->
+  <section class="card tab-panel" id="tabPanel-market">
+    <h2>🌐 環境認識ボード</h2>
+    <div class="section-note">監視している通貨ペアの週足・日足・4時間足が「トレンドかレンジか」を都度記録します。更新するたびに履歴として残るので、後から「あの時どう見ていたか」を振り返れます。</div>
+
+    <div class="mv-toolbar">
+      <select id="mvAddPair">
+        <option value="">監視ペアを追加…</option>
+        <option>USD/JPY</option>
+        <option>EUR/JPY</option>
+        <option>GBP/JPY</option>
+        <option>AUD/JPY</option>
+        <option>EUR/USD</option>
+        <option>GBP/USD</option>
+        <option>AUD/USD</option>
+        <option>GOLD (XAU/USD)</option>
+        <option value="__custom__">その他（自由入力）</option>
+      </select>
+      <input type="text" id="mvAddPairCustom" class="hidden" placeholder="例: CAD/JPY">
+      <button class="btn-ghost hidden" type="button" id="mvAddPairCustomOk">追加する</button>
+      <span class="spacer"></span>
+    </div>
+
+    <div id="mvList"></div>
+  </section>
 
   <!-- ============ ① チェックリスト ============ -->
   <section class="card tab-panel" id="tabPanel-checklist">
@@ -677,6 +802,9 @@
 
 <!-- ============ 下部タブバー ============ -->
 <nav class="tab-bar" id="tabBar">
+  <button class="tab-btn" type="button" data-tab="market">
+    <span class="tab-icon">🌐</span><span class="tab-label">環境</span>
+  </button>
   <button class="tab-btn" type="button" data-tab="checklist">
     <span class="tab-icon">✅</span><span class="tab-label">チェック</span>
   </button>
@@ -751,6 +879,44 @@
     <div class="modal-actions">
       <button class="btn-secondary" type="button" id="exitCancel">キャンセル</button>
       <button class="btn-accent-solid" type="button" id="exitSave">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 環境認識の記録モーダル -->
+<div class="modal-backdrop" id="mvModal">
+  <div class="modal wide">
+    <h3>🌐 <span id="mvModalPair"></span> の環境認識</h3>
+    <div id="mvModalRows"></div>
+
+    <div class="mv-ai">
+      <div class="ai-head">
+        <span class="t">🤖 AIチャート分析（任意）</span>
+        <span class="spacer"></span>
+        <button class="btn-ghost" type="button" id="mvCopyPrompt">📋 分析プロンプトをコピー</button>
+      </div>
+      <textarea id="mvAiText" placeholder="Claude や ChatGPT にチャート画像と一緒にプロンプトを渡し、返ってきた分析をここに貼り付けます。"></textarea>
+      <p class="mv-hint">
+        「分析プロンプトをコピー」で、上で選んだ自分の見立てを織り込んだ依頼文がクリップボードに入ります。<br>
+        チャート画像を添えて AI に渡し、返答を貼り付けると自分の分析と並べて残せます。
+      </p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="mvCancel">キャンセル</button>
+      <button class="btn-accent-solid" type="button" id="mvSave">記録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 監視ペア削除の確認モーダル -->
+<div class="modal-backdrop" id="mvDeleteModal">
+  <div class="modal">
+    <h3>🗑 監視ペアの削除</h3>
+    <p id="mvDeleteText"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="mvDeleteCancel">キャンセル</button>
+      <button class="btn-danger-solid" type="button" id="mvDeleteConfirm">削除する</button>
     </div>
   </div>
 </div>
@@ -1853,11 +2019,340 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
+/* ============ 環境認識ボード ============ */
+/* トレード記録とは別キーで保存する。既存データ・CSV には一切影響しない。 */
+const MARKET_KEY = 'mochipoyo_market_view_v1';
+
+/* 記録する時間足。ここに1行足せば入力欄・表示・履歴すべてに反映される。 */
+const MV_TFS = [
+  { k: 'w',  label: '週足' },
+  { k: 'd',  label: '日足' },
+  { k: 'h4', label: '4時間足' },
+];
+const MV_STATES = [
+  { v: 'up',    label: '▲ 上昇' },
+  { v: 'range', label: '▬ レンジ' },
+  { v: 'down',  label: '▼ 下降' },
+];
+const MV_STATE_LABELS = Object.fromEntries(MV_STATES.map(s => [s.v, s.label]));
+
+function loadMarket() {
+  try {
+    const o = JSON.parse(localStorage.getItem(MARKET_KEY) || '{}');
+    return {
+      pairs:     Array.isArray(o.pairs) ? o.pairs : [],
+      snapshots: Array.isArray(o.snapshots) ? o.snapshots : [],
+    };
+  } catch (e) {
+    console.error('環境認識データの読み込みエラー:', e);
+    return { pairs: [], snapshots: [] };
+  }
+}
+function saveMarket(data) {
+  try {
+    localStorage.setItem(MARKET_KEY, JSON.stringify(data));
+    return true;
+  } catch (e) {
+    alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
+    return false;
+  }
+}
+/* そのペアの最新スナップショット（記録時刻の新しい順で先頭） */
+function latestSnapshot(data, pair) {
+  return data.snapshots
+    .filter(s => s.pair === pair)
+    .sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0] || null;
+}
+function snapshotsOf(data, pair) {
+  return data.snapshots
+    .filter(s => s.pair === pair)
+    .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+}
+function stateChip(v) {
+  return v && MV_STATE_LABELS[v]
+    ? '<span class="mv-state ' + v + '">' + MV_STATE_LABELS[v] + '</span>'
+    : '<span class="mv-state none">未記録</span>';
+}
+
+const mvListEl = document.getElementById('mvList');
+
+function renderMarket() {
+  const data = loadMarket();
+  if (data.pairs.length === 0) {
+    mvListEl.innerHTML = '<div class="empty-state">監視する通貨ペアがまだありません。' +
+      '上のプルダウンから追加してください。</div>';
+    return;
+  }
+  mvListEl.innerHTML = data.pairs.map(pair => {
+    const latest = latestSnapshot(data, pair);
+    const hist = snapshotsOf(data, pair).slice(1);
+    const tf = (latest && latest.tf) || {};
+
+    const rows = MV_TFS.map(t => {
+      const cell = tf[t.k] || {};
+      return '<div class="mv-tf-row">' +
+        '<span class="tf">' + t.label + '</span>' +
+        stateChip(cell.s) +
+        '<span class="note' + (cell.note ? '' : ' empty') + '">' +
+          (cell.note ? esc(cell.note) : '—') + '</span>' +
+      '</div>';
+    }).join('');
+
+    const ai = latest && latest.ai
+      ? '<div class="mv-ai"><div class="ai-head"><span class="t">🤖 AI分析</span></div>' +
+        '<div class="ai-body">' + esc(latest.ai) + '</div></div>'
+      : '';
+
+    const history = hist.length
+      ? '<details class="mv-history"><summary>過去の見立て（' + hist.length + '件）</summary>' +
+        hist.map(s => {
+          const stf = s.tf || {};
+          return '<div class="mv-hist-item">' +
+            '<span class="at">' + fmtDatetime(s.at) + '</span>' +
+            MV_TFS.map(t => stateChip((stf[t.k] || {}).s)).join('') +
+            '<span class="spacer"></span>' +
+            '<button class="btn-delete" type="button" data-mv-del-snap="' + esc(s.id) + '">削除</button>' +
+          '</div>';
+        }).join('') +
+        '</details>'
+      : '';
+
+    return '<div class="mv-card">' +
+      '<div class="mv-card-head">' +
+        '<span class="pair">' + esc(pair) + '</span>' +
+        '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn-accent-solid" type="button" data-mv-record="' + esc(pair) + '">✎ 記録する</button>' +
+        '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(pair) + '">監視解除</button>' +
+      '</div>' +
+      rows + ai + history +
+    '</div>';
+  }).join('');
+}
+
+/* ---- 監視ペアの追加 ---- */
+const mvAddPair       = document.getElementById('mvAddPair');
+const mvAddPairCustom = document.getElementById('mvAddPairCustom');
+const mvAddPairCustomOk = document.getElementById('mvAddPairCustomOk');
+
+function addWatchPair(pair) {
+  pair = String(pair || '').trim();
+  if (!pair) return;
+  const data = loadMarket();
+  if (data.pairs.includes(pair)) { showToast('⚠ 「' + pair + '」はすでに監視中です'); return; }
+  data.pairs.push(pair);
+  if (!saveMarket(data)) return;
+  renderMarket();
+  showToast('✔ 「' + pair + '」を監視リストに追加しました');
+}
+mvAddPair.addEventListener('change', () => {
+  const v = mvAddPair.value;
+  const custom = v === '__custom__';
+  mvAddPairCustom.classList.toggle('hidden', !custom);
+  mvAddPairCustomOk.classList.toggle('hidden', !custom);
+  if (custom) { mvAddPairCustom.focus(); return; }
+  if (v) { addWatchPair(v); mvAddPair.value = ''; }
+});
+function commitCustomPair() {
+  const v = mvAddPairCustom.value.trim();
+  if (!v) { showToast('⚠ 通貨ペア名を入力してください'); return; }
+  addWatchPair(v);
+  mvAddPairCustom.value = '';
+  mvAddPair.value = '';
+  mvAddPairCustom.classList.add('hidden');
+  mvAddPairCustomOk.classList.add('hidden');
+}
+mvAddPairCustomOk.addEventListener('click', commitCustomPair);
+mvAddPairCustom.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); commitCustomPair(); }
+});
+
+/* ---- 記録モーダル ---- */
+const mvModal      = document.getElementById('mvModal');
+const mvModalPair  = document.getElementById('mvModalPair');
+const mvModalRows  = document.getElementById('mvModalRows');
+const mvAiText     = document.getElementById('mvAiText');
+let mvEditingPair  = null;
+
+function openMvModal(pair) {
+  const data = loadMarket();
+  const latest = latestSnapshot(data, pair);
+  const tf = (latest && latest.tf) || {};
+  mvEditingPair = pair;
+  mvModalPair.textContent = pair;
+
+  /* 前回の見立てを初期値として引き継ぐ。変わっていない時間足はそのまま記録できる。 */
+  mvModalRows.innerHTML = MV_TFS.map(t => {
+    const cell = tf[t.k] || {};
+    return '<div class="mv-edit-row" data-tf="' + t.k + '">' +
+      '<div class="tf-label">' + t.label + '</div>' +
+      '<div class="mv-choice">' +
+        MV_STATES.map(s =>
+          '<button type="button" data-state="' + s.v + '"' +
+          (cell.s === s.v ? ' class="on"' : '') + '>' + s.label + '</button>').join('') +
+      '</div>' +
+      '<input type="text" class="memo" placeholder="メモ（任意）例: 直近高値を更新、押し目待ち" value="' +
+        esc(cell.note || '') + '">' +
+    '</div>';
+  }).join('');
+
+  mvAiText.value = (latest && latest.ai) || '';
+  mvModal.classList.add('show');
+}
+function closeMvModal() {
+  mvModal.classList.remove('show');
+  mvEditingPair = null;
+}
+
+/* 状態ボタンはトグル式。同じものを再度押すと未選択に戻せる。 */
+mvModalRows.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-state]');
+  if (!btn) return;
+  const wasOn = btn.classList.contains('on');
+  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+  if (!wasOn) btn.classList.add('on');
+});
+
+function readMvModal() {
+  const tf = {};
+  mvModalRows.querySelectorAll('.mv-edit-row').forEach(row => {
+    const on = row.querySelector('button.on');
+    tf[row.dataset.tf] = {
+      s: on ? on.dataset.state : '',
+      note: row.querySelector('input.memo').value.trim(),
+    };
+  });
+  return tf;
+}
+
+document.getElementById('mvCancel').addEventListener('click', closeMvModal);
+mvModal.addEventListener('click', (e) => { if (e.target === mvModal) closeMvModal(); });
+
+document.getElementById('mvSave').addEventListener('click', () => {
+  if (!mvEditingPair) return;
+  const tf = readMvModal();
+  const filled = MV_TFS.some(t => tf[t.k].s || tf[t.k].note);
+  const ai = mvAiText.value.trim();
+  if (!filled && !ai) {
+    showToast('⚠ 少なくとも1つの時間足を選択するか、メモを入力してください');
+    return;
+  }
+  const data = loadMarket();
+  data.snapshots.push({
+    id: 'mv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    pair: mvEditingPair,
+    at: new Date().toISOString(),
+    tf: tf,
+    ai: ai,
+  });
+  if (!saveMarket(data)) return;
+  closeMvModal();
+  renderMarket();
+  showToast('✔ 環境認識を記録しました');
+});
+
+/* ---- AI分析プロンプトのコピー ---- */
+/* 自分の見立てを本文に織り込む。AI に「追認」ではなく「相違点の指摘」を求めるのが狙い。 */
+function buildAiPrompt(pair, tf) {
+  const lines = MV_TFS.map(t => {
+    const c = tf[t.k] || {};
+    const state = c.s ? MV_STATE_LABELS[c.s].replace(/^[▲▬▼]\s*/, '') : '未判断';
+    return '- ' + t.label + '：' + state + (c.note ? '（' + c.note + '）' : '');
+  }).join('\n');
+
+  return [
+    'あなたはFXのマルチタイムフレーム分析に詳しいトレーダーです。',
+    '添付した ' + pair + ' のチャート画像（週足・日足・4時間足）を分析してください。',
+    '',
+    '【私の現在の見立て】',
+    lines,
+    '',
+    '【依頼】',
+    '1. 各時間足がトレンド（上昇/下降）かレンジかを、根拠とあわせて判定してください。',
+    '2. 私の見立てと異なる点があれば、どこがどう違うかを具体的に指摘してください。',
+    '3. 上位足と下位足の方向が揃っているか、ねじれているかを整理してください。',
+    '4. 意識されている高値・安値ライン、ラウンドナンバーを挙げてください。',
+    '5. 現時点で優位性のある方向と、逆に手を出すべきでない場面を述べてください。',
+    '',
+    '簡潔な箇条書きで、断定しすぎず根拠を添えて回答してください。',
+  ].join('\n');
+}
+document.getElementById('mvCopyPrompt').addEventListener('click', () => {
+  if (!mvEditingPair) return;
+  const text = buildAiPrompt(mvEditingPair, readMvModal());
+  /* navigator.clipboard は https / localhost 以外では使えないため、
+     失敗時は選択済みテキストエリアにフォールバックする。 */
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    showToast(ok ? '📋 プロンプトをコピーしました' : '⚠ コピーできませんでした');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('📋 プロンプトをコピーしました'))
+      .catch(fallback);
+  } else {
+    fallback();
+  }
+});
+
+/* ---- 一覧内の操作 ---- */
+const mvDeleteModal = document.getElementById('mvDeleteModal');
+let mvPendingDeletePair = null;
+
+mvListEl.addEventListener('click', (e) => {
+  const rec = e.target.closest('[data-mv-record]');
+  if (rec) { openMvModal(rec.dataset.mvRecord); return; }
+
+  const delPair = e.target.closest('[data-mv-del-pair]');
+  if (delPair) {
+    const pair = delPair.dataset.mvDelPair;
+    const n = snapshotsOf(loadMarket(), pair).length;
+    mvPendingDeletePair = pair;
+    document.getElementById('mvDeleteText').textContent =
+      '「' + pair + '」を監視リストから外します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
+    mvDeleteModal.classList.add('show');
+    return;
+  }
+
+  const delSnap = e.target.closest('[data-mv-del-snap]');
+  if (delSnap) {
+    const data = loadMarket();
+    data.snapshots = data.snapshots.filter(s => s.id !== delSnap.dataset.mvDelSnap);
+    if (!saveMarket(data)) return;
+    renderMarket();
+    showToast('履歴を1件削除しました');
+  }
+});
+document.getElementById('mvDeleteCancel').addEventListener('click', () => {
+  mvDeleteModal.classList.remove('show');
+  mvPendingDeletePair = null;
+});
+document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
+  if (!mvPendingDeletePair) return;
+  const data = loadMarket();
+  data.pairs = data.pairs.filter(p => p !== mvPendingDeletePair);
+  data.snapshots = data.snapshots.filter(s => s.pair !== mvPendingDeletePair);
+  if (saveMarket(data)) {
+    renderMarket();
+    showToast('「' + mvPendingDeletePair + '」の監視を解除しました');
+  }
+  mvDeleteModal.classList.remove('show');
+  mvPendingDeletePair = null;
+});
+
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';
 const tabBar = document.getElementById('tabBar');
 const tabButtons = Array.from(tabBar.querySelectorAll('.tab-btn'));
 const tabPanels = {
+  market:    document.getElementById('tabPanel-market'),
   checklist: document.getElementById('tabPanel-checklist'),
   form:      document.getElementById('tabPanel-form'),
   list:      document.getElementById('tabPanel-list'),
@@ -1881,7 +2376,7 @@ tabBar.addEventListener('click', (e) => {
 setActiveTab(localStorage.getItem(TAB_KEY) || 'checklist');
 
 /* ============ 初期描画 ============ */
-function renderAll() { renderStats(); renderList(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); }
 document.querySelectorAll('.type-filter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);
