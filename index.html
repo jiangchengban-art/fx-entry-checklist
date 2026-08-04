@@ -235,6 +235,7 @@
   }
   .result-btn:hover { background: var(--surface-2); }
   .result-btn.entered.active { background: var(--good); border-color: var(--good); color: #fff; }
+  .result-btn.hold.active { background: var(--warn); border-color: var(--warn); color: #fff; }
   .result-btn.through.active { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
   .result-btn.demo.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .result-btn.real.active { background: var(--good); border-color: var(--good); color: #fff; }
@@ -285,6 +286,7 @@
   .badge.checks-full { background: var(--good-soft); color: var(--good); }
   .badge.checks-part { background: var(--warn-soft); color: var(--warn); }
   .badge.entered { background: var(--good-soft); color: var(--good); }
+  .badge.hold { background: var(--warn-soft); color: var(--warn); }
   .badge.through { background: var(--surface-2); color: var(--ink-muted); border: 1px solid var(--border); }
   .record-head .spacer { flex: 1; }
   .btn-delete {
@@ -488,6 +490,20 @@
   .mv-card-head .pair { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
   .mv-card-head .at { font-size: 11px; color: var(--ink-muted); }
   .mv-card-head .spacer { flex: 1; }
+  .mv-tf-badge {
+    display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
+    padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+  }
+
+  .mv-judge-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0 12px;
+    border-bottom: 1px solid var(--hairline); margin-bottom: 4px;
+  }
+  .mv-judge-row .label { font-size: 12px; font-weight: 700; color: var(--ink-2); white-space: nowrap; }
+  .mv-judge-row .mv-choice { flex: 1; }
+  .mv-judge-btn.on.entered { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+  .mv-judge-btn.on.hold    { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .mv-judge-btn.on.through { background: var(--surface); color: var(--ink-muted); border-color: var(--ink-muted); }
 
   .mv-tf-row {
     display: grid; grid-template-columns: 64px auto 1fr; gap: 10px;
@@ -604,7 +620,16 @@
         <option value="__custom__">その他（自由入力）</option>
       </select>
       <input type="text" id="mvAddPairCustom" class="hidden" placeholder="例: CAD/JPY">
-      <button class="btn-ghost hidden" type="button" id="mvAddPairCustomOk">追加する</button>
+      <select id="mvAddTf">
+        <option value="">時間足を選択…</option>
+        <option>日足</option>
+        <option>4時間足</option>
+        <option>1時間足</option>
+        <option>15分足</option>
+        <option>5分足</option>
+        <option>1分足</option>
+      </select>
+      <button class="btn-ghost" type="button" id="mvAddOk">追加する</button>
       <span class="spacer"></span>
     </div>
 
@@ -747,6 +772,7 @@
           <label>判定<span class="req">*</span></label>
           <div class="result-toggle" id="resultToggle">
             <button type="button" class="result-btn entered" data-value="entered">✅ エントリーした</button>
+            <button type="button" class="result-btn hold" data-value="hold">⏸ 保留した</button>
             <button type="button" class="result-btn through" data-value="through">⏭ スルーした</button>
           </div>
         </div>
@@ -1313,12 +1339,12 @@ function setResultState(value) {
   resultToggle.querySelectorAll('.result-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.value === value);
   });
-  const isThrough = value === 'through';
-  directionField.classList.toggle('hidden', isThrough);
-  fDirection.required = !isThrough;
-  if (isThrough) fDirection.value = '';
-  exitResultField.classList.toggle('hidden', isThrough);
-  if (isThrough) fExitResult.value = '';
+  const isEntered = value === 'entered';
+  directionField.classList.toggle('hidden', !isEntered);
+  fDirection.required = isEntered;
+  if (!isEntered) fDirection.value = '';
+  exitResultField.classList.toggle('hidden', !isEntered);
+  if (!isEntered) fExitResult.value = '';
 }
 resultToggle.addEventListener('click', (e) => {
   const btn = e.target.closest('.result-btn');
@@ -1344,7 +1370,7 @@ document.getElementById('tradeForm').addEventListener('submit', (e) => {
     return;
   }
   if (!resultState) {
-    showToast('⚠ 「エントリーした／スルーした」を選択してください');
+    showToast('⚠ 「エントリーした／保留した／スルーした」を選択してください');
     return;
   }
   const checks = getCheckStates();
@@ -1394,8 +1420,8 @@ function doSave(checks) {
     pair:       pair,
     tfHigher:   document.getElementById('fTfHigher').value,
     tfEntry:    document.getElementById('fTfEntry').value,
-    direction:  resultState === 'through' ? '' : document.getElementById('fDirection').value,
-    exitResult: resultState === 'through' ? '' : document.getElementById('fExitResult').value,
+    direction:  resultState === 'entered' ? document.getElementById('fDirection').value : '',
+    exitResult: resultState === 'entered' ? document.getElementById('fExitResult').value : '',
     notes:      document.getElementById('fNotes').value.trim(),
     /* 利確データは履歴タブの「💰 利確」で管理するため、編集時は既存値を引き継ぐ */
     entryPrice: existing ? existing.entryPrice : '',
@@ -1427,7 +1453,7 @@ function doSave(checks) {
   renderAll();
   showToast(wasEditing
     ? '✔ 記録を更新しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）'
-    : '✔ ' + (trade.result === 'entered' ? 'エントリー' : 'スルー') + 'を記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
+    : '✔ ' + (trade.result === 'entered' ? 'エントリー' : trade.result === 'hold' ? '保留' : 'スルー') + 'を記録しました（OK ' + checks.filter(s => s === 'ok').length + '/' + CHECK_ITEMS.length + '）');
 }
 
 /* ============ 統計サマリー ============ */
@@ -1463,6 +1489,7 @@ function renderStats() {
   const avgCheck = checkRates.length
     ? checkRates.reduce((s, r) => s + r, 0) / checkRates.length * 100 : 0;
   const enteredCount = trades.filter(t => t.result === 'entered').length;
+  const holdCount    = trades.filter(t => t.result === 'hold').length;
   const throughCount = trades.filter(t => t.result === 'through').length;
 
   /* ---- RR 集計 ---- */
@@ -1492,6 +1519,7 @@ function renderStats() {
   const tiles = [
     { label: 'トレード数', value: String(trades.length), unit: '件' },
     { label: 'エントリー数', value: String(enteredCount), unit: '件' },
+    { label: '保留数', value: String(holdCount), unit: '件' },
     { label: 'スルー数', value: String(throughCount), unit: '件' },
     { label: 'チェック遵守率', value: trades.length ? avgCheck.toFixed(0) : '–', unit: '%' },
     { label: '平均RR', value: avgRR == null ? '–' : fmtRR(round2(avgRR)), cls: rrCls(avgRR) },
@@ -1557,7 +1585,9 @@ function renderList() {
     const full = nChecks === CHECK_ITEMS.length;
     const missed = Array.isArray(t.checks)
       ? CHECK_ITEMS.filter((_, i) => t.checks[i] === 'ng').map(c => c.tag) : [];
-    const isThrough = t.result === 'through';
+    const isEntered = t.result === 'entered';
+    const resultBadge = t.result === 'entered' ? 'entered' : t.result === 'hold' ? 'hold' : 'through';
+    const resultLabel = t.result === 'entered' ? '✅ エントリー' : t.result === 'hold' ? '⏸ 保留' : '⏭ スルー';
     const exits = tradeExits(t);
     return (
       '<div class="record-card">' +
@@ -1566,11 +1596,10 @@ function renderList() {
           (t.createdAt ? '<span class="recorded-at">（記録: ' + fmtDatetime(t.createdAt) + '）</span>' : '') +
           '<span class="badge ' + getTradeType(t) + '">' +
             (getTradeType(t) === 'demo' ? '🔬 検証' : '💰 リアル') + '</span>' +
-          '<span class="badge ' + (isThrough ? 'through' : 'entered') + '">' +
-            (isThrough ? '⏭ スルー' : '✅ エントリー') + '</span>' +
+          '<span class="badge ' + resultBadge + '">' + resultLabel + '</span>' +
           '<span class="badge pair">' + esc(t.pair) + '</span>' +
           (t.entryPattern ? '<span class="badge style">' + esc(t.entryPattern) + '</span>' : '') +
-          (!isThrough
+          (isEntered
             ? '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
               (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>'
             : '') +
@@ -1579,7 +1608,7 @@ function renderList() {
               (full ? '✔ ' : '⚠ ') + nChecks + '/' + CHECK_ITEMS.length + '</span>'
             : '') +
           '<span class="spacer"></span>' +
-          (!isThrough
+          (isEntered
             ? '<button class="btn-exit" type="button" data-exit="' + esc(t.id) + '">💰 利確</button>'
             : '') +
           '<button class="btn-ghost" type="button" data-edit="' + esc(t.id) + '">✎ 編集</button>' +
@@ -1674,7 +1703,7 @@ function loadTradeIntoForm(t) {
   editingId = t.id;
 
   setTradeTypeState(getTradeType(t));
-  setResultState(t.result === 'through' ? 'through' : 'entered');
+  setResultState(t.result === 'through' ? 'through' : t.result === 'hold' ? 'hold' : 'entered');
 
   const alertPairKnown = Array.from(alertPairSelect.options).some(o => o.value === t.alertPair);
   alertPairSelect.value = alertPairKnown ? (t.alertPair || '') : '__custom__';
@@ -1972,7 +2001,7 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           tradeType: get(r, 'tradeType') === 'demo' ? 'demo' : 'real',
           alertPair: get(r, 'alertPair'),
           alertTf:   get(r, 'alertTf'),
-          result:    get(r, 'result') === 'through' ? 'through' : (get(r, 'result') === 'entered' ? 'entered' : ''),
+          result:    ['through', 'hold', 'entered'].includes(get(r, 'result')) ? get(r, 'result') : '',
           entryPattern: get(r, 'entryPattern'),
           datetime:   get(r, 'datetime'),
           exitDatetime: get(r, 'exitDatetime'),
@@ -2036,13 +2065,38 @@ const MV_STATES = [
 ];
 const MV_STATE_LABELS = Object.fromEntries(MV_STATES.map(s => [s.v, s.label]));
 
+/* アラート発生時の判定（トレード記録フォームの判定と同じ3択） */
+const MV_JUDGES = [
+  { v: 'entered', label: '✅ エントリー' },
+  { v: 'hold',    label: '⏸ 保留' },
+  { v: 'through', label: '⏭ スルー' },
+];
+const MV_JUDGE_LABELS = Object.fromEntries(MV_JUDGES.map(j => [j.v, j.label]));
+
+function mvGenId(prefix) {
+  return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
 function loadMarket() {
   try {
     const o = JSON.parse(localStorage.getItem(MARKET_KEY) || '{}');
-    return {
-      pairs:     Array.isArray(o.pairs) ? o.pairs : [],
-      snapshots: Array.isArray(o.snapshots) ? o.snapshots : [],
-    };
+    let pairs = Array.isArray(o.pairs) ? o.pairs : [];
+    let snapshots = Array.isArray(o.snapshots) ? o.snapshots : [];
+
+    /* 旧形式（監視ペアが文字列配列、通貨ペアと時間足・判定の区別なし）からの移行。
+       各ペアに id・alertTf・judge を付与し、既存スナップショットに watchId を紐付ける。 */
+    if (pairs.length && typeof pairs[0] === 'string') {
+      const nameToId = {};
+      pairs = pairs.map(name => {
+        const id = mvGenId('w');
+        nameToId[name] = id;
+        return { id, pair: name, alertTf: '', judge: '' };
+      });
+      snapshots = snapshots.map(s => Object.assign({}, s, { watchId: nameToId[s.pair] || '' }));
+      saveMarket({ pairs, snapshots });
+    }
+
+    return { pairs, snapshots };
   } catch (e) {
     console.error('環境認識データの読み込みエラー:', e);
     return { pairs: [], snapshots: [] };
@@ -2057,15 +2111,15 @@ function saveMarket(data) {
     return false;
   }
 }
-/* そのペアの最新スナップショット（記録時刻の新しい順で先頭） */
-function latestSnapshot(data, pair) {
+/* その監視項目の最新スナップショット（記録時刻の新しい順で先頭） */
+function latestSnapshot(data, watchId) {
   return data.snapshots
-    .filter(s => s.pair === pair)
+    .filter(s => s.watchId === watchId)
     .sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0] || null;
 }
-function snapshotsOf(data, pair) {
+function snapshotsOf(data, watchId) {
   return data.snapshots
-    .filter(s => s.pair === pair)
+    .filter(s => s.watchId === watchId)
     .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
 }
 function stateChip(v) {
@@ -2079,13 +2133,13 @@ const mvListEl = document.getElementById('mvList');
 function renderMarket() {
   const data = loadMarket();
   if (data.pairs.length === 0) {
-    mvListEl.innerHTML = '<div class="empty-state">監視する通貨ペアがまだありません。' +
-      '上のプルダウンから追加してください。</div>';
+    mvListEl.innerHTML = '<div class="empty-state">監視中のアラートがまだありません。' +
+      '上で通貨ペアと時間足を選んで追加してください。</div>';
     return;
   }
-  mvListEl.innerHTML = data.pairs.map(pair => {
-    const latest = latestSnapshot(data, pair);
-    const hist = snapshotsOf(data, pair).slice(1);
+  mvListEl.innerHTML = data.pairs.map(w => {
+    const latest = latestSnapshot(data, w.id);
+    const hist = snapshotsOf(data, w.id).slice(1);
     const tf = (latest && latest.tf) || {};
 
     const rows = MV_TFS.map(t => {
@@ -2119,52 +2173,60 @@ function renderMarket() {
 
     return '<div class="mv-card">' +
       '<div class="mv-card-head">' +
-        '<span class="pair">' + esc(pair) + '</span>' +
+        '<span class="pair">' + esc(w.pair) + '</span>' +
+        (w.alertTf ? '<span class="mv-tf-badge">' + esc(w.alertTf) + '</span>' : '') +
         '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
         '<span class="spacer"></span>' +
-        '<button class="btn-accent-solid" type="button" data-mv-record="' + esc(pair) + '">✎ 記録する</button>' +
-        '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(pair) + '">監視解除</button>' +
+        '<button class="btn-accent-solid" type="button" data-mv-record="' + esc(w.id) + '">✎ 記録する</button>' +
+        '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">監視解除</button>' +
+      '</div>' +
+      '<div class="mv-judge-row">' +
+        '<span class="label">判定</span>' +
+        '<div class="mv-choice">' +
+          MV_JUDGES.map(j =>
+            '<button type="button" class="mv-judge-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
+            ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
+        '</div>' +
       '</div>' +
       rows + ai + history +
     '</div>';
   }).join('');
 }
 
-/* ---- 監視ペアの追加 ---- */
+/* ---- 監視項目（通貨ペア＋時間足）の追加 ---- */
 const mvAddPair       = document.getElementById('mvAddPair');
 const mvAddPairCustom = document.getElementById('mvAddPairCustom');
-const mvAddPairCustomOk = document.getElementById('mvAddPairCustomOk');
+const mvAddTf         = document.getElementById('mvAddTf');
+const mvAddOk         = document.getElementById('mvAddOk');
 
-function addWatchPair(pair) {
-  pair = String(pair || '').trim();
-  if (!pair) return;
+mvAddPair.addEventListener('change', () => {
+  const custom = mvAddPair.value === '__custom__';
+  mvAddPairCustom.classList.toggle('hidden', !custom);
+  if (custom) mvAddPairCustom.focus();
+});
+
+function addWatch() {
+  const pair = (mvAddPair.value === '__custom__' ? mvAddPairCustom.value : mvAddPair.value).trim();
+  const alertTf = mvAddTf.value;
+  if (!pair) { showToast('⚠ 通貨ペアを選択または入力してください'); return; }
+  if (!alertTf) { showToast('⚠ 時間足を選択してください'); return; }
   const data = loadMarket();
-  if (data.pairs.includes(pair)) { showToast('⚠ 「' + pair + '」はすでに監視中です'); return; }
-  data.pairs.push(pair);
+  if (data.pairs.some(w => w.pair === pair && w.alertTf === alertTf)) {
+    showToast('⚠ 「' + pair + ' / ' + alertTf + '」はすでに監視中です');
+    return;
+  }
+  data.pairs.push({ id: mvGenId('w'), pair, alertTf, judge: '' });
   if (!saveMarket(data)) return;
   renderMarket();
-  showToast('✔ 「' + pair + '」を監視リストに追加しました');
-}
-mvAddPair.addEventListener('change', () => {
-  const v = mvAddPair.value;
-  const custom = v === '__custom__';
-  mvAddPairCustom.classList.toggle('hidden', !custom);
-  mvAddPairCustomOk.classList.toggle('hidden', !custom);
-  if (custom) { mvAddPairCustom.focus(); return; }
-  if (v) { addWatchPair(v); mvAddPair.value = ''; }
-});
-function commitCustomPair() {
-  const v = mvAddPairCustom.value.trim();
-  if (!v) { showToast('⚠ 通貨ペア名を入力してください'); return; }
-  addWatchPair(v);
-  mvAddPairCustom.value = '';
+  showToast('✔ 「' + pair + ' / ' + alertTf + '」を監視リストに追加しました');
   mvAddPair.value = '';
+  mvAddTf.value = '';
+  mvAddPairCustom.value = '';
   mvAddPairCustom.classList.add('hidden');
-  mvAddPairCustomOk.classList.add('hidden');
 }
-mvAddPairCustomOk.addEventListener('click', commitCustomPair);
+mvAddOk.addEventListener('click', addWatch);
 mvAddPairCustom.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); commitCustomPair(); }
+  if (e.key === 'Enter') { e.preventDefault(); addWatch(); }
 });
 
 /* ---- 記録モーダル ---- */
@@ -2172,14 +2234,16 @@ const mvModal      = document.getElementById('mvModal');
 const mvModalPair  = document.getElementById('mvModalPair');
 const mvModalRows  = document.getElementById('mvModalRows');
 const mvAiText     = document.getElementById('mvAiText');
-let mvEditingPair  = null;
+let mvEditingId    = null;
 
-function openMvModal(pair) {
+function openMvModal(watchId) {
   const data = loadMarket();
-  const latest = latestSnapshot(data, pair);
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return;
+  const latest = latestSnapshot(data, watchId);
   const tf = (latest && latest.tf) || {};
-  mvEditingPair = pair;
-  mvModalPair.textContent = pair;
+  mvEditingId = watchId;
+  mvModalPair.textContent = w.pair + (w.alertTf ? '（' + w.alertTf + '）' : '');
 
   /* 前回の見立てを初期値として引き継ぐ。変わっていない時間足はそのまま記録できる。 */
   mvModalRows.innerHTML = MV_TFS.map(t => {
@@ -2201,7 +2265,7 @@ function openMvModal(pair) {
 }
 function closeMvModal() {
   mvModal.classList.remove('show');
-  mvEditingPair = null;
+  mvEditingId = null;
 }
 
 /* 状態ボタンはトグル式。同じものを再度押すと未選択に戻せる。 */
@@ -2229,7 +2293,7 @@ document.getElementById('mvCancel').addEventListener('click', closeMvModal);
 mvModal.addEventListener('click', (e) => { if (e.target === mvModal) closeMvModal(); });
 
 document.getElementById('mvSave').addEventListener('click', () => {
-  if (!mvEditingPair) return;
+  if (!mvEditingId) return;
   const tf = readMvModal();
   const filled = MV_TFS.some(t => tf[t.k].s || tf[t.k].note);
   const ai = mvAiText.value.trim();
@@ -2239,8 +2303,8 @@ document.getElementById('mvSave').addEventListener('click', () => {
   }
   const data = loadMarket();
   data.snapshots.push({
-    id: 'mv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    pair: mvEditingPair,
+    id: mvGenId('mv'),
+    watchId: mvEditingId,
     at: new Date().toISOString(),
     tf: tf,
     ai: ai,
@@ -2278,8 +2342,10 @@ function buildAiPrompt(pair, tf) {
   ].join('\n');
 }
 document.getElementById('mvCopyPrompt').addEventListener('click', () => {
-  if (!mvEditingPair) return;
-  const text = buildAiPrompt(mvEditingPair, readMvModal());
+  if (!mvEditingId) return;
+  const w = loadMarket().pairs.find(p => p.id === mvEditingId);
+  if (!w) return;
+  const text = buildAiPrompt(w.pair, readMvModal());
   /* navigator.clipboard は https / localhost 以外では使えないため、
      失敗時は選択済みテキストエリアにフォールバックする。 */
   const fallback = () => {
@@ -2304,19 +2370,36 @@ document.getElementById('mvCopyPrompt').addEventListener('click', () => {
 
 /* ---- 一覧内の操作 ---- */
 const mvDeleteModal = document.getElementById('mvDeleteModal');
-let mvPendingDeletePair = null;
+let mvPendingDeleteId = null;
 
 mvListEl.addEventListener('click', (e) => {
   const rec = e.target.closest('[data-mv-record]');
   if (rec) { openMvModal(rec.dataset.mvRecord); return; }
 
+  /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。 */
+  const judgeBtn = e.target.closest('[data-mv-judge]');
+  if (judgeBtn) {
+    const id = judgeBtn.dataset.mvJudge;
+    const value = judgeBtn.dataset.value;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === id);
+    if (!w) return;
+    w.judge = w.judge === value ? '' : value;
+    if (!saveMarket(data)) return;
+    renderMarket();
+    return;
+  }
+
   const delPair = e.target.closest('[data-mv-del-pair]');
   if (delPair) {
-    const pair = delPair.dataset.mvDelPair;
-    const n = snapshotsOf(loadMarket(), pair).length;
-    mvPendingDeletePair = pair;
+    const id = delPair.dataset.mvDelPair;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === id);
+    if (!w) return;
+    const n = snapshotsOf(data, id).length;
+    mvPendingDeleteId = id;
     document.getElementById('mvDeleteText').textContent =
-      '「' + pair + '」を監視リストから外します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
+      '「' + w.pair + (w.alertTf ? ' / ' + w.alertTf : '') + '」を監視リストから外します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
     mvDeleteModal.classList.add('show');
     return;
   }
@@ -2332,19 +2415,19 @@ mvListEl.addEventListener('click', (e) => {
 });
 document.getElementById('mvDeleteCancel').addEventListener('click', () => {
   mvDeleteModal.classList.remove('show');
-  mvPendingDeletePair = null;
+  mvPendingDeleteId = null;
 });
 document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
-  if (!mvPendingDeletePair) return;
+  if (!mvPendingDeleteId) return;
   const data = loadMarket();
-  data.pairs = data.pairs.filter(p => p !== mvPendingDeletePair);
-  data.snapshots = data.snapshots.filter(s => s.pair !== mvPendingDeletePair);
+  data.pairs = data.pairs.filter(p => p.id !== mvPendingDeleteId);
+  data.snapshots = data.snapshots.filter(s => s.watchId !== mvPendingDeleteId);
   if (saveMarket(data)) {
     renderMarket();
-    showToast('「' + mvPendingDeletePair + '」の監視を解除しました');
+    showToast('監視を解除しました');
   }
   mvDeleteModal.classList.remove('show');
-  mvPendingDeletePair = null;
+  mvPendingDeleteId = null;
 });
 
 /* ============ タブ切替 ============ */
