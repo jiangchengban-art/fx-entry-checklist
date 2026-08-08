@@ -513,6 +513,8 @@
   .mv-tf-row + .mv-tf-row { border-top: 1px solid var(--hairline); }
   .mv-tf-row .tf { font-size: 12px; font-weight: 700; color: var(--ink-2); }
 
+  .mv-goto-checklist { width: 100%; margin-top: 12px; }
+
   .mv-state {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
@@ -2131,7 +2133,9 @@ function renderMarket() {
             ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
         '</div>' +
       '</div>' +
-      rows + history +
+      rows +
+      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
+      history +
     '</div>';
   }).join('');
 }
@@ -2203,6 +2207,10 @@ mvListEl.addEventListener('click', (e) => {
     renderMarket();
     return;
   }
+
+  /* 上位足の環境認識を終えてエントリーできそうなら、そのままチェックタブへ移動する。 */
+  const gotoChecklist = e.target.closest('[data-mv-goto-checklist]');
+  if (gotoChecklist) { setActiveTab('checklist'); return; }
 
   /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。 */
   const judgeBtn = e.target.closest('[data-mv-judge]');
