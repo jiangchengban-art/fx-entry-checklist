@@ -505,14 +505,13 @@
   .mv-judge-btn.on.hold    { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
   .mv-judge-btn.on.through { background: var(--surface); color: var(--ink-muted); border-color: var(--ink-muted); }
 
+  /* 状態ボタンをカード上に直接並べる。ラベル幅は判定行と揃える。 */
   .mv-tf-row {
-    display: grid; grid-template-columns: 64px auto 1fr; gap: 10px;
+    display: grid; grid-template-columns: 64px 1fr; gap: 10px;
     align-items: center; padding: 7px 0;
   }
   .mv-tf-row + .mv-tf-row { border-top: 1px solid var(--hairline); }
   .mv-tf-row .tf { font-size: 12px; font-weight: 700; color: var(--ink-2); }
-  .mv-tf-row .note { font-size: 12px; color: var(--ink-2); word-break: break-word; }
-  .mv-tf-row .note.empty { color: var(--ink-muted); }
 
   .mv-state {
     display: inline-flex; align-items: center; gap: 4px;
@@ -537,33 +536,6 @@
   .mv-choice button.on[data-state="down"]  { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
   .mv-choice button.on[data-state="range"] { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 
-  .mv-edit-row { padding: 10px 0; }
-  .mv-edit-row + .mv-edit-row { border-top: 1px solid var(--hairline); }
-  .mv-edit-row .tf-label { font-size: 12px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
-  .mv-edit-row input.memo {
-    width: 100%; margin-top: 6px; background: var(--surface-2); color: var(--ink);
-    border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
-    font-size: 13px; font-family: inherit;
-  }
-
-  .mv-ai {
-    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
-  }
-  .mv-ai .ai-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-  .mv-ai .ai-head .t { font-size: 12px; font-weight: 700; color: var(--ink-2); }
-  .mv-ai .ai-body {
-    font-size: 12px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 10px; max-height: 200px; overflow-y: auto;
-  }
-  .mv-ai textarea {
-    width: 100%; min-height: 110px; resize: vertical;
-    background: var(--surface-2); color: var(--ink);
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
-    font-size: 13px; font-family: inherit; line-height: 1.5;
-  }
-  .mv-hint { font-size: 11px; color: var(--ink-muted); margin-top: 6px; line-height: 1.5; }
-
   .mv-history { margin-top: 10px; }
   .mv-history > summary {
     cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-muted);
@@ -585,8 +557,7 @@
     .stat-tile .value { font-size: 21px; }
     .tab-bar .tab-btn { padding: 8px 2px 6px; }
     .tab-bar .tab-btn .tab-label { font-size: 10px; }
-    .mv-tf-row { grid-template-columns: 52px auto; row-gap: 2px; }
-    .mv-tf-row .note { grid-column: 1 / -1; }
+    .mv-tf-row { grid-template-columns: 52px 1fr; }
   }
 </style>
 </head>
@@ -604,7 +575,7 @@
   <!-- ============ ⓪ 環境認識ボード ============ -->
   <section class="card tab-panel" id="tabPanel-market">
     <h2>🌐 環境認識ボード</h2>
-    <div class="section-note">監視している通貨ペアの週足・日足・4時間足が「トレンドかレンジか」を都度記録します。更新するたびに履歴として残るので、後から「あの時どう見ていたか」を振り返れます。</div>
+    <div class="section-note">監視している通貨ペアの週足・日足・4時間足が「トレンドかレンジか」をワンタップで記録します。押すたびに履歴として残るので、後から「あの時どう見ていたか」を振り返れます。</div>
 
     <div class="mv-toolbar">
       <select id="mvAddPair">
@@ -621,7 +592,7 @@
       </select>
       <input type="text" id="mvAddPairCustom" class="hidden" placeholder="例: CAD/JPY">
       <select id="mvAddTf">
-        <option value="">時間足を選択…</option>
+        <option value="">アラート発生足を選択…</option>
         <option>日足</option>
         <option>4時間足</option>
         <option>1時間足</option>
@@ -905,32 +876,6 @@
     <div class="modal-actions">
       <button class="btn-secondary" type="button" id="exitCancel">キャンセル</button>
       <button class="btn-accent-solid" type="button" id="exitSave">保存する</button>
-    </div>
-  </div>
-</div>
-
-<!-- 環境認識の記録モーダル -->
-<div class="modal-backdrop" id="mvModal">
-  <div class="modal wide">
-    <h3>🌐 <span id="mvModalPair"></span> の環境認識</h3>
-    <div id="mvModalRows"></div>
-
-    <div class="mv-ai">
-      <div class="ai-head">
-        <span class="t">🤖 AIチャート分析（任意）</span>
-        <span class="spacer"></span>
-        <button class="btn-ghost" type="button" id="mvCopyPrompt">📋 分析プロンプトをコピー</button>
-      </div>
-      <textarea id="mvAiText" placeholder="Claude や ChatGPT にチャート画像と一緒にプロンプトを渡し、返ってきた分析をここに貼り付けます。"></textarea>
-      <p class="mv-hint">
-        「分析プロンプトをコピー」で、上で選んだ自分の見立てを織り込んだ依頼文がクリップボードに入ります。<br>
-        チャート画像を添えて AI に渡し、返答を貼り付けると自分の分析と並べて残せます。
-      </p>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn-secondary" type="button" id="mvCancel">キャンセル</button>
-      <button class="btn-accent-solid" type="button" id="mvSave">記録する</button>
     </div>
   </div>
 </div>
@@ -2142,20 +2087,19 @@ function renderMarket() {
     const hist = snapshotsOf(data, w.id).slice(1);
     const tf = (latest && latest.tf) || {};
 
+    /* 状態ボタンはカード上で直接クリックでき、押すたびに新しいスナップショットとして即保存される。
+       行ごとに data-watch/data-tf を持たせ、クリックイベント側でどの監視項目・時間足かを判定する。 */
     const rows = MV_TFS.map(t => {
       const cell = tf[t.k] || {};
-      return '<div class="mv-tf-row">' +
+      return '<div class="mv-tf-row" data-watch="' + esc(w.id) + '" data-tf="' + t.k + '">' +
         '<span class="tf">' + t.label + '</span>' +
-        stateChip(cell.s) +
-        '<span class="note' + (cell.note ? '' : ' empty') + '">' +
-          (cell.note ? esc(cell.note) : '—') + '</span>' +
+        '<div class="mv-choice">' +
+          MV_STATES.map(s =>
+            '<button type="button" data-state="' + s.v + '"' +
+            (cell.s === s.v ? ' class="on"' : '') + '>' + s.label + '</button>').join('') +
+        '</div>' +
       '</div>';
     }).join('');
-
-    const ai = latest && latest.ai
-      ? '<div class="mv-ai"><div class="ai-head"><span class="t">🤖 AI分析</span></div>' +
-        '<div class="ai-body">' + esc(latest.ai) + '</div></div>'
-      : '';
 
     const history = hist.length
       ? '<details class="mv-history"><summary>過去の見立て（' + hist.length + '件）</summary>' +
@@ -2177,7 +2121,6 @@ function renderMarket() {
         (w.alertTf ? '<span class="mv-tf-badge">' + esc(w.alertTf) + '</span>' : '') +
         '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
         '<span class="spacer"></span>' +
-        '<button class="btn-accent-solid" type="button" data-mv-record="' + esc(w.id) + '">✎ 記録する</button>' +
         '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">監視解除</button>' +
       '</div>' +
       '<div class="mv-judge-row">' +
@@ -2188,7 +2131,7 @@ function renderMarket() {
             ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
         '</div>' +
       '</div>' +
-      rows + ai + history +
+      rows + history +
     '</div>';
   }).join('');
 }
@@ -2209,7 +2152,7 @@ function addWatch() {
   const pair = (mvAddPair.value === '__custom__' ? mvAddPairCustom.value : mvAddPair.value).trim();
   const alertTf = mvAddTf.value;
   if (!pair) { showToast('⚠ 通貨ペアを選択または入力してください'); return; }
-  if (!alertTf) { showToast('⚠ 時間足を選択してください'); return; }
+  if (!alertTf) { showToast('⚠ アラート発生足を選択してください'); return; }
   const data = loadMarket();
   if (data.pairs.some(w => w.pair === pair && w.alertTf === alertTf)) {
     showToast('⚠ 「' + pair + ' / ' + alertTf + '」はすでに監視中です');
@@ -2229,152 +2172,37 @@ mvAddPairCustom.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); addWatch(); }
 });
 
-/* ---- 記録モーダル ---- */
-const mvModal      = document.getElementById('mvModal');
-const mvModalPair  = document.getElementById('mvModalPair');
-const mvModalRows  = document.getElementById('mvModalRows');
-const mvAiText     = document.getElementById('mvAiText');
-let mvEditingId    = null;
-
-function openMvModal(watchId) {
-  const data = loadMarket();
-  const w = data.pairs.find(p => p.id === watchId);
-  if (!w) return;
-  const latest = latestSnapshot(data, watchId);
-  const tf = (latest && latest.tf) || {};
-  mvEditingId = watchId;
-  mvModalPair.textContent = w.pair + (w.alertTf ? '（' + w.alertTf + '）' : '');
-
-  /* 前回の見立てを初期値として引き継ぐ。変わっていない時間足はそのまま記録できる。 */
-  mvModalRows.innerHTML = MV_TFS.map(t => {
-    const cell = tf[t.k] || {};
-    return '<div class="mv-edit-row" data-tf="' + t.k + '">' +
-      '<div class="tf-label">' + t.label + '</div>' +
-      '<div class="mv-choice">' +
-        MV_STATES.map(s =>
-          '<button type="button" data-state="' + s.v + '"' +
-          (cell.s === s.v ? ' class="on"' : '') + '>' + s.label + '</button>').join('') +
-      '</div>' +
-      '<input type="text" class="memo" placeholder="メモ（任意）例: 直近高値を更新、押し目待ち" value="' +
-        esc(cell.note || '') + '">' +
-    '</div>';
-  }).join('');
-
-  mvAiText.value = (latest && latest.ai) || '';
-  mvModal.classList.add('show');
-}
-function closeMvModal() {
-  mvModal.classList.remove('show');
-  mvEditingId = null;
-}
-
-/* 状態ボタンはトグル式。同じものを再度押すと未選択に戻せる。 */
-mvModalRows.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-state]');
-  if (!btn) return;
-  const wasOn = btn.classList.contains('on');
-  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('on'));
-  if (!wasOn) btn.classList.add('on');
-});
-
-function readMvModal() {
-  const tf = {};
-  mvModalRows.querySelectorAll('.mv-edit-row').forEach(row => {
-    const on = row.querySelector('button.on');
-    tf[row.dataset.tf] = {
-      s: on ? on.dataset.state : '',
-      note: row.querySelector('input.memo').value.trim(),
-    };
-  });
-  return tf;
-}
-
-document.getElementById('mvCancel').addEventListener('click', closeMvModal);
-mvModal.addEventListener('click', (e) => { if (e.target === mvModal) closeMvModal(); });
-
-document.getElementById('mvSave').addEventListener('click', () => {
-  if (!mvEditingId) return;
-  const tf = readMvModal();
-  const filled = MV_TFS.some(t => tf[t.k].s || tf[t.k].note);
-  const ai = mvAiText.value.trim();
-  if (!filled && !ai) {
-    showToast('⚠ 少なくとも1つの時間足を選択するか、メモを入力してください');
-    return;
-  }
-  const data = loadMarket();
-  data.snapshots.push({
-    id: mvGenId('mv'),
-    watchId: mvEditingId,
-    at: new Date().toISOString(),
-    tf: tf,
-    ai: ai,
-  });
-  if (!saveMarket(data)) return;
-  closeMvModal();
-  renderMarket();
-  showToast('✔ 環境認識を記録しました');
-});
-
-/* ---- AI分析プロンプトのコピー ---- */
-/* 自分の見立てを本文に織り込む。AI に「追認」ではなく「相違点の指摘」を求めるのが狙い。 */
-function buildAiPrompt(pair, tf) {
-  const lines = MV_TFS.map(t => {
-    const c = tf[t.k] || {};
-    const state = c.s ? MV_STATE_LABELS[c.s].replace(/^[▲▬▼]\s*/, '') : '未判断';
-    return '- ' + t.label + '：' + state + (c.note ? '（' + c.note + '）' : '');
-  }).join('\n');
-
-  return [
-    'あなたはFXのマルチタイムフレーム分析に詳しいトレーダーです。',
-    '添付した ' + pair + ' のチャート画像（週足・日足・4時間足）を分析してください。',
-    '',
-    '【私の現在の見立て】',
-    lines,
-    '',
-    '【依頼】',
-    '1. 各時間足がトレンド（上昇/下降）かレンジかを、根拠とあわせて判定してください。',
-    '2. 私の見立てと異なる点があれば、どこがどう違うかを具体的に指摘してください。',
-    '3. 上位足と下位足の方向が揃っているか、ねじれているかを整理してください。',
-    '4. 意識されている高値・安値ライン、ラウンドナンバーを挙げてください。',
-    '5. 現時点で優位性のある方向と、逆に手を出すべきでない場面を述べてください。',
-    '',
-    '簡潔な箇条書きで、断定しすぎず根拠を添えて回答してください。',
-  ].join('\n');
-}
-document.getElementById('mvCopyPrompt').addEventListener('click', () => {
-  if (!mvEditingId) return;
-  const w = loadMarket().pairs.find(p => p.id === mvEditingId);
-  if (!w) return;
-  const text = buildAiPrompt(w.pair, readMvModal());
-  /* navigator.clipboard は https / localhost 以外では使えないため、
-     失敗時は選択済みテキストエリアにフォールバックする。 */
-  const fallback = () => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    document.body.removeChild(ta);
-    showToast(ok ? '📋 プロンプトをコピーしました' : '⚠ コピーできませんでした');
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('📋 プロンプトをコピーしました'))
-      .catch(fallback);
-  } else {
-    fallback();
-  }
-});
-
 /* ---- 一覧内の操作 ---- */
 const mvDeleteModal = document.getElementById('mvDeleteModal');
 let mvPendingDeleteId = null;
 
 mvListEl.addEventListener('click', (e) => {
-  const rec = e.target.closest('[data-mv-record]');
-  if (rec) { openMvModal(rec.dataset.mvRecord); return; }
+  /* 週足/日足/4時間足の状態ボタン。クリックのたびに新しいスナップショットとして即保存する。
+     同じ状態を再度押すと未選択に戻せる（トグル式）。 */
+  const stateBtn = e.target.closest('.mv-tf-row button[data-state]');
+  if (stateBtn) {
+    const row = stateBtn.closest('.mv-tf-row');
+    const watchId = row.dataset.watch;
+    const tfKey = row.dataset.tf;
+    const value = stateBtn.dataset.state;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === watchId);
+    if (!w) return;
+    const latest = latestSnapshot(data, watchId);
+    const prevTf = (latest && latest.tf) || {};
+    const newTf = {};
+    MV_TFS.forEach(t => { newTf[t.k] = { s: (prevTf[t.k] || {}).s || '' }; });
+    newTf[tfKey] = { s: newTf[tfKey].s === value ? '' : value };
+    data.snapshots.push({
+      id: mvGenId('mv'),
+      watchId: watchId,
+      at: new Date().toISOString(),
+      tf: newTf,
+    });
+    if (!saveMarket(data)) return;
+    renderMarket();
+    return;
+  }
 
   /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。 */
   const judgeBtn = e.target.closest('[data-mv-judge]');
