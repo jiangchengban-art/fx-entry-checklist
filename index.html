@@ -491,9 +491,11 @@
   .mv-card-head .at { font-size: 11px; color: var(--ink-muted); }
   .mv-card-head .spacer { flex: 1; }
   .mv-tf-badge {
-    display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
-    padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700;
+    padding: 2px 9px 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent);
   }
+  .mv-tf-badge::before { content: "🔔"; font-size: 10px; }
 
   .mv-judge-row {
     display: flex; align-items: center; gap: 10px; padding: 8px 0 12px;
@@ -2120,11 +2122,13 @@ function renderMarket() {
     return '<div class="mv-card">' +
       '<div class="mv-card-head">' +
         '<span class="pair">' + esc(w.pair) + '</span>' +
-        (w.alertTf ? '<span class="mv-tf-badge">' + esc(w.alertTf) + '</span>' : '') +
+        (w.alertTf ? '<span class="mv-tf-badge" title="アラート発生足">' + esc(w.alertTf) + '</span>' : '') +
         '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
         '<span class="spacer"></span>' +
         '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">監視解除</button>' +
       '</div>' +
+      rows +
+      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
       '<div class="mv-judge-row">' +
         '<span class="label">判定</span>' +
         '<div class="mv-choice">' +
@@ -2133,8 +2137,6 @@ function renderMarket() {
             ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
         '</div>' +
       '</div>' +
-      rows +
-      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
       history +
     '</div>';
   }).join('');
