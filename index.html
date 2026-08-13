@@ -547,6 +547,11 @@
     border: 1px solid var(--accent);
   }
   .mv-tf-badge::before { content: "🔔"; font-size: 10px; }
+  .mv-tf-badge-select {
+    font-size: 11.5px; font-weight: 700; padding: 3px 6px;
+    border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent); font-family: inherit; cursor: pointer;
+  }
 
   .mv-judge-row {
     display: flex; align-items: center; gap: 10px; padding: 8px 0 12px;
@@ -640,8 +645,8 @@
     <div class="section-note">監視している通貨ペアの週足・日足・4時間足が「トレンドかレンジか」をワンタップで記録します。押すたびに履歴として残るので、後から「あの時どう見ていたか」を振り返れます。</div>
 
     <div class="mv-toolbar">
-      <select id="mvAddPair">
-        <option value="">監視ペアを追加…</option>
+      <select id="mvPairSelect">
+        <option value="">通貨ペアを選択…</option>
         <option>USD/JPY</option>
         <option>EUR/JPY</option>
         <option>GBP/JPY</option>
@@ -652,17 +657,8 @@
         <option>GOLD (XAU/USD)</option>
         <option value="__custom__">その他（自由入力）</option>
       </select>
-      <input type="text" id="mvAddPairCustom" class="hidden" placeholder="例: CAD/JPY">
-      <select id="mvAddTf">
-        <option value="">アラート発生足を選択…</option>
-        <option>日足</option>
-        <option>4時間足</option>
-        <option>1時間足</option>
-        <option>15分足</option>
-        <option>5分足</option>
-        <option>1分足</option>
-      </select>
-      <button class="btn-ghost" type="button" id="mvAddOk">追加する</button>
+      <input type="text" id="mvPairCustom" class="hidden" placeholder="例: CAD/JPY">
+      <button class="btn-ghost hidden" type="button" id="mvPairCustomOk">決定</button>
       <span class="spacer"></span>
     </div>
 
@@ -2088,6 +2084,7 @@ function loadMarket() {
     const o = JSON.parse(localStorage.getItem(MARKET_KEY) || '{}');
     let pairs = Array.isArray(o.pairs) ? o.pairs : [];
     let snapshots = Array.isArray(o.snapshots) ? o.snapshots : [];
+    let changed = false;
 
     /* 旧形式（監視ペアが文字列配列、通貨ペアと時間足・判定の区別なし）からの移行。
        各ペアに id・alertTf・judge を付与し、既存スナップショットに watchId を紐付ける。 */
@@ -2099,14 +2096,43 @@ function loadMarket() {
         return { id, pair: name, alertTf: '', judge: '' };
       });
       snapshots = snapshots.map(s => Object.assign({}, s, { watchId: nameToId[s.pair] || '' }));
-      saveMarket({ pairs, snapshots });
+      changed = true;
     }
+
+    /* セッション17移行：ペア＋時間足の組み合わせごとに複数カードを持てた旧形式から、
+       通貨ペア1つにつき1枚のボードへ統合する。同名ペアが複数あれば最初の1件に統合し、
+       残りのスナップショットは統合先の watchId に付け替える（履歴は失わない）。 */
+    const seen = {};
+    const idRemap = {};
+    const mergedPairs = [];
+    pairs.forEach(w => {
+      if (seen[w.pair]) {
+        idRemap[w.id] = seen[w.pair].id;
+        changed = true;
+      } else {
+        seen[w.pair] = w;
+        mergedPairs.push(w);
+      }
+    });
+    if (Object.keys(idRemap).length) {
+      snapshots = snapshots.map(s => idRemap[s.watchId] ? Object.assign({}, s, { watchId: idRemap[s.watchId] }) : s);
+    }
+    pairs = mergedPairs;
+
+    if (changed) saveMarket({ pairs, snapshots });
 
     return { pairs, snapshots };
   } catch (e) {
     console.error('環境認識データの読み込みエラー:', e);
     return { pairs: [], snapshots: [] };
   }
+}
+const MARKET_SELECTED_KEY = 'mochipoyo_market_view_selected';
+function loadSelectedPairId() {
+  try { return localStorage.getItem(MARKET_SELECTED_KEY) || ''; } catch (e) { return ''; }
+}
+function saveSelectedPairId(id) {
+  try { localStorage.setItem(MARKET_SELECTED_KEY, id || ''); } catch (e) { /* noop */ }
 }
 function saveMarket(data) {
   try {
@@ -2135,104 +2161,128 @@ function stateChip(v) {
 }
 
 const mvListEl = document.getElementById('mvList');
+const MV_PRESET_PAIRS = ['USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'EUR/USD', 'GBP/USD', 'AUD/USD', 'GOLD (XAU/USD)'];
+const MV_TF_OPTIONS = ['日足', '4時間足', '1時間足', '15分足', '5分足', '1分足'];
+
+/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。 */
+function syncPairSelectOptions(data, selectedId) {
+  const known = new Set(MV_PRESET_PAIRS);
+  const customPairs = data.pairs.map(w => w.pair).filter(p => !known.has(p));
+  const selectedPair = (data.pairs.find(w => w.id === selectedId) || {}).pair || '';
+  let html = '<option value="">通貨ペアを選択…</option>';
+  MV_PRESET_PAIRS.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+  customPairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+  html += '<option value="__custom__">その他（自由入力）</option>';
+  mvPairSelect.innerHTML = html;
+}
 
 function renderMarket() {
   const data = loadMarket();
-  if (data.pairs.length === 0) {
-    mvListEl.innerHTML = '<div class="empty-state">監視中のアラートがまだありません。' +
-      '上で通貨ペアと時間足を選んで追加してください。</div>';
+  let selectedId = loadSelectedPairId();
+  let w = data.pairs.find(p => p.id === selectedId);
+  if (!w) { selectedId = ''; saveSelectedPairId(''); }
+
+  syncPairSelectOptions(data, selectedId);
+
+  if (!w) {
+    mvListEl.innerHTML = '<div class="empty-state">上で通貨ペアを選択すると、ここにボードが表示されます。</div>';
     return;
   }
-  mvListEl.innerHTML = data.pairs.map(w => {
-    const latest = latestSnapshot(data, w.id);
-    const hist = snapshotsOf(data, w.id).slice(1);
-    const tf = (latest && latest.tf) || {};
 
-    /* 状態ボタンはカード上で直接クリックでき、押すたびに新しいスナップショットとして即保存される。
-       行ごとに data-watch/data-tf を持たせ、クリックイベント側でどの監視項目・時間足かを判定する。 */
-    const rows = MV_TFS.map(t => {
-      const cell = tf[t.k] || {};
-      return '<div class="mv-tf-row" data-watch="' + esc(w.id) + '" data-tf="' + t.k + '">' +
-        '<span class="tf">' + t.label + '</span>' +
-        '<div class="mv-choice">' +
-          MV_STATES.map(s =>
-            '<button type="button" data-state="' + s.v + '"' +
-            (cell.s === s.v ? ' class="on"' : '') + '>' + s.label + '</button>').join('') +
-        '</div>' +
-      '</div>';
-    }).join('');
+  const latest = latestSnapshot(data, w.id);
+  const hist = snapshotsOf(data, w.id).slice(1);
+  const tf = (latest && latest.tf) || {};
 
-    const history = hist.length
-      ? '<details class="mv-history"><summary>過去の見立て（' + hist.length + '件）</summary>' +
-        hist.map(s => {
-          const stf = s.tf || {};
-          return '<div class="mv-hist-item">' +
-            '<span class="at">' + fmtDatetime(s.at) + '</span>' +
-            MV_TFS.map(t => stateChip((stf[t.k] || {}).s)).join('') +
-            '<span class="spacer"></span>' +
-            '<button class="btn-delete" type="button" data-mv-del-snap="' + esc(s.id) + '">削除</button>' +
-          '</div>';
-        }).join('') +
-        '</details>'
-      : '';
-
-    return '<div class="mv-card">' +
-      '<div class="mv-card-head">' +
-        '<span class="pair">' + esc(w.pair) + '</span>' +
-        (w.alertTf ? '<span class="mv-tf-badge" title="アラート発生足">' + esc(w.alertTf) + '</span>' : '') +
-        '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
-        '<span class="spacer"></span>' +
-        '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">監視解除</button>' +
+  /* 状態ボタンはカード上で直接クリックでき、押すたびに新しいスナップショットとして即保存される。
+     行ごとに data-watch/data-tf を持たせ、クリックイベント側でどの監視項目・時間足かを判定する。 */
+  const rows = MV_TFS.map(t => {
+    const cell = tf[t.k] || {};
+    return '<div class="mv-tf-row" data-watch="' + esc(w.id) + '" data-tf="' + t.k + '">' +
+      '<span class="tf">' + t.label + '</span>' +
+      '<div class="mv-choice">' +
+        MV_STATES.map(s =>
+          '<button type="button" data-state="' + s.v + '"' +
+          (cell.s === s.v ? ' class="on"' : '') + '>' + s.label + '</button>').join('') +
       '</div>' +
-      rows +
-      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
-      '<div class="mv-judge-row">' +
-        '<span class="label">判定</span>' +
-        '<div class="mv-choice">' +
-          MV_JUDGES.map(j =>
-            '<button type="button" class="mv-judge-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
-            ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
-        '</div>' +
-      '</div>' +
-      history +
     '</div>';
   }).join('');
+
+  const history = hist.length
+    ? '<details class="mv-history"><summary>過去の見立て（' + hist.length + '件）</summary>' +
+      hist.map(s => {
+        const stf = s.tf || {};
+        return '<div class="mv-hist-item">' +
+          '<span class="at">' + fmtDatetime(s.at) + '</span>' +
+          MV_TFS.map(t => stateChip((stf[t.k] || {}).s)).join('') +
+          '<span class="spacer"></span>' +
+          '<button class="btn-delete" type="button" data-mv-del-snap="' + esc(s.id) + '">削除</button>' +
+        '</div>';
+      }).join('') +
+      '</details>'
+    : '';
+
+  const alertTfOptions = '<option value="">アラート発生足を選択…</option>' +
+    MV_TF_OPTIONS.map(tfOpt => '<option' + (w.alertTf === tfOpt ? ' selected' : '') + '>' + esc(tfOpt) + '</option>').join('');
+
+  mvListEl.innerHTML = '<div class="mv-card">' +
+    '<div class="mv-card-head">' +
+      '<span class="pair">' + esc(w.pair) + '</span>' +
+      '<select class="mv-tf-badge-select" data-mv-alerttf="' + esc(w.id) + '" title="アラート発生足">' + alertTfOptions + '</select>' +
+      '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
+      '<span class="spacer"></span>' +
+      '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">このペアのデータを削除</button>' +
+    '</div>' +
+    rows +
+    '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
+    '<div class="mv-judge-row">' +
+      '<span class="label">判定</span>' +
+      '<div class="mv-choice">' +
+        MV_JUDGES.map(j =>
+          '<button type="button" class="mv-judge-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
+          ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
+      '</div>' +
+    '</div>' +
+    history +
+  '</div>';
 }
 
-/* ---- 監視項目（通貨ペア＋時間足）の追加 ---- */
-const mvAddPair       = document.getElementById('mvAddPair');
-const mvAddPairCustom = document.getElementById('mvAddPairCustom');
-const mvAddTf         = document.getElementById('mvAddTf');
-const mvAddOk         = document.getElementById('mvAddOk');
+/* ---- 通貨ペアの選択 ---- */
+const mvPairSelect   = document.getElementById('mvPairSelect');
+const mvPairCustom   = document.getElementById('mvPairCustom');
+const mvPairCustomOk = document.getElementById('mvPairCustomOk');
 
-mvAddPair.addEventListener('change', () => {
-  const custom = mvAddPair.value === '__custom__';
-  mvAddPairCustom.classList.toggle('hidden', !custom);
-  if (custom) mvAddPairCustom.focus();
-});
-
-function addWatch() {
-  const pair = (mvAddPair.value === '__custom__' ? mvAddPairCustom.value : mvAddPair.value).trim();
-  const alertTf = mvAddTf.value;
-  if (!pair) { showToast('⚠ 通貨ペアを選択または入力してください'); return; }
-  if (!alertTf) { showToast('⚠ アラート発生足を選択してください'); return; }
+/* 選択したペアの監視項目がなければ新規作成し、そのペア1枚だけをボードに表示する。 */
+function selectPair(pair) {
+  pair = (pair || '').trim();
+  if (!pair) return;
   const data = loadMarket();
-  if (data.pairs.some(w => w.pair === pair && w.alertTf === alertTf)) {
-    showToast('⚠ 「' + pair + ' / ' + alertTf + '」はすでに監視中です');
-    return;
+  let w = data.pairs.find(p => p.pair === pair);
+  if (!w) {
+    w = { id: mvGenId('w'), pair, alertTf: '', judge: '' };
+    data.pairs.push(w);
+    if (!saveMarket(data)) return;
   }
-  data.pairs.push({ id: mvGenId('w'), pair, alertTf, judge: '' });
-  if (!saveMarket(data)) return;
+  saveSelectedPairId(w.id);
   renderMarket();
-  showToast('✔ 「' + pair + ' / ' + alertTf + '」を監視リストに追加しました');
-  mvAddPair.value = '';
-  mvAddTf.value = '';
-  mvAddPairCustom.value = '';
-  mvAddPairCustom.classList.add('hidden');
 }
-mvAddOk.addEventListener('click', addWatch);
-mvAddPairCustom.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); addWatch(); }
+
+mvPairSelect.addEventListener('change', () => {
+  const custom = mvPairSelect.value === '__custom__';
+  mvPairCustom.classList.toggle('hidden', !custom);
+  mvPairCustomOk.classList.toggle('hidden', !custom);
+  if (custom) { mvPairCustom.focus(); return; }
+  if (mvPairSelect.value) selectPair(mvPairSelect.value);
+});
+function confirmCustomPair() {
+  if (!mvPairCustom.value.trim()) { showToast('⚠ 通貨ペアを入力してください'); return; }
+  selectPair(mvPairCustom.value);
+  mvPairCustom.value = '';
+  mvPairCustom.classList.add('hidden');
+  mvPairCustomOk.classList.add('hidden');
+}
+mvPairCustomOk.addEventListener('click', confirmCustomPair);
+mvPairCustom.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); confirmCustomPair(); }
 });
 
 /* ---- 一覧内の操作 ---- */
@@ -2300,7 +2350,7 @@ mvListEl.addEventListener('click', (e) => {
     const n = snapshotsOf(data, id).length;
     mvPendingDeleteId = id;
     document.getElementById('mvDeleteText').textContent =
-      '「' + w.pair + (w.alertTf ? ' / ' + w.alertTf : '') + '」を監視リストから外します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
+      '「' + w.pair + (w.alertTf ? ' / ' + w.alertTf : '') + '」のデータを削除します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
     mvDeleteModal.classList.add('show');
     return;
   }
@@ -2324,11 +2374,24 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
   data.pairs = data.pairs.filter(p => p.id !== mvPendingDeleteId);
   data.snapshots = data.snapshots.filter(s => s.watchId !== mvPendingDeleteId);
   if (saveMarket(data)) {
+    if (loadSelectedPairId() === mvPendingDeleteId) saveSelectedPairId('');
     renderMarket();
-    showToast('監視を解除しました');
+    showToast('データを削除しました');
   }
   mvDeleteModal.classList.remove('show');
   mvPendingDeleteId = null;
+});
+
+/* アラート発生足はカード上のセレクトから直接変更・保存する。 */
+mvListEl.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-mv-alerttf]');
+  if (!sel) return;
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === sel.dataset.mvAlerttf);
+  if (!w) return;
+  w.alertTf = sel.value;
+  if (!saveMarket(data)) return;
+  renderMarket();
 });
 
 /* ============ タブ切替 ============ */
