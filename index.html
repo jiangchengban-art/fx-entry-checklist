@@ -553,6 +553,23 @@
     border: 1px solid var(--accent); font-family: inherit; cursor: pointer;
   }
 
+  /* 複数時間足のアラート発生トグル（1H/4H/D/W）。タップした足だけ色が変わる。 */
+  .mv-alert-badges { display: flex; gap: 5px; }
+  .mv-alert-badge {
+    font-size: 11.5px; font-weight: 700; padding: 3px 9px;
+    border-radius: 999px; background: transparent; color: var(--ink-muted);
+    border: 1px solid var(--border); font-family: inherit; cursor: pointer;
+  }
+  .mv-alert-badge.on {
+    background: var(--accent-soft); color: var(--accent); border-color: var(--accent);
+  }
+  .mv-alert-badge.on::before { content: "🔔"; font-size: 10px; margin-right: 2px; }
+  .mv-alert-times {
+    width: 100%; display: flex; flex-wrap: wrap; gap: 6px 14px;
+    font-size: 11px; color: var(--ink-muted); margin-top: -2px;
+  }
+  .mv-alert-times .item { color: var(--accent); font-weight: 600; }
+
   .mv-judge-row {
     display: flex; align-items: center; gap: 10px; padding: 8px 0 12px;
     border-bottom: 1px solid var(--hairline); margin-bottom: 4px;
@@ -827,6 +844,7 @@
     </div>
     <div class="stats-grid" id="statsGrid"></div>
     <div class="basis-rr" id="basisRr"></div>
+    <div class="basis-rr" id="mvAlertStats"></div>
   </section>
 
   <section class="card">
@@ -1547,6 +1565,39 @@ function renderStats() {
         '</div>').join('')
     : '<h3>利確根拠別の平均RR</h3><div class="empty-state">' +
       '利確ポイントがまだありません。📚履歴の「💰 利確」から追記してください。</div>';
+
+  renderMvAlertStats();
+}
+
+/* ---- アラート発生足別の判定統計 ---- */
+/* 環境認識ボードで判定（エントリー/保留/スルー）を押すたびに記録される judgeLog を、
+   そのときONだった各時間足（1H/4H/D/W）ごとに集計する。複数の足が同時にONの場合は
+   それぞれの足のカウントに重複して加算される（同時アラートの傾向を見るため）。 */
+function renderMvAlertStats() {
+  const el = document.getElementById('mvAlertStats');
+  if (!el) return;
+  const log = loadMarket().judgeLog || [];
+  if (!log.length) {
+    el.innerHTML = '<h3>アラート発生足別の判定統計</h3><div class="empty-state">' +
+      '環境認識ボードで判定（✅エントリー/⏸保留/⏭スルー）を記録するとここに集計されます。</div>';
+    return;
+  }
+  const rows = MV_ALERT_TFS.map(t => {
+    const entries = log.filter(l => (l.alerts && l.alerts[t.k] && l.alerts[t.k].on));
+    const n = entries.length;
+    const entered = entries.filter(l => l.judge === 'entered').length;
+    const hold    = entries.filter(l => l.judge === 'hold').length;
+    const through = entries.filter(l => l.judge === 'through').length;
+    return { t, n, entered, hold, through };
+  }).filter(r => r.n > 0);
+  el.innerHTML = '<h3>アラート発生足別の判定統計</h3>' + (rows.length
+    ? rows.map(r =>
+        '<div class="row">' +
+          '<span class="name">' + esc(r.t.full) + '</span>' +
+          '<span class="n">' + r.n + '件</span>' +
+          '<span class="rr" style="width:auto;">✅' + r.entered + ' ⏸' + r.hold + ' ⏭' + r.through + '</span>' +
+        '</div>').join('')
+    : '<div class="empty-state">環境認識ボードで判定を記録するとここに集計されます。</div>');
 }
 function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -2067,6 +2118,21 @@ const MV_STATES = [
 ];
 const MV_STATE_LABELS = Object.fromEntries(MV_STATES.map(s => [s.v, s.label]));
 
+/* アラート発生足（複数可）。同時に複数の時間足でアラートが鳴ることがあるため、
+   4つそれぞれをタップでON/OFFでき、ONにした瞬間の日時を記録する。 */
+const MV_ALERT_TFS = [
+  { k: 'h1', label: '1H', full: '1時間足' },
+  { k: 'h4', label: '4H', full: '4時間足' },
+  { k: 'd',  label: 'D',  full: '日足' },
+  { k: 'w',  label: 'W',  full: '週足' },
+];
+const MV_ALERT_TF_LABELS = Object.fromEntries(MV_ALERT_TFS.map(t => [t.k, t.full]));
+
+/* 旧 alertTf（自由入力の日本語表記）を新しい alerts.{h1,h4,d,w} キーへ変換する対応表。 */
+const MV_ALERT_TF_LEGACY_MAP = {
+  '1時間足': 'h1', '4時間足': 'h4', '日足': 'd', '週足': 'w',
+};
+
 /* アラート発生時の判定（トレード記録フォームの判定と同じ3択） */
 const MV_JUDGES = [
   { v: 'entered', label: '✅ エントリー' },
@@ -2084,6 +2150,7 @@ function loadMarket() {
     const o = JSON.parse(localStorage.getItem(MARKET_KEY) || '{}');
     let pairs = Array.isArray(o.pairs) ? o.pairs : [];
     let snapshots = Array.isArray(o.snapshots) ? o.snapshots : [];
+    let judgeLog = Array.isArray(o.judgeLog) ? o.judgeLog : [];
     let changed = false;
 
     /* 旧形式（監視ペアが文字列配列、通貨ペアと時間足・判定の区別なし）からの移行。
@@ -2119,12 +2186,24 @@ function loadMarket() {
     }
     pairs = mergedPairs;
 
-    if (changed) saveMarket({ pairs, snapshots });
+    /* 今回の移行：単一選択の alertTf（自由入力の日本語表記）→ 複数選択可能な alerts オブジェクトへ。
+       一致する時間足があれば ON として引き継ぐが、発生日時は不明なため空のままにする。 */
+    pairs.forEach(w => {
+      if (!w.alerts) {
+        const key = MV_ALERT_TF_LEGACY_MAP[w.alertTf || ''];
+        w.alerts = {};
+        MV_ALERT_TFS.forEach(t => { w.alerts[t.k] = { on: t.k === key, at: '' }; });
+        delete w.alertTf;
+        changed = true;
+      }
+    });
 
-    return { pairs, snapshots };
+    if (changed) saveMarket({ pairs, snapshots, judgeLog });
+
+    return { pairs, snapshots, judgeLog };
   } catch (e) {
     console.error('環境認識データの読み込みエラー:', e);
-    return { pairs: [], snapshots: [] };
+    return { pairs: [], snapshots: [], judgeLog: [] };
   }
 }
 const MARKET_SELECTED_KEY = 'mochipoyo_market_view_selected';
@@ -2162,7 +2241,6 @@ function stateChip(v) {
 
 const mvListEl = document.getElementById('mvList');
 const MV_PRESET_PAIRS = ['USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'EUR/USD', 'GBP/USD', 'AUD/USD', 'GOLD (XAU/USD)'];
-const MV_TF_OPTIONS = ['日足', '4時間足', '1時間足', '15分足', '5分足', '1分足'];
 
 /* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。 */
 function syncPairSelectOptions(data, selectedId) {
@@ -2221,16 +2299,27 @@ function renderMarket() {
       '</details>'
     : '';
 
-  const alertTfOptions = '<option value="">アラート発生足を選択…</option>' +
-    MV_TF_OPTIONS.map(tfOpt => '<option' + (w.alertTf === tfOpt ? ' selected' : '') + '>' + esc(tfOpt) + '</option>').join('');
+  const alerts = w.alerts || {};
+  const alertBadges = MV_ALERT_TFS.map(t => {
+    const a = alerts[t.k] || {};
+    return '<button type="button" class="mv-alert-badge' + (a.on ? ' on' : '') + '"' +
+      ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
+      t.label + '</button>';
+  }).join('');
+  const activeAlertTimes = MV_ALERT_TFS
+    .filter(t => (alerts[t.k] || {}).on)
+    .map(t => '<span class="item">' + t.full + ': ' + fmtDatetime((alerts[t.k] || {}).at) + '</span>');
+  const alertTimesRow = activeAlertTimes.length
+    ? '<div class="mv-alert-times">' + activeAlertTimes.join('') + '</div>' : '';
 
   mvListEl.innerHTML = '<div class="mv-card">' +
     '<div class="mv-card-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
-      '<select class="mv-tf-badge-select" data-mv-alerttf="' + esc(w.id) + '" title="アラート発生足">' + alertTfOptions + '</select>' +
+      '<div class="mv-alert-badges">' + alertBadges + '</div>' +
       '<span class="at">' + (latest ? '更新: ' + fmtDatetime(latest.at) : '未記録') + '</span>' +
       '<span class="spacer"></span>' +
       '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">このペアのデータを削除</button>' +
+      alertTimesRow +
     '</div>' +
     rows +
     '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-checklist="' + esc(w.id) + '">📝 チェックリストへ</button>' +
@@ -2258,7 +2347,9 @@ function selectPair(pair) {
   const data = loadMarket();
   let w = data.pairs.find(p => p.pair === pair);
   if (!w) {
-    w = { id: mvGenId('w'), pair, alertTf: '', judge: '' };
+    const alerts = {};
+    MV_ALERT_TFS.forEach(t => { alerts[t.k] = { on: false, at: '' }; });
+    w = { id: mvGenId('w'), pair, alerts, judge: '' };
     data.pairs.push(w);
     if (!saveMarket(data)) return;
   }
@@ -2327,7 +2418,25 @@ mvListEl.addEventListener('click', (e) => {
     return;
   }
 
-  /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。 */
+  /* 複数時間足のアラート発生トグル。ONにした瞬間の日時を記録し、OFFに戻すと日時もクリアする。 */
+  const alertBadge = e.target.closest('[data-mv-alert-toggle]');
+  if (alertBadge) {
+    const watchId = alertBadge.dataset.mvAlertToggle;
+    const tfKey = alertBadge.dataset.tf;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === watchId);
+    if (!w) return;
+    if (!w.alerts) w.alerts = {};
+    const cur = w.alerts[tfKey] || { on: false, at: '' };
+    w.alerts[tfKey] = cur.on ? { on: false, at: '' } : { on: true, at: new Date().toISOString() };
+    if (!saveMarket(data)) return;
+    renderMarket();
+    return;
+  }
+
+  /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。
+     判定を新たに設定したタイミングで、そのときONになっていたアラート発生足と日時を
+     統計用ログ（judgeLog）に記録する。振り返りタブの時間足別統計はこのログを集計する。 */
   const judgeBtn = e.target.closest('[data-mv-judge]');
   if (judgeBtn) {
     const id = judgeBtn.dataset.mvJudge;
@@ -2335,9 +2444,21 @@ mvListEl.addEventListener('click', (e) => {
     const data = loadMarket();
     const w = data.pairs.find(p => p.id === id);
     if (!w) return;
-    w.judge = w.judge === value ? '' : value;
+    const newJudge = w.judge === value ? '' : value;
+    w.judge = newJudge;
+    if (newJudge) {
+      data.judgeLog.push({
+        id: mvGenId('jl'),
+        watchId: id,
+        pair: w.pair,
+        judge: newJudge,
+        at: new Date().toISOString(),
+        alerts: JSON.parse(JSON.stringify(w.alerts || {})),
+      });
+    }
     if (!saveMarket(data)) return;
     renderMarket();
+    renderStats();
     return;
   }
 
@@ -2350,7 +2471,7 @@ mvListEl.addEventListener('click', (e) => {
     const n = snapshotsOf(data, id).length;
     mvPendingDeleteId = id;
     document.getElementById('mvDeleteText').textContent =
-      '「' + w.pair + (w.alertTf ? ' / ' + w.alertTf : '') + '」のデータを削除します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
+      '「' + w.pair + '」のデータを削除します。記録済みの環境認識 ' + n + ' 件も削除され、この操作は取り消せません。';
     mvDeleteModal.classList.add('show');
     return;
   }
@@ -2380,18 +2501,6 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
   }
   mvDeleteModal.classList.remove('show');
   mvPendingDeleteId = null;
-});
-
-/* アラート発生足はカード上のセレクトから直接変更・保存する。 */
-mvListEl.addEventListener('change', (e) => {
-  const sel = e.target.closest('[data-mv-alerttf]');
-  if (!sel) return;
-  const data = loadMarket();
-  const w = data.pairs.find(p => p.id === sel.dataset.mvAlerttf);
-  if (!w) return;
-  w.alertTf = sel.value;
-  if (!saveMarket(data)) return;
-  renderMarket();
 });
 
 /* ============ タブ切替 ============ */
