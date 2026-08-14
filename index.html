@@ -664,14 +664,28 @@
     <div class="mv-toolbar">
       <select id="mvPairSelect">
         <option value="">通貨ペアを選択…</option>
-        <option>USD/JPY</option>
-        <option>EUR/JPY</option>
-        <option>GBP/JPY</option>
-        <option>AUD/JPY</option>
-        <option>EUR/USD</option>
-        <option>GBP/USD</option>
-        <option>AUD/USD</option>
-        <option>GOLD (XAU/USD)</option>
+        <option>SPX500</option>
+        <option>NAS100</option>
+        <option>US30</option>
+        <option>JP225</option>
+        <option>UK100</option>
+        <option>DAX40</option>
+        <option>GOLD</option>
+        <option>SILVER</option>
+        <option>OIL</option>
+        <option>USDJPY</option>
+        <option>EURJPY</option>
+        <option>GBPJPY</option>
+        <option>EURUSD</option>
+        <option>GBPUSD</option>
+        <option>AUDUSD</option>
+        <option>AUDJPY</option>
+        <option>NZDUSD</option>
+        <option>NZDJPY</option>
+        <option>USDCHF</option>
+        <option>CHFJPY</option>
+        <option>USDCAD</option>
+        <option>CADJPY</option>
         <option value="__custom__">その他（自由入力）</option>
       </select>
       <input type="text" id="mvPairCustom" class="hidden" placeholder="例: CAD/JPY">
@@ -713,14 +727,28 @@
           <label for="fAlertPair">アラート発生通貨ペア<span class="req">*</span></label>
           <select id="fAlertPair" required>
             <option value="">選択してください</option>
-            <option>USD/JPY</option>
-            <option>EUR/JPY</option>
-            <option>GBP/JPY</option>
-            <option>AUD/JPY</option>
-            <option>EUR/USD</option>
-            <option>GBP/USD</option>
-            <option>AUD/USD</option>
-            <option>GOLD (XAU/USD)</option>
+            <option>SPX500</option>
+            <option>NAS100</option>
+            <option>US30</option>
+            <option>JP225</option>
+            <option>UK100</option>
+            <option>DAX40</option>
+            <option>GOLD</option>
+            <option>SILVER</option>
+            <option>OIL</option>
+            <option>USDJPY</option>
+            <option>EURJPY</option>
+            <option>GBPJPY</option>
+            <option>EURUSD</option>
+            <option>GBPUSD</option>
+            <option>AUDUSD</option>
+            <option>AUDJPY</option>
+            <option>NZDUSD</option>
+            <option>NZDJPY</option>
+            <option>USDCHF</option>
+            <option>CHFJPY</option>
+            <option>USDCAD</option>
+            <option>CADJPY</option>
             <option value="__custom__">その他（自由入力）</option>
           </select>
           <input type="text" id="alertPairCustom" placeholder="例: CAD/JPY">
@@ -755,14 +783,28 @@
           <label for="fPair">通貨ペア<span class="req">*</span></label>
           <select id="fPair" required>
             <option value="">選択してください</option>
-            <option>USD/JPY</option>
-            <option>EUR/JPY</option>
-            <option>GBP/JPY</option>
-            <option>AUD/JPY</option>
-            <option>EUR/USD</option>
-            <option>GBP/USD</option>
-            <option>AUD/USD</option>
-            <option>GOLD (XAU/USD)</option>
+            <option>SPX500</option>
+            <option>NAS100</option>
+            <option>US30</option>
+            <option>JP225</option>
+            <option>UK100</option>
+            <option>DAX40</option>
+            <option>GOLD</option>
+            <option>SILVER</option>
+            <option>OIL</option>
+            <option>USDJPY</option>
+            <option>EURJPY</option>
+            <option>GBPJPY</option>
+            <option>EURUSD</option>
+            <option>GBPUSD</option>
+            <option>AUDUSD</option>
+            <option>AUDJPY</option>
+            <option>NZDUSD</option>
+            <option>NZDJPY</option>
+            <option>USDCHF</option>
+            <option>CHFJPY</option>
+            <option>USDCAD</option>
+            <option>CADJPY</option>
             <option value="__custom__">その他（自由入力）</option>
           </select>
           <input type="text" id="pairCustom" placeholder="例: CAD/JPY">
@@ -2240,7 +2282,11 @@ function stateChip(v) {
 }
 
 const mvListEl = document.getElementById('mvList');
-const MV_PRESET_PAIRS = ['USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'EUR/USD', 'GBP/USD', 'AUD/USD', 'GOLD (XAU/USD)'];
+const MV_PRESET_PAIRS = [
+  'SPX500', 'NAS100', 'US30', 'JP225', 'UK100', 'DAX40', 'GOLD', 'SILVER', 'OIL',
+  'USDJPY', 'EURJPY', 'GBPJPY', 'EURUSD', 'GBPUSD', 'AUDUSD', 'AUDJPY',
+  'NZDUSD', 'NZDJPY', 'USDCHF', 'CHFJPY', 'USDCAD', 'CADJPY',
+];
 
 /* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。 */
 function syncPairSelectOptions(data, selectedId) {
