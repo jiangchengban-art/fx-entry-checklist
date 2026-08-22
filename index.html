@@ -585,11 +585,24 @@
     display: grid; grid-template-columns: 64px 1fr; gap: 10px;
     align-items: center; padding: 7px 0;
   }
-  .mv-tf-select-row + .mv-tf-select-row { border-top: 1px solid var(--hairline); }
+  .mv-tf-block + .mv-tf-block { border-top: 1px solid var(--hairline); margin-top: 4px; padding-top: 4px; }
   .mv-tf-select-row .tf { font-size: 12px; font-weight: 700; color: var(--ink-2); }
   .mv-tf-select-row select {
     width: 100%; padding: 7px 8px; font-size: 13px; font-family: inherit;
     background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 8px;
+  }
+
+  /* 時間足ごとの根拠チェック。プルダウンの下に一段インデントして従属関係を示す。 */
+  .mv-tf-checks {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 2px 0 8px 10px; margin-left: 54px;
+    border-left: 2px solid var(--hairline);
+  }
+  .mv-tfcheck-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: center; }
+  .mv-tfcheck-row .label { font-size: 11px; font-weight: 600; color: var(--ink-muted); }
+  .mv-tfcheck-btn { padding: 5px 4px !important; font-size: 11px !important; }
+  .mv-tfcheck-btn.on {
+    background: var(--accent-soft); color: var(--accent); border-color: var(--accent);
   }
 
   .mv-goto-checklist { width: 100%; margin-top: 12px; }
@@ -611,6 +624,8 @@
     .tab-bar .tab-btn { padding: 8px 2px 6px; }
     .tab-bar .tab-btn .tab-label { font-size: 10px; }
     .mv-tf-select-row { grid-template-columns: 52px 1fr; }
+    .mv-tf-checks { margin-left: 8px; }
+    .mv-tfcheck-row { grid-template-columns: 78px 1fr; }
   }
 </style>
 </head>
@@ -2129,6 +2144,20 @@ const MARKET_KEY = 'mochipoyo_market_view_v1';
 const MV_TF_HIGHER_OPTIONS = ['週足', '日足', '4時間足', '1時間足'];
 const MV_TF_ENTRY_OPTIONS  = ['5分足', '15分足', '1時間足', '4時間足'];
 
+/* 上位足・エントリー足それぞれで確認する根拠のチェック項目。
+   選んだ時間足ごとに独立して保存され（checksHigher / checksEntry）、ペア切り替え時に復元される。
+   項目を増やしたいときはこの配列に1行足せば、両方の時間足のカードに自動反映される。 */
+const MV_TF_CHECKS = [
+  { k: 'granville',    label: 'グランビル',       opts: ['1', '2', '❌'] },
+  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '下限', '❌'] },
+  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '下限', '❌'] },
+  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '下限', '❌'] },
+  { k: 'macd',         label: 'MACD',             opts: ['レギュラー', 'ヒドゥン', '❌'] },
+  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'] },
+  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'] },
+];
+const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
+
 /* アラート発生足（複数可）。同時に複数の時間足でアラートが鳴ることがあるため、
    4つそれぞれをタップでON/OFFでき、ONにした瞬間の日時を記録する。 */
 const MV_ALERT_TFS = [
@@ -2219,6 +2248,14 @@ function loadMarket() {
       }
     });
 
+    /* セッション20移行：上位足・エントリー足ごとの根拠チェック（グランビル/RCI/MACD/
+       ラウンドナンバー/ロールリバーサル）を追加。既存ペアには空オブジェクトを補う。 */
+    pairs.forEach(w => {
+      Object.values(MV_CHECK_FIELDS).forEach(f => {
+        if (!w[f] || typeof w[f] !== 'object') { w[f] = {}; changed = true; }
+      });
+    });
+
     if (changed) saveMarket({ pairs, snapshots, judgeLog });
 
     return { pairs, snapshots, judgeLog };
@@ -2280,19 +2317,33 @@ function renderMarket() {
     return '<option value="">選択してください</option>' +
       options.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   }
-  const rows =
-    '<div class="mv-tf-select-row">' +
-      '<span class="tf">上位足</span>' +
-      '<select data-mv-tf-select="tfHigher" data-watch="' + esc(w.id) + '">' +
-        tfSelectOptions(MV_TF_HIGHER_OPTIONS, w.tfHigher) +
-      '</select>' +
-    '</div>' +
-    '<div class="mv-tf-select-row">' +
-      '<span class="tf">エントリー足</span>' +
-      '<select data-mv-tf-select="tfEntry" data-watch="' + esc(w.id) + '">' +
-        tfSelectOptions(MV_TF_ENTRY_OPTIONS, w.tfEntry) +
-      '</select>' +
+  /* 各時間足の下に根拠チェックを並べる。上位足とエントリー足で別々の値を保持するため、
+     保存先フィールド（checksHigher / checksEntry）を data 属性で持ち回る。 */
+  function tfCheckBlock(field, checks) {
+    return '<div class="mv-tf-checks">' + MV_TF_CHECKS.map(c =>
+      '<div class="mv-tfcheck-row">' +
+        '<span class="label">' + esc(c.label) + '</span>' +
+        '<div class="mv-choice">' + c.opts.map(o =>
+          '<button type="button" class="mv-tfcheck-btn' + (checks[c.k] === o ? ' on' : '') + '"' +
+          ' data-mv-tfcheck="' + esc(w.id) + '" data-field="' + field + '"' +
+          ' data-key="' + c.k + '" data-value="' + esc(o) + '">' + esc(o) + '</button>').join('') +
+        '</div>' +
+      '</div>').join('') + '</div>';
+  }
+  function tfSection(label, field, options, selected) {
+    return '<div class="mv-tf-block">' +
+      '<div class="mv-tf-select-row">' +
+        '<span class="tf">' + label + '</span>' +
+        '<select data-mv-tf-select="' + field + '" data-watch="' + esc(w.id) + '">' +
+          tfSelectOptions(options, selected) +
+        '</select>' +
+      '</div>' +
+      tfCheckBlock(field, w[MV_CHECK_FIELDS[field]] || {}) +
     '</div>';
+  }
+  const rows =
+    tfSection('上位足', 'tfHigher', MV_TF_HIGHER_OPTIONS, w.tfHigher) +
+    tfSection('エントリー足', 'tfEntry', MV_TF_ENTRY_OPTIONS, w.tfEntry);
 
   const alerts = w.alerts || {};
   const alertBadges = MV_ALERT_TFS.map(t => {
@@ -2341,7 +2392,8 @@ function selectPair(pair) {
   if (!w) {
     const alerts = {};
     MV_ALERT_TFS.forEach(t => { alerts[t.k] = { on: false, at: '' }; });
-    w = { id: mvGenId('w'), pair, alerts, judge: '', tfHigher: '', tfEntry: '' };
+    w = { id: mvGenId('w'), pair, alerts, judge: '', tfHigher: '', tfEntry: '',
+          checksHigher: {}, checksEntry: {} };
     data.pairs.push(w);
     if (!saveMarket(data)) return;
   }
@@ -2395,6 +2447,23 @@ mvListEl.addEventListener('click', (e) => {
     requestAnimationFrame(() => {
       document.getElementById('tabPanel-checklist').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+    return;
+  }
+
+  /* 上位足・エントリー足それぞれの根拠チェック。選んだ瞬間に保存する。
+     同じものを再度押すと未選択に戻せる（❌ は「該当なし」を明示的に記録する選択肢）。 */
+  const tfCheckBtn = e.target.closest('[data-mv-tfcheck]');
+  if (tfCheckBtn) {
+    const { mvTfcheck: watchId, field, key, value } = tfCheckBtn.dataset;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === watchId);
+    if (!w) return;
+    const store = MV_CHECK_FIELDS[field];
+    if (!store) return;
+    if (!w[store] || typeof w[store] !== 'object') w[store] = {};
+    w[store][key] = w[store][key] === value ? '' : value;
+    if (!saveMarket(data)) return;
+    renderMarket();
     return;
   }
 
