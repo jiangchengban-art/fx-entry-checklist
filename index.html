@@ -390,10 +390,50 @@
   .exit-row .del:hover { color: var(--bad); }
   .exit-empty { font-size: 12.5px; color: var(--ink-muted); padding: 10px 0 4px; }
   .exit-hint { font-size: 11.5px; color: var(--ink-muted); margin: 10px 0 16px; line-height: 1.6; }
+  /* ---- 建玉（記録フォーム）と3分割の決済スロット ---- */
+  .pos-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .pos-grid label { display: block; font-size: 12px; color: var(--ink-muted); margin-bottom: 5px; }
+  .pos-grid input, .pos-grid select {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--ink); border-radius: 8px; padding: 9px 12px;
+    font-size: 14px; font-family: inherit; font-variant-numeric: tabular-nums;
+  }
+  /* 打鍵のたびに書き換わるので、スクロールしても常に見える位置に留める */
+  .exit-sum {
+    position: sticky; top: 0; z-index: 1; background: var(--surface);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    font-size: 13px; font-weight: 700; padding: 10px 0;
+    border-bottom: 1px solid var(--hairline); font-variant-numeric: tabular-nums;
+  }
+  .exit-sum .rr.pos { color: var(--good); }
+  .exit-sum .rr.neg { color: var(--bad); }
+  .exit-sum .note { font-weight: 400; font-size: 11.5px; color: var(--ink-muted); }
+  .exit-shortcuts { display: flex; gap: 8px; margin: 10px 0; }
+  .btn-add-exit.danger { color: var(--bad); }
+  .exit-slot {
+    border: 1px solid var(--hairline); border-radius: 10px; padding: 10px;
+    margin-bottom: 8px; background: var(--surface-2);
+  }
+  .slot-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 8px; }
+  .slot-head label { display: flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer; }
+  .slot-head input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .slot-target { flex: 1; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .btn-plan {
+    flex: none; background: none; border: 1px solid var(--border); color: var(--ink-muted);
+    border-radius: 6px; padding: 3px 9px; font-size: 11.5px; cursor: pointer; font-family: inherit;
+  }
+  .btn-plan:hover { color: var(--accent); border-color: var(--accent); }
+  .exit-legacy-note {
+    font-size: 12px; color: var(--ink-muted); line-height: 1.6;
+    border: 1px solid var(--hairline); border-radius: 8px; padding: 10px; margin: 10px 0;
+  }
   @media (max-width: 480px) {
     .exit-basis-grid { grid-template-columns: 1fr; }
     .exit-row { flex-wrap: wrap; }
     .exit-row select { flex: 1 1 100%; }
+    .pos-grid { grid-template-columns: 1fr; }
+    .slot-head { flex-wrap: wrap; }
+    .slot-target { flex: 1 1 100%; order: 3; }
   }
   .btn-exit {
     background: none; border: 1px solid var(--border); color: var(--ink-muted);
@@ -695,11 +735,11 @@
           <label for="fExitDatetime">エグジット日時</label>
           <input type="datetime-local" id="fExitDatetime">
         </div>
-        <!-- 利確はエントリー時点では未確定のため、履歴タブの「💰 利確」から後日追記する。
+        <!-- 決済はエントリー時点では未確定のため、振り返りタブの「💰 決済」から後日追記する。
              fExitResult は旧記録（セッション9以前）との互換のため空値で残す。 -->
         <div class="form-field" id="exitResultField">
           <label>利確</label>
-          <p class="field-note">決済後に 📚履歴 の「💰 利確」から根拠と到達価格を追記すると、RRが自動計算されます。</p>
+          <p class="field-note">決済後に 📚振り返り の「💰 決済」から各枚の根拠と価格を追記すると、合成RRが自動計算されます。</p>
           <input type="hidden" id="fExitResult" value="">
         </div>
         <div class="form-field" id="directionField">
@@ -709,6 +749,27 @@
             <option value="long">ロング</option>
             <option value="short">ショート</option>
           </select>
+        </div>
+        <!-- 建玉。エントリー時点で確定している情報なのでここで入力し、
+             2:1 / 3:1 / 4:1 の計画ターゲットをその場で自動計算して見せる。
+             価格未確定でも保存したいので required は付けない。 -->
+        <div class="form-field full hidden" id="positionField">
+          <label>建玉（3分割・同値エントリー）</label>
+          <div class="pos-grid">
+            <div>
+              <label for="fEntryPrice">エントリー価格</label>
+              <input type="text" inputmode="decimal" id="fEntryPrice" placeholder="例: 157.230">
+            </div>
+            <div>
+              <label for="fSlPrice">損切り価格</label>
+              <input type="text" inputmode="decimal" id="fSlPrice" placeholder="例: 156.900">
+            </div>
+            <div>
+              <label for="fSlBasis">損切り根拠</label>
+              <select id="fSlBasis"><option value="">選択してください</option></select>
+            </div>
+          </div>
+          <p class="field-note" id="planTargets"></p>
         </div>
         <div class="form-field full">
           <label for="fNotes">振り返り・備考</label>
@@ -734,6 +795,8 @@
       <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
     </div>
     <div class="stats-grid" id="statsGrid"></div>
+    <div class="basis-rr" id="slotStats"></div>
+    <div class="basis-rr" id="slBasisStats"></div>
     <div class="basis-rr" id="basisRr"></div>
     <div class="basis-rr" id="mvAlertStats"></div>
   </section>
@@ -805,7 +868,7 @@
 <!-- 利確ポイント記録モーダル -->
 <div class="modal-backdrop" id="exitModal">
   <div class="modal wide">
-    <h3>💰 利確ポイントを記録</h3>
+    <h3>💰 決済を記録</h3>
     <div class="exit-meta" id="exitMeta"></div>
 
     <div class="exit-basis-grid">
@@ -820,15 +883,28 @@
     </div>
     <div class="exit-risk" id="exitRisk"></div>
 
+    <!-- 3分割の実玉。旧記録（slot なし・◎1つ）は #exitLegacy 側で従来UIのまま開く -->
+    <div id="exitSplit">
+      <div class="exit-sum" id="exitSum"></div>
+      <div class="exit-shortcuts">
+        <button class="btn-add-exit" type="button" id="exitAllBe">残りを建値決済</button>
+        <button class="btn-add-exit danger" type="button" id="exitAllSl">全損</button>
+      </div>
+      <div id="exitSlots"></div>
+    </div>
+    <div class="exit-legacy-note hidden" id="exitLegacyNote">
+      ⚠ この記録は3分割対応より前の旧形式です。過去の集計を動かさないよう、従来のままの入力欄で開いています。
+    </div>
+
     <div class="exit-list-head">
-      <span class="t">利確ポイント</span>
+      <span class="t" id="exitRowsTitle">参考到達ポイント</span>
       <span class="spacer"></span>
-      <button class="btn-add-exit" type="button" id="exitAddRow">＋ ポイント追加</button>
+      <button class="btn-add-exit" type="button" id="exitAddRow">＋ 到達ポイント追加</button>
     </div>
     <div id="exitRows"></div>
-    <p class="exit-hint">
-      ◎ は実際に決済したポイントです（勝率・平均RRの集計対象）。<br>
-      到達しただけのポイントも記録すると「持っていたらどこまで伸びたか」を根拠別に比較できます。
+    <p class="exit-hint" id="exitHint">
+      「決済済」にチェックした枚だけが合成RRに入ります。3枚すべて決済すると成績の集計対象になります。<br>
+      参考到達ポイントは実玉ではなく「持っていたらどこまで伸びたか」の記録です。
     </p>
 
     <div class="modal-actions">
@@ -932,6 +1008,21 @@ const EXIT_BASIS = [
 ];
 const EXIT_BASIS_LABELS = Object.fromEntries(EXIT_BASIS.map(b => [b.v, b.label]));
 
+/* 損切り位置の根拠。EXIT_BASIS と同じ形なので1行足せば選択肢・統計の両方に反映される */
+const SL_BASIS = [
+  { v: 'swing_cover',  label: '直近高値/安値をカバー' },
+  { v: 'fib161_cover', label: 'フィボ161%をカバー' },
+  { v: 'other',        label: 'その他' },
+];
+const SL_BASIS_LABELS = Object.fromEntries(SL_BASIS.map(b => [b.v, b.label]));
+
+/* エントリーは常に3分割。各枚の計画ターゲットRR（1枚目=2:1 / 2枚目=3:1 / 3枚目=4:1）。
+   配列の長さがそのまま分割数になるため、将来ここを変えれば枚数も変わる。 */
+const SPLIT_TARGETS = [2, 3, 4];
+const SPLIT_COUNT = SPLIT_TARGETS.length;
+/* 計画到達とみなす許容率。指値が数pips届かなかったケースを到達扱いにする */
+const PLAN_HIT_RATIO = 0.95;
+
 /* 符号付きRR。損切り = -1.00 / 建値 = 0.00 / 利確 = 正の値。
    ショートは値動きの向きが逆になるため符号を反転する。 */
 function calcRR(entryPrice, slPrice, exitPrice, direction) {
@@ -949,6 +1040,50 @@ function tradeExits(t) {
   return t.exits.map(x => Object.assign({}, x, {
     rr: calcRR(t.entryPrice, t.slPrice, x.price, t.direction),
   }));
+}
+
+/* ---- 3分割モデル ----
+   slot 1〜3 が実玉、slot を持たない行は「持っていたらどこまで伸びたか」の参考ポイント。
+   旧記録（S21以前）は slot を持たず actual が1件だけなので、レガシー経路で
+   従来とまったく同じ数値を返す。ここを崩すと過去の統計が動くので注意。 */
+function isSplitTrade(t) {
+  return Array.isArray(t.exits) && t.exits.some(x => x.slot);
+}
+/* 実玉の行だけを slot 昇順で返す */
+function slotExits(t) {
+  return tradeExits(t).filter(x => x.slot).sort((a, b) => a.slot - b.slot);
+}
+/* トレードの合成RR。3枚すべて決済し終えたものだけ net を返す（進行中は null）。
+   返り値: { net, closed, total, isSplit } */
+function tradeNetRR(t) {
+  if (isSplitTrade(t)) {
+    const done = slotExits(t).filter(x => x.actual && x.rr != null);
+    return {
+      net: done.length === SPLIT_COUNT
+        ? round2(done.reduce((s, x) => s + x.rr, 0) / SPLIT_COUNT) : null,
+      closed: done.length, total: SPLIT_COUNT, isSplit: true,
+    };
+  }
+  /* レガシー: 現行 renderStats と同じく先頭の actual 1件だけを見る */
+  const a = tradeExits(t).find(x => x.actual && x.rr != null);
+  return { net: a ? a.rr : null, closed: a ? 1 : 0, total: 1, isSplit: false };
+}
+
+/* エントリー価格・損切り価格から 2:1 / 3:1 / 4:1 の計画ターゲット価格を求める。
+   ショートは値動きの向きが逆なので符号を反転する（calcRR と同じ規則）。 */
+function planTargetPrices(entryPrice, slPrice, direction) {
+  const e = parseFloat(entryPrice), s = parseFloat(slPrice);
+  if (![e, s].every(Number.isFinite)) return null;
+  const risk = Math.abs(e - s);
+  if (risk === 0) return null;
+  const sign = direction === 'short' ? -1 : 1;
+  /* 価格の桁数はペアによって違う（157.230 と 1.08450 など）ため入力値の小数桁に合わせる */
+  const dec = Math.max(decimals(entryPrice), decimals(slPrice));
+  return SPLIT_TARGETS.map(n => (e + sign * risk * n).toFixed(dec));
+}
+function decimals(v) {
+  const m = String(v).match(/\.(\d+)$/);
+  return m ? m[1].length : 0;
 }
 
 /* ============ インジケーター解説データ ============ */
@@ -1149,6 +1284,31 @@ const fDirection = document.getElementById('fDirection');
 const exitResultField = document.getElementById('exitResultField');
 const fExitResult = document.getElementById('fExitResult');
 const formMarketSummary = document.getElementById('formMarketSummary');
+const positionField = document.getElementById('positionField');
+const fEntryPrice = document.getElementById('fEntryPrice');
+const fSlPrice = document.getElementById('fSlPrice');
+const fSlBasis = document.getElementById('fSlBasis');
+const planTargetsEl = document.getElementById('planTargets');
+
+SL_BASIS.forEach(b => {
+  const o = document.createElement('option');
+  o.value = b.v; o.textContent = b.label;
+  fSlBasis.appendChild(o);
+});
+
+/* エントリー価格・損切り価格・売買方向のいずれかが変わるたびに計画ターゲットを引き直す */
+function renderPlanTargets() {
+  const p = planTargetPrices(fEntryPrice.value, fSlPrice.value, fDirection.value);
+  if (!p) {
+    planTargetsEl.textContent =
+      'エントリー価格と損切り価格（と売買方向）を入れると、2:1 / 3:1 / 4:1 の計画ターゲットを表示します。';
+    return;
+  }
+  planTargetsEl.textContent = '🎯 計画ターゲット　' +
+    SPLIT_TARGETS.map((n, i) => (i + 1) + '枚目 RR' + n + ' → ' + p[i]).join('　/　');
+}
+[fEntryPrice, fSlPrice].forEach(el => el.addEventListener('input', renderPlanTargets));
+fDirection.addEventListener('change', renderPlanTargets);
 
 /* 選択中のペアからボード由来のフィールドを組み立てる。
    必須（上位足・エントリー足・判定）が欠けていれば null を返し、呼び出し側が保存を止める。 */
@@ -1209,6 +1369,12 @@ function syncFormFromMarket() {
   if (!isEntered) fDirection.value = '';
   exitResultField.classList.toggle('hidden', !isEntered);
   if (!isEntered) fExitResult.value = '';
+
+  /* 建玉はエントリーのときだけ。判定が保留／スルーに変わったら値も消す
+     （form.reset() では計画ターゲットの文言が戻らないので明示的に描き直す） */
+  positionField.classList.toggle('hidden', !isEntered);
+  if (!isEntered) { fEntryPrice.value = ''; fSlPrice.value = ''; fSlBasis.value = ''; }
+  renderPlanTargets();
 
   formSubmitBtn.disabled = !mv;
   formMarketSummary.classList.toggle('incomplete', !mv);
@@ -1285,9 +1451,15 @@ function doSave() {
     direction:    isEntered ? document.getElementById('fDirection').value : '',
     exitResult:   isEntered ? document.getElementById('fExitResult').value : '',
     notes:        document.getElementById('fNotes').value.trim(),
-    /* 利確データは履歴タブの「💰 利確」で管理するため、編集時は既存値を引き継ぐ */
-    entryPrice: existing ? existing.entryPrice : '',
-    slPrice:    existing ? existing.slPrice : '',
+    /* 建玉はこのフォームで入力するが、利確モーダル側でも編集できる。
+       空のまま保存したときに既存値を消さないよう、空欄なら保存済みの値を残す */
+    entryPrice: isEntered ? (fEntryPrice.value.trim() || (existing ? existing.entryPrice : '')) : '',
+    slPrice:    isEntered ? (fSlPrice.value.trim()    || (existing ? existing.slPrice    : '')) : '',
+    slBasis:    isEntered ? fSlBasis.value : '',
+    /* 旧記録（1枚前提）を編集しただけで分割モデル扱いにしないよう undefined を維持する。
+       実際に slot を記録した時点で利確モーダルが 3 を立てる。 */
+    splitCount: existing ? existing.splitCount : SPLIT_COUNT,
+    /* 決済データは振り返りタブの「💰 決済」で管理するため、編集時は既存値を引き継ぐ */
     exits:      existing ? existing.exits : [],
     createdAt:  existing ? existing.createdAt : new Date().toISOString(),
   });
@@ -1344,27 +1516,39 @@ function renderStats() {
   const throughCount = trades.filter(t => t.result === 'through').length;
 
   /* ---- RR 集計 ---- */
-  /* actualRRs = 実際に決済したポイントのRR（平均RR・勝率の母数） */
-  const actualRRs = [];
+  /* netRRs = トレード単位の合成RR（3分割なら3枚の平均）。決済し切ったものだけが母数。
+     旧記録は tradeNetRR がレガシー経路（◎1件）を返すので従来と同じ数値になる。 */
+  const netRRs = [];
+  let openCount = 0;              // 決済待ち（進行中）の件数
   /* maxRRs = 1トレードで到達した最大RR＝「持っていたらどこまで伸びたか」 */
   const maxRRs = [];
   /* byBasis = 根拠別の集計。到達しただけのポイントも含めて比較する */
   const byBasis = {};
+  /* bySlot = 枚目別の成績。「4:1 まで引っ張る価値があるか」を見るための軸 */
+  const bySlot = {};
+  /* bySlBasis = 損切り根拠別。直近高安カバー と フィボ161%カバー の比較 */
+  const bySlBasis = {};
   trades.forEach(t => {
     const exits = tradeExits(t).filter(x => x.rr != null);
     if (!exits.length) return;
-    const actual = exits.find(x => x.actual);
-    if (actual) actualRRs.push(actual.rr);
+    const n = tradeNetRR(t);
+    if (n.net != null) {
+      netRRs.push(n.net);
+      (bySlBasis[t.slBasis || ''] || (bySlBasis[t.slBasis || ''] = [])).push(n.net);
+    } else if (n.closed > 0 || isSplitTrade(t)) {
+      openCount++;
+    }
     maxRRs.push(Math.max(...exits.map(x => x.rr)));
     exits.forEach(x => {
       const k = x.basis || 'other';
       (byBasis[k] || (byBasis[k] = [])).push(x.rr);
+      if (x.slot && x.actual) (bySlot[x.slot] || (bySlot[x.slot] = [])).push(x.rr);
     });
   });
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
-  const avgRR  = actualRRs.length ? mean(actualRRs) : null;
-  const winPct = actualRRs.length
-    ? actualRRs.filter(r => r > 0).length / actualRRs.length * 100 : null;
+  const avgRR  = netRRs.length ? mean(netRRs) : null;
+  const winPct = netRRs.length
+    ? netRRs.filter(r => r > 0).length / netRRs.length * 100 : null;
   const avgMax = maxRRs.length ? mean(maxRRs) : null;
 
   const tiles = [
@@ -1372,10 +1556,11 @@ function renderStats() {
     { label: 'エントリー数', value: String(enteredCount), unit: '件' },
     { label: '保留数', value: String(holdCount), unit: '件' },
     { label: 'スルー数', value: String(throughCount), unit: '件' },
-    { label: '平均RR', value: avgRR == null ? '–' : fmtRR(round2(avgRR)), cls: rrCls(avgRR) },
+    { label: '平均合成RR', value: avgRR == null ? '–' : fmtRR(round2(avgRR)), cls: rrCls(avgRR) },
     { label: '勝率', value: winPct == null ? '–' : winPct.toFixed(0), unit: '%',
       cls: winPct == null ? '' : winPct >= 50 ? 'pos' : 'neg' },
-    { label: '最大到達RR', value: avgMax == null ? '–' : fmtRR(round2(avgMax)), cls: rrCls(avgMax) },
+    { label: '最大到達RR（参考含む）', value: avgMax == null ? '–' : fmtRR(round2(avgMax)), cls: rrCls(avgMax) },
+    { label: '決済待ち', value: String(openCount), unit: '件' },
   ];
   document.getElementById('statsGrid').innerHTML = tiles.map(t =>
     '<div class="stat-tile">' +
@@ -1397,7 +1582,45 @@ function renderStats() {
           '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
         '</div>').join('')
     : '<h3>利確根拠別の平均RR</h3><div class="empty-state">' +
-      '利確ポイントがまだありません。📚履歴の「💰 利確」から追記してください。</div>';
+      '決済ポイントがまだありません。📚振り返りの「💰 決済」から追記してください。</div>';
+
+  /* ---- 枚目別の成績 ----
+     1枚目(RR2) / 2枚目(RR3) / 3枚目(RR4) それぞれの平均RRと計画到達率。
+     3枚目の到達率が低く平均RRも伸びないなら、4:1 まで引っ張る価値が薄いと判断できる。 */
+  const slotRows = SPLIT_TARGETS.map((target, i) => {
+    const rrs = bySlot[i + 1] || [];
+    if (!rrs.length) return null;
+    const hit = rrs.filter(r => r >= target * PLAN_HIT_RATIO).length;
+    return { label: (i + 1) + '枚目（計画 RR' + target + '）', n: rrs.length,
+             avg: mean(rrs), hit: hit / rrs.length * 100 };
+  }).filter(Boolean);
+  document.getElementById('slotStats').innerHTML =
+    '<h3>枚目別の成績</h3>' + (slotRows.length
+      ? slotRows.map(r =>
+          '<div class="row">' +
+            '<span class="name">' + r.label + '</span>' +
+            '<span class="n">' + r.n + '枚 / 計画到達 ' + r.hit.toFixed(0) + '%</span>' +
+            '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
+          '</div>').join('')
+      : '<div class="empty-state">3分割の決済記録がまだありません。' +
+        '📚振り返りの「💰 決済」から各枚の決済を記録してください。</div>');
+
+  /* ---- 損切り根拠別の成績 ----
+     直近高安をカバー と フィボ161%をカバー のどちらが機能しているかを比較する。 */
+  const slbRows = Object.keys(bySlBasis).map(k => {
+    const nets = bySlBasis[k];
+    return { k, n: nets.length, avg: mean(nets),
+             loss: nets.filter(r => r <= -PLAN_HIT_RATIO).length / nets.length * 100 };
+  }).sort((a, b) => b.avg - a.avg);
+  document.getElementById('slBasisStats').innerHTML =
+    '<h3>損切り根拠別の成績</h3>' + (slbRows.length
+      ? slbRows.map(r =>
+          '<div class="row">' +
+            '<span class="name">' + esc(SL_BASIS_LABELS[r.k] || '(未記入)') + '</span>' +
+            '<span class="n">' + r.n + '件 / 全損 ' + r.loss.toFixed(0) + '%</span>' +
+            '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
+          '</div>').join('')
+      : '<div class="empty-state">決済し終えた記録がまだありません。</div>');
 
   renderMvAlertStats();
 }
@@ -1484,7 +1707,7 @@ function renderList() {
             : '') +
           '<span class="spacer"></span>' +
           (isEntered
-            ? '<button class="btn-exit" type="button" data-exit="' + esc(t.id) + '">💰 利確</button>'
+            ? '<button class="btn-exit" type="button" data-exit="' + esc(t.id) + '">💰 決済</button>'
             : '') +
           '<button class="btn-ghost" type="button" data-edit="' + esc(t.id) + '">✎ 編集</button>' +
           '<button class="btn-delete" type="button" data-delete="' + esc(t.id) + '">削除</button>' +
@@ -1498,7 +1721,8 @@ function renderList() {
             : '') +
           kv('時間足', esc(t.tfHigher) + ' / ' + esc(t.tfEntry)) +
           (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
-          (exits.length ? kv('利確', exitSummaryHtml(exits)) : '') +
+          (t.slBasis ? kv('損切り根拠', esc(SL_BASIS_LABELS[t.slBasis] || t.slBasis)) : '') +
+          (exits.length ? kv('決済', exitSummaryHtml(t, exits)) : '') +
           /* 旧記録（セッション9以前）の固定RRプリセットは従来通り表示する */
           (!exits.length && t.exitResult && EXIT_RESULT_LABELS[t.exitResult]
             ? kv('利確', esc(EXIT_RESULT_LABELS[t.exitResult])) : '') +
@@ -1543,15 +1767,28 @@ function basisDetailHtml(mvChecks) {
   }).filter(Boolean);
   return rows.length ? '<div class="record-basis">' + rows.join('') + '</div>' : '';
 }
-/* 実際に決済したポイント（◎）を先頭に、RR降順で並べる */
-function exitSummaryHtml(exits) {
-  const sorted = exits.slice().sort((a, b) =>
-    (b.actual ? 1 : 0) - (a.actual ? 1 : 0) || (b.rr ?? -Infinity) - (a.rr ?? -Infinity));
-  return '<div class="exit-summary">' + sorted.map(x =>
-    '<span class="item">' + (x.actual ? '◎ ' : '') +
-      esc(EXIT_BASIS_LABELS[x.basis] || x.basis || '(根拠なし)') + ' ' +
-      '<span class="rr ' + rrCls(x.rr) + '">RR ' + fmtRR(x.rr) + '</span>' +
-    '</span>').join('') + '</div>';
+/* 分割記録は「決済 n/3枚 合成RR」を先頭に、続けて枚順 → 参考ポイントの順に並べる。
+   旧記録は従来どおり ◎ を先頭に RR 降順。 */
+function exitSummaryHtml(t, exits) {
+  const item = (x, prefix) => '<span class="item">' + prefix +
+    esc(EXIT_BASIS_LABELS[x.basis] || x.basis || '(根拠なし)') + ' ' +
+    '<span class="rr ' + rrCls(x.rr) + '">RR ' + fmtRR(x.rr) + '</span></span>';
+
+  if (!isSplitTrade(t)) {
+    const sorted = exits.slice().sort((a, b) =>
+      (b.actual ? 1 : 0) - (a.actual ? 1 : 0) || (b.rr ?? -Infinity) - (a.rr ?? -Infinity));
+    return '<div class="exit-summary">' + sorted.map(x => item(x, x.actual ? '◎ ' : '')).join('') + '</div>';
+  }
+
+  const n = tradeNetRR(t);
+  const refs = exits.filter(x => !x.slot)
+    .sort((a, b) => (b.rr ?? -Infinity) - (a.rr ?? -Infinity));
+  return '<div class="exit-summary">' +
+    '<span class="item">決済 ' + n.closed + '/' + n.total + '枚 ' +
+      '<span class="rr ' + rrCls(n.net) + '">合成RR ' + fmtRR(n.net) + '</span></span>' +
+    slotExits(t).map(x => item(x, (x.actual ? '◎ ' : '△ ') + x.slot + '枚目 ')).join('') +
+    refs.map(x => item(x, '参考 ')).join('') +
+  '</div>';
 }
 function rrCls(rr) { return rr == null ? '' : rr > 0 ? 'pos' : rr < 0 ? 'neg' : ''; }
 
@@ -1610,6 +1847,13 @@ function loadTradeIntoForm(t) {
   syncFormFromMarket();
   document.getElementById('fDirection').value = t.direction || '';
 
+  /* 建玉はボード由来ではないので pickMarketFields() の凍結対象外。個別に復元する。
+     syncFormFromMarket() が値をクリアした後に入れる順序であることが重要。 */
+  fEntryPrice.value = t.entryPrice || '';
+  fSlPrice.value = t.slPrice || '';
+  fSlBasis.value = t.slBasis || '';
+  renderPlanTargets();
+
   editModeBadge.classList.remove('hidden');
   formSubmitBtn.textContent = '💾 更新を保存';
   cancelEditBtn.classList.remove('hidden');
@@ -1640,8 +1884,14 @@ const exitModal = document.getElementById('exitModal');
 const exEntryPrice = document.getElementById('exEntryPrice');
 const exSlPrice = document.getElementById('exSlPrice');
 const exitRowsEl = document.getElementById('exitRows');
+const exitSlotsEl = document.getElementById('exitSlots');
+const exitSumEl = document.getElementById('exitSum');
 let exitTrade = null;   // 編集中のトレード
-let exitDraft = [];     // 編集中の利確ポイント配列（DOMではなくこの配列が唯一の真実）
+/* 編集中の決済ポイント配列（DOMではなくこの配列が唯一の真実）。
+   分割モードでは index 0〜2 が必ず slot 1〜3（価格が空でも席は残す）、index 3 以降が参考行。
+   この並びを守ることで、行削除しても data-i のズレが起きない。 */
+let exitDraft = [];
+let exitSplitMode = true;  // false = 旧記録を従来UIで開いている
 
 document.getElementById('recordList').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-exit]');
@@ -1653,9 +1903,25 @@ document.getElementById('recordList').addEventListener('click', (e) => {
 
 function openExitModal(t) {
   exitTrade = t;
-  exitDraft = Array.isArray(t.exits) && t.exits.length
-    ? t.exits.map(x => ({ basis: x.basis || '', price: x.price || '', actual: !!x.actual }))
-    : [{ basis: '', price: '', actual: true }];
+  const src = Array.isArray(t.exits) ? t.exits : [];
+  /* 旧記録（slot なしで ◎ が付いている）は従来UIのまま開く。
+     slot に昇格させると「1/3枚決済」扱いになり過去の平均RRが動いてしまうため。 */
+  exitSplitMode = isSplitTrade(t) || !src.some(x => x.actual);
+
+  if (exitSplitMode) {
+    const slots = SPLIT_TARGETS.map((_, n) => {
+      const f = src.find(x => Number(x.slot) === n + 1);
+      return f
+        ? { slot: n + 1, basis: f.basis || '', price: f.price || '', actual: !!f.actual }
+        : { slot: n + 1, basis: '', price: '', actual: false };
+    });
+    const refs = src.filter(x => !x.slot)
+      .map(x => ({ basis: x.basis || '', price: x.price || '', actual: false }));
+    exitDraft = slots.concat(refs);
+  } else {
+    exitDraft = src.map(x => ({ basis: x.basis || '', price: x.price || '', actual: !!x.actual }));
+  }
+
   exEntryPrice.value = t.entryPrice || '';
   exSlPrice.value = t.slPrice || '';
   document.getElementById('exitMeta').innerHTML =
@@ -1663,12 +1929,38 @@ function openExitModal(t) {
     '<span class="badge pair">' + esc(t.pair) + '</span>' +
     '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
       (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>';
-  renderExitRows();
+
+  document.getElementById('exitSplit').classList.toggle('hidden', !exitSplitMode);
+  document.getElementById('exitLegacyNote').classList.toggle('hidden', exitSplitMode);
+  document.getElementById('exitRowsTitle').textContent =
+    exitSplitMode ? '参考到達ポイント' : '利確ポイント';
+  document.getElementById('exitAddRow').textContent =
+    exitSplitMode ? '＋ 到達ポイント追加' : '＋ ポイント追加';
+  document.getElementById('exitHint').innerHTML = exitSplitMode
+    ? '「決済済」にチェックした枚だけが合成RRに入ります。3枚すべて決済すると成績の集計対象になります。<br>' +
+      '参考到達ポイントは実玉ではなく「持っていたらどこまで伸びたか」の記録です。'
+    : '◎ は実際に決済したポイントです（勝率・平均RRの集計対象）。<br>' +
+      '到達しただけのポイントも記録すると「持っていたらどこまで伸びたか」を根拠別に比較できます。';
+
+  renderExitAll();
   exitModal.classList.add('show');
 }
 
-function renderExitRows() {
-  /* リスク幅（RRの分母） */
+/* 分割モードでの参考行の開始位置。旧モードでは全行が参考枠に並ぶ */
+function refStart() { return exitSplitMode ? SPLIT_COUNT : 0; }
+function draftRR(x) {
+  return calcRR(exEntryPrice.value, exSlPrice.value, x.price,
+    exitTrade ? exitTrade.direction : '');
+}
+
+function renderExitAll() {
+  renderExitRisk();
+  renderExitSlots();
+  renderExitRows();
+  renderExitSum();
+}
+
+function renderExitRisk() {
   const e = parseFloat(exEntryPrice.value), s = parseFloat(exSlPrice.value);
   const riskEl = document.getElementById('exitRisk');
   if (Number.isFinite(e) && Number.isFinite(s)) {
@@ -1681,65 +1973,150 @@ function renderExitRows() {
     riskEl.textContent = '↳ 2つの価格を入れるとRRが自動計算されます';
     riskEl.classList.remove('warn');
   }
-
-  if (exitDraft.length === 0) {
-    exitRowsEl.innerHTML = '<div class="exit-empty">利確ポイントがありません。「＋ ポイント追加」で追加してください。</div>';
-    return;
-  }
-  const dir = exitTrade ? exitTrade.direction : '';
-  exitRowsEl.innerHTML = exitDraft.map((x, i) => {
-    const rr = calcRR(exEntryPrice.value, exSlPrice.value, x.price, dir);
-    return '<div class="exit-row">' +
-      '<input class="actual" type="radio" name="exitActual" data-i="' + i + '"' +
-        (x.actual ? ' checked' : '') + ' title="実際に決済したポイント">' +
-      '<select data-field="basis" data-i="' + i + '">' +
-        '<option value="">根拠を選択</option>' +
-        EXIT_BASIS.map(b =>
-          '<option value="' + b.v + '"' + (x.basis === b.v ? ' selected' : '') + '>' +
-          b.label + '</option>').join('') +
-      '</select>' +
-      '<input type="text" inputmode="decimal" data-field="price" data-i="' + i + '"' +
-        ' value="' + esc(x.price) + '" placeholder="到達価格">' +
-      '<span class="rr ' + rrCls(rr) + '">' + (rr == null ? '–' : fmtRR(rr)) + '</span>' +
-      '<button class="del" type="button" data-del="' + i + '" title="この行を削除">✕</button>' +
-    '</div>';
-  }).join('');
 }
 
-/* 入力 → exitDraft を更新 → 再描画（単方向）。
-   再描画でフォーカスが飛ばないよう、価格入力中はRR表示だけ差し替える */
-exitRowsEl.addEventListener('input', (e) => {
+/* 実玉3枚。席は常に3つあり、価格が空でも消えない */
+function renderExitSlots() {
+  if (!exitSplitMode) { exitSlotsEl.innerHTML = ''; return; }
+  const plan = planTargetPrices(exEntryPrice.value, exSlPrice.value,
+    exitTrade ? exitTrade.direction : '');
+  exitSlotsEl.innerHTML = exitDraft.slice(0, SPLIT_COUNT).map((x, i) =>
+    '<div class="exit-slot">' +
+      '<div class="slot-head">' +
+        '<label><input class="closed" type="checkbox" data-i="' + i + '"' +
+          (x.actual ? ' checked' : '') + '> ' + (i + 1) + '枚目</label>' +
+        '<span class="slot-target">計画 RR' + SPLIT_TARGETS[i] +
+          (plan ? ' → ' + esc(plan[i]) : '') + '</span>' +
+        (plan ? '<button class="btn-plan" type="button" data-plan="' + i + '">計画通り</button>' : '') +
+      '</div>' +
+      exitRowInner(x, i, false) +
+    '</div>').join('');
+}
+
+/* 参考到達ポイント（分割モード）／旧記録の利確ポイント一覧 */
+function renderExitRows() {
+  const refs = exitDraft.slice(refStart());
+  if (!refs.length) {
+    exitRowsEl.innerHTML = '<div class="exit-empty">' + (exitSplitMode
+      ? '参考到達ポイントはありません。「＋ 到達ポイント追加」で追加できます。'
+      : '利確ポイントがありません。「＋ ポイント追加」で追加してください。') + '</div>';
+    return;
+  }
+  exitRowsEl.innerHTML = refs
+    .map((x, j) => exitRowInner(x, refStart() + j, true)).join('');
+}
+
+/* 1行分の中身。分割の枚（withControls=false）と参考行（true）で共通に使う */
+function exitRowInner(x, i, isRef) {
+  const rr = draftRR(x);
+  /* 旧記録では参考枠に ◎ ラジオが要る。分割モードの参考行は実玉ではないので出さない */
+  const actualCtl = (isRef && !exitSplitMode)
+    ? '<input class="actual" type="radio" name="exitActual" data-i="' + i + '"' +
+        (x.actual ? ' checked' : '') + ' title="実際に決済したポイント">' : '';
+  return '<div class="exit-row">' + actualCtl +
+    '<select data-field="basis" data-i="' + i + '">' +
+      '<option value="">根拠を選択</option>' +
+      EXIT_BASIS.map(b =>
+        '<option value="' + b.v + '"' + (x.basis === b.v ? ' selected' : '') + '>' +
+        b.label + '</option>').join('') +
+    '</select>' +
+    '<input type="text" inputmode="decimal" data-field="price" data-i="' + i + '"' +
+      ' value="' + esc(x.price) + '" placeholder="到達価格">' +
+    '<span class="rr ' + rrCls(rr) + '">' + (rr == null ? '–' : fmtRR(rr)) + '</span>' +
+    (isRef ? '<button class="del" type="button" data-del="' + i + '" title="この行を削除">✕</button>' : '') +
+  '</div>';
+}
+
+/* ヘッダの合成RRと決済枚数。価格の打鍵ごとにここだけ差し替えるのでフォーカスが飛ばない */
+function renderExitSum() {
+  if (!exitSplitMode) { exitSumEl.innerHTML = ''; return; }
+  const done = exitDraft.slice(0, SPLIT_COUNT)
+    .filter(x => x.actual && draftRR(x) != null);
+  const net = done.length === SPLIT_COUNT
+    ? round2(done.reduce((s, x) => s + draftRR(x), 0) / SPLIT_COUNT) : null;
+  exitSumEl.innerHTML =
+    '<span>決済済 ' + done.length + '/' + SPLIT_COUNT + '枚</span>' +
+    '<span>合成RR <b class="rr ' + rrCls(net) + '">' + fmtRR(net) + '</b></span>' +
+    (net == null && done.length < SPLIT_COUNT
+      ? '<span class="note">3枚すべて決済すると成績に反映されます</span>' : '');
+}
+
+/* 入力 → exitDraft を更新（単方向）。
+   再描画するとフォーカスが飛ぶので、価格入力中は RR と合成RR の表示だけ差し替える */
+exitModal.addEventListener('input', (e) => {
   const el = e.target.closest('[data-field]');
   if (!el) return;
   const i = Number(el.dataset.i);
   exitDraft[i][el.dataset.field] = el.value;
   if (el.dataset.field === 'price') {
-    const rr = calcRR(exEntryPrice.value, exSlPrice.value, el.value,
-      exitTrade ? exitTrade.direction : '');
+    const rr = draftRR(exitDraft[i]);
     const rrEl = el.parentNode.querySelector('.rr');
     rrEl.textContent = rr == null ? '–' : fmtRR(rr);
     rrEl.className = 'rr ' + rrCls(rr);
+    renderExitSum();
   }
 });
-exitRowsEl.addEventListener('change', (e) => {
+exitModal.addEventListener('change', (e) => {
+  const box = e.target.closest('.closed');
+  if (box) {
+    exitDraft[Number(box.dataset.i)].actual = box.checked;
+    renderExitSum();
+    return;
+  }
+  /* 旧記録の ◎ は従来どおり排他 */
   const radio = e.target.closest('.actual');
   if (!radio) return;
   const i = Number(radio.dataset.i);
   exitDraft.forEach((x, j) => { x.actual = (j === i); });
 });
-exitRowsEl.addEventListener('click', (e) => {
+exitModal.addEventListener('click', (e) => {
+  const plan = e.target.closest('[data-plan]');
+  if (plan) {
+    const p = planTargetPrices(exEntryPrice.value, exSlPrice.value,
+      exitTrade ? exitTrade.direction : '');
+    if (!p) return;
+    const i = Number(plan.dataset.plan);
+    exitDraft[i].price = p[i];
+    exitDraft[i].actual = true;   // 根拠はユーザーが選ぶので触らない
+    renderExitAll();
+    return;
+  }
   const del = e.target.closest('[data-del]');
   if (!del) return;
   const i = Number(del.dataset.del);
+  if (i < refStart()) return;     // 実玉の席は消さない
   const wasActual = exitDraft[i].actual;
   exitDraft.splice(i, 1);
-  if (wasActual && exitDraft.length) exitDraft[0].actual = true;
-  renderExitRows();
+  /* 旧記録で ◎ の行を消したときだけ、従来どおり先頭へ付け替える */
+  if (!exitSplitMode && wasActual && exitDraft.length) exitDraft[0].actual = true;
+  renderExitAll();
 });
-[exEntryPrice, exSlPrice].forEach(el => el.addEventListener('input', renderExitRows));
+[exEntryPrice, exSlPrice].forEach(el => el.addEventListener('input', renderExitAll));
+
+/* 未決済の枚をまとめて埋めるショートカット。建値移動後の戻し・全損の記録用 */
+function fillRemainingSlots(basis, price, label) {
+  if (!Number.isFinite(parseFloat(price))) {
+    showToast('⚠ エントリー価格と損切り価格を入力してください');
+    return;
+  }
+  let n = 0;
+  exitDraft.slice(0, SPLIT_COUNT).forEach(x => {
+    if (x.actual) return;
+    x.basis = basis; x.price = price; x.actual = true; n++;
+  });
+  renderExitAll();
+  showToast(n ? label + ' で ' + n + '枚を埋めました' : '未決済の枚はありません');
+}
+document.getElementById('exitAllBe').addEventListener('click', () => {
+  fillRemainingSlots('breakeven', exEntryPrice.value.trim(), '建値決済');
+});
+document.getElementById('exitAllSl').addEventListener('click', () => {
+  fillRemainingSlots('stoploss', exSlPrice.value.trim(), '損切り');
+});
+
 document.getElementById('exitAddRow').addEventListener('click', () => {
-  exitDraft.push({ basis: '', price: '', actual: exitDraft.length === 0 });
-  renderExitRows();
+  exitDraft.push({ basis: '', price: '', actual: !exitSplitMode && exitDraft.length === 0 });
+  renderExitAll();
 });
 document.getElementById('exitCancel').addEventListener('click', () => {
   exitModal.classList.remove('show');
@@ -1748,10 +2125,20 @@ document.getElementById('exitCancel').addEventListener('click', () => {
 document.getElementById('exitSave').addEventListener('click', () => {
   if (!exitTrade) return;
   /* 価格が未入力の行は捨てる */
-  const exits = exitDraft
-    .filter(x => Number.isFinite(parseFloat(x.price)))
-    .map(x => ({ basis: x.basis, price: x.price, actual: !!x.actual }));
-  if (exits.length && !exits.some(x => x.actual)) exits[0].actual = true;
+  const hasPrice = x => Number.isFinite(parseFloat(x.price));
+  const exits = [];
+  if (exitSplitMode) {
+    exitDraft.slice(0, SPLIT_COUNT).forEach(x => {
+      if (hasPrice(x)) exits.push({ slot: x.slot, basis: x.basis, price: x.price, actual: !!x.actual });
+    });
+    exitDraft.slice(SPLIT_COUNT).filter(hasPrice)
+      .forEach(x => exits.push({ basis: x.basis, price: x.price, actual: false }));
+  } else {
+    exitDraft.filter(hasPrice)
+      .forEach(x => exits.push({ basis: x.basis, price: x.price, actual: !!x.actual }));
+    /* 旧記録は必ず ◎ が1つある前提を保つ（分割モードでは未決済が正常なので適用しない） */
+    if (exits.length && !exits.some(x => x.actual)) exits[0].actual = true;
+  }
 
   const trades = loadTrades();
   const target = trades.find(t => t.id === exitTrade.id);
@@ -1759,12 +2146,14 @@ document.getElementById('exitSave').addEventListener('click', () => {
   target.entryPrice = exEntryPrice.value.trim();
   target.slPrice = exSlPrice.value.trim();
   target.exits = exits;
+  /* 実際に枚を記録したときだけ分割モデルとして確定させる */
+  if (exits.some(x => x.slot)) target.splitCount = SPLIT_COUNT;
   if (!saveTrades(trades)) return;
 
   exitModal.classList.remove('show');
   exitTrade = null;
   renderAll();
-  showToast('✔ 利確ポイントを保存しました（' + exits.length + '件）');
+  showToast('✔ 決済を保存しました（' + exits.length + '件）');
 });
 
 /* ============ CSV ============ */
@@ -1777,7 +2166,7 @@ const CSV_BASIS_COLUMNS = MV_CHECK_SNAPSHOTS.flatMap(s =>
 const CSV_HEADERS = [
   'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
   'pair', 'tfHigher', 'tfEntry', 'direction', 'exitResult', 'notes',
-  'entryPrice', 'slPrice', 'exits', 'watchId',
+  'entryPrice', 'slPrice', 'slBasis', 'splitCount', 'exits', 'watchId',
   ...CSV_BASIS_COLUMNS.map(c => c.col),
   'createdAt',
 ];
@@ -1792,11 +2181,17 @@ function parseExitsCsv(s) {
   try {
     const a = JSON.parse(s);
     if (!Array.isArray(a)) return [];
-    return a.map(x => ({
-      basis:  typeof x.basis === 'string' ? x.basis : '',
-      price:  x.price == null ? '' : String(x.price),
-      actual: !!x.actual,
-    }));
+    return a.map(x => {
+      const o = {
+        basis:  typeof x.basis === 'string' ? x.basis : '',
+        price:  x.price == null ? '' : String(x.price),
+        actual: !!x.actual,
+      };
+      /* slot は実玉の枚番号。旧CSVには無いのでキーごと省く（null を入れると実玉扱いになる） */
+      const s = Number(x.slot);
+      if (s >= 1 && s <= SPLIT_COUNT) o.slot = s;
+      return o;
+    });
   } catch (e) { return []; }
 }
 
@@ -1828,7 +2223,8 @@ document.getElementById('exportCsv').addEventListener('click', () => {
       t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.exitResult, t.notes,
       /* 配列はJSON文字列で1列に格納。csvField() が " を "" にエスケープし、
          parseCsv() が復元するためそのまま往復できる */
-      t.entryPrice, t.slPrice, JSON.stringify(Array.isArray(t.exits) ? t.exits : []), t.watchId,
+      t.entryPrice, t.slPrice, t.slBasis, t.splitCount,
+      JSON.stringify(Array.isArray(t.exits) ? t.exits : []), t.watchId,
       ...CSV_BASIS_COLUMNS.map(c => (mvChecks[c.snapshot] || {})[c.key] || ''),
       t.createdAt,
     ].map(csvField).join(','));
@@ -1912,6 +2308,9 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           notes:      get(r, 'notes'),
           entryPrice: get(r, 'entryPrice'),
           slPrice:    get(r, 'slPrice'),
+          slBasis:    get(r, 'slBasis'),
+          /* 旧CSVには列が無い。undefined のままにしてレガシー集計に落とす */
+          splitCount: Number(get(r, 'splitCount')) === SPLIT_COUNT ? SPLIT_COUNT : undefined,
           exits:      parseExitsCsv(get(r, 'exits')),
           watchId:    get(r, 'watchId'),
           /* hi_* / en_* 列から根拠スナップショットを復元。
