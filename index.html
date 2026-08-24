@@ -831,28 +831,44 @@
     <div class="mv-toolbar">
       <select id="mvPairSelect">
         <option value="">通貨ペアを選択…</option>
-        <option>SPX500</option>
-        <option>NAS100</option>
-        <option>US30</option>
-        <option>JP225</option>
-        <option>UK100</option>
-        <option>DAX40</option>
-        <option>GOLD</option>
-        <option>SILVER</option>
-        <option>OIL</option>
-        <option>USDJPY</option>
-        <option>EURJPY</option>
-        <option>GBPJPY</option>
-        <option>EURUSD</option>
-        <option>GBPUSD</option>
-        <option>AUDUSD</option>
-        <option>AUDJPY</option>
-        <option>NZDUSD</option>
-        <option>NZDJPY</option>
-        <option>USDCHF</option>
-        <option>CHFJPY</option>
-        <option>USDCAD</option>
-        <option>CADJPY</option>
+        <optgroup label="株価先物">
+          <option>SPX500</option>
+          <option>NAS100</option>
+          <option>US30</option>
+          <option>JP225</option>
+          <option>UK100</option>
+          <option>DAX40</option>
+        </optgroup>
+        <optgroup label="仮想通貨">
+          <option>BTCUSDT</option>
+          <option>ETHUSDT</option>
+          <option>XRPUSDT</option>
+          <option>SOLUSDT</option>
+          <option>BNBUSDT</option>
+          <option>DOGEUSDT</option>
+        </optgroup>
+        <optgroup label="金・銀・原油">
+          <option>GOLD</option>
+          <option>SILVER</option>
+          <option>OIL</option>
+        </optgroup>
+        <optgroup label="USD・EUR・GBP">
+          <option>USDJPY</option>
+          <option>EURJPY</option>
+          <option>GBPJPY</option>
+          <option>EURUSD</option>
+          <option>GBPUSD</option>
+        </optgroup>
+        <optgroup label="AUD・NZD・CHF・CAD">
+          <option>AUDUSD</option>
+          <option>AUDJPY</option>
+          <option>NZDUSD</option>
+          <option>NZDJPY</option>
+          <option>USDCHF</option>
+          <option>CHFJPY</option>
+          <option>USDCAD</option>
+          <option>CADJPY</option>
+        </optgroup>
         <option value="__custom__">その他（自由入力）</option>
       </select>
       <input type="text" id="mvPairCustom" class="hidden" placeholder="例: CAD/JPY">
@@ -2688,6 +2704,20 @@ function loadMarket() {
        既存フィールドには一切触れない。 */
     pairs.forEach(w => { if (mvEnsureTrend(w)) changed = true; });
 
+    /* S25移行：🔭一覧はボードでの選択有無に関わらずプリセット全銘柄を巡回対象にするため、
+       未作成のプリセットペアをここで自動生成する。ボード側の挙動（selectPair）には影響しない。 */
+    const existingPairNames = new Set(pairs.map(w => w.pair));
+    MV_PRESET_PAIRS.forEach(name => {
+      if (existingPairNames.has(name)) return;
+      const alerts = {};
+      MV_ALERT_TFS.forEach(t => { alerts[t.k] = { on: false, at: '' }; });
+      const w = { id: mvGenId('w'), pair: name, alerts, judge: '', tfHigher: '', tfEntry: '',
+                  checksHigher: {}, checksEntry: {} };
+      mvEnsureTrend(w);
+      pairs.push(w);
+      changed = true;
+    });
+
     if (changed) saveMarket({ pairs, snapshots, judgeLog });
 
     return { pairs, snapshots, judgeLog };
@@ -2713,20 +2743,33 @@ function saveMarket(data) {
   }
 }
 const mvListEl = document.getElementById('mvList');
-const MV_PRESET_PAIRS = [
-  'SPX500', 'NAS100', 'US30', 'JP225', 'UK100', 'DAX40', 'GOLD', 'SILVER', 'OIL',
-  'USDJPY', 'EURJPY', 'GBPJPY', 'EURUSD', 'GBPUSD', 'AUDUSD', 'AUDJPY',
-  'NZDUSD', 'NZDJPY', 'USDCHF', 'CHFJPY', 'USDCAD', 'CADJPY',
+/* S25: 一覧タブは全通貨横断のチャート巡回画面なので、プリセット銘柄をグループ分けして持つ。
+   ここに1行足せば選択肢・一覧タブの巡回対象の両方に自動反映される（loadMarket の自動生成が参照）。 */
+const MV_PAIR_GROUPS = [
+  { label: '株価先物', pairs: ['SPX500', 'NAS100', 'US30', 'JP225', 'UK100', 'DAX40'] },
+  { label: '仮想通貨', pairs: ['BTCUSDT', 'ETHUSDT', 'XRPUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT'] },
+  { label: '金・銀・原油', pairs: ['GOLD', 'SILVER', 'OIL'] },
+  { label: 'USD・EUR・GBP', pairs: ['USDJPY', 'EURJPY', 'GBPJPY', 'EURUSD', 'GBPUSD'] },
+  { label: 'AUD・NZD・CHF・CAD', pairs: ['AUDUSD', 'AUDJPY', 'NZDUSD', 'NZDJPY', 'USDCHF', 'CHFJPY', 'USDCAD', 'CADJPY'] },
 ];
+const MV_PRESET_PAIRS = MV_PAIR_GROUPS.flatMap(g => g.pairs);
 
-/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。 */
+/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。グループごとに optgroup 化。 */
 function syncPairSelectOptions(data, selectedId) {
   const known = new Set(MV_PRESET_PAIRS);
   const customPairs = data.pairs.map(w => w.pair).filter(p => !known.has(p));
   const selectedPair = (data.pairs.find(w => w.id === selectedId) || {}).pair || '';
   let html = '<option value="">通貨ペアを選択…</option>';
-  MV_PRESET_PAIRS.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
-  customPairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+  MV_PAIR_GROUPS.forEach(g => {
+    html += '<optgroup label="' + esc(g.label) + '">';
+    g.pairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+    html += '</optgroup>';
+  });
+  if (customPairs.length) {
+    html += '<optgroup label="自由入力">';
+    customPairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+    html += '</optgroup>';
+  }
   html += '<option value="__custom__">その他（自由入力）</option>';
   mvPairSelect.innerHTML = html;
 }
@@ -3192,7 +3235,7 @@ function renderTrendList() {
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
   if (!pairs.length) {
-    trendListEl.innerHTML = '<div class="empty-state">まだ監視ペアがありません。🎯トレードタブの環境認識ボードで通貨ペアを選択すると、ここに並びます。</div>';
+    trendListEl.innerHTML = '<div class="empty-state">表示するペアがありません。</div>';
     return;
   }
 
