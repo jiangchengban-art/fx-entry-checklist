@@ -668,6 +668,10 @@
   }
   .trend-toolbar .spacer { flex: 1; }
   .trend-filter-btn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .trend-category-select {
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
+  }
 
   .trend-group-head {
     font-size: 12px; font-weight: 700; color: var(--ink-2);
@@ -987,6 +991,7 @@
     <div class="trend-toolbar">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🔥 揃っているペアのみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
+      <select class="trend-category-select" id="trendCategorySelect"></select>
       <span class="spacer"></span>
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
@@ -3079,9 +3084,17 @@ const trendSummaryEl = document.getElementById('trendSummary');
 const trendFilterBtn = document.getElementById('trendFilterAligned');
 const trendStaleBtn  = document.getElementById('trendFilterStale');
 const trendTfBar     = document.getElementById('trendTfToggles');
+const trendCategorySelect = document.getElementById('trendCategorySelect');
 
 let trendAlignedOnly = false; // 「揃っているペアのみ」の絞り込み。永続化しない
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
+let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
+
+/* ペア名 → MV_PAIR_GROUPS のラベル。プリセット外（自由入力）のペアは「その他」扱い。 */
+function trendCategoryOf(pairName) {
+  const g = MV_PAIR_GROUPS.find(g => g.pairs.includes(pairName));
+  return g ? g.label : 'その他';
+}
 
 /* 表示する時間足。日足・4時間足が既定で、週足・月足は希望時だけ出す。
    端末ごとの表示設定にすぎないので、市場データ（saveMarket）ではなく専用キーに持つ。 */
@@ -3224,6 +3237,16 @@ function renderTrendTfToggles() {
     ' data-trend-tf-toggle="' + t.k + '">' + esc(t.label) + '</button>').join('');
 }
 
+/* ボードの通貨ペア選択と同じ MV_PAIR_GROUPS を流用し、カテゴリ絞り込み用プルダウンを描画する。 */
+function renderTrendCategoryOptions() {
+  let html = '<option value="">すべてのカテゴリ</option>';
+  MV_PAIR_GROUPS.forEach(g => {
+    html += '<option' + (g.label === trendCategory ? ' selected' : '') + '>' + esc(g.label) + '</option>';
+  });
+  html += '<option' + (trendCategory === 'その他' ? ' selected' : '') + '>その他</option>';
+  trendCategorySelect.innerHTML = html;
+}
+
 function renderTrendList() {
   const data = loadMarket();
   const pairs = data.pairs.slice().sort((a, b) =>
@@ -3231,6 +3254,7 @@ function renderTrendList() {
 
   renderTrendSummary(pairs);
   renderTrendTfToggles();
+  renderTrendCategoryOptions();
   trendFilterBtn.classList.toggle('on', trendAlignedOnly);
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
@@ -3242,6 +3266,7 @@ function renderTrendList() {
   let shown = pairs;
   if (trendAlignedOnly) shown = shown.filter(w => trendRank(w) === 0);
   if (trendStaleOnly)   shown = shown.filter(isTrendStale);
+  if (trendCategory)    shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   if (!shown.length) {
     trendListEl.innerHTML = '<div class="empty-state">条件に当てはまるペアはありません。</div>';
     return;
@@ -3277,6 +3302,10 @@ trendFilterBtn.addEventListener('click', () => {
 });
 trendStaleBtn.addEventListener('click', () => {
   trendStaleOnly = !trendStaleOnly;
+  renderTrendList();
+});
+trendCategorySelect.addEventListener('change', () => {
+  trendCategory = trendCategorySelect.value;
   renderTrendList();
 });
 trendTfBar.addEventListener('click', (e) => {
