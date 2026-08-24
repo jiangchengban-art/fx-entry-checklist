@@ -643,9 +643,9 @@
   }
   .mv-choice button:hover { background: var(--surface); }
 
-  /* ============ 🔭 トレンド一覧タブ（セッション23） ============ */
-  /* 監視ペアを1行ずつ密に並べ、上位足（日足・4時間足）のトレンド方向を一目で比較する。
-     行をタップすると、その行だけトレンド状態とグランビル位置の編集欄が開く。 */
+  /* ============ 🔭 トレンド一覧タブ（セッション23、S24で巡回ツール化） ============ */
+  /* 監視ペアを1行ずつ密に並べる。1ペア＝ヘッダ1行＋可視時間足ごとの入力行という2バンド構成で、
+     トレンド方向・EMAゾーン・グランビルをすべて行内で完結してタップできる（展開操作なし）。 */
   .trend-summary {
     display: flex; flex-wrap: wrap; gap: 6px 8px;
     padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--hairline);
@@ -675,59 +675,108 @@
   }
   .trend-group-head:first-child { padding-top: 0; }
 
+  .trend-tf-label { font-size: 11.5px; color: var(--ink-muted); }
+  .trend-tf-toggles { display: inline-flex; gap: 6px; }
+
   .trend-item {
     border: 1px solid var(--border); border-radius: 10px;
     background: var(--surface-2); margin-bottom: 6px; overflow: hidden;
   }
-  .trend-item.open { border-color: var(--accent); }
 
-  /* 折りたたみ行：ペア名／日足・4時間足のトレンド／アラート／判定 を横一列に並べる。 */
-  .trend-row {
+  /* バンドA：ペア名／鮮度／アラート／判定／ボードへ */
+  .trend-head {
     display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
-    padding: 9px 11px; cursor: pointer;
+    padding: 8px 11px 6px;
   }
-  .trend-row:hover { background: var(--surface); }
-  .trend-row .caret { font-size: 10px; color: var(--ink-muted); width: 10px; flex: none; }
-  .trend-item.open .trend-row .caret { transform: rotate(90deg); }
-  .trend-row .pair {
+  .trend-head .pair {
     font-size: 13.5px; font-weight: 700; letter-spacing: 0.02em;
     min-width: 74px; flex: none;
   }
-  .trend-row .spacer { flex: 1; }
-
-  .trend-marks { display: flex; gap: 6px; flex: none; }
-  .trend-mark {
-    display: inline-flex; align-items: baseline; gap: 3px;
-    font-size: 11.5px; font-weight: 700; white-space: nowrap;
-    border: 1px solid var(--border); border-radius: 7px;
-    padding: 3px 7px; background: var(--surface);
-    color: var(--ink-muted);
-  }
-  .trend-mark .tf { font-size: 10px; font-weight: 600; opacity: 0.85; }
-  .trend-mark .g { font-size: 10.5px; font-weight: 700; opacity: 0.9; }
-  .trend-mark.up    { color: var(--good); border-color: var(--good); background: var(--good-soft); }
-  .trend-mark.down  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
-  .trend-mark.range { color: var(--ink-muted); }
-  .trend-mark.none  { color: var(--ink-muted); opacity: 0.55; border-style: dashed; }
-
-  /* 展開部：トレンド状態のトグルとグランビル位置のプルダウン */
-  .trend-detail { padding: 4px 11px 11px; border-top: 1px solid var(--hairline); }
-  .trend-tf-row {
-    display: grid; grid-template-columns: 62px 1fr 190px; gap: 8px;
-    align-items: center; padding: 7px 0;
-  }
-  .trend-tf-row .tf { font-size: 12px; font-weight: 700; color: var(--ink-2); }
-  .trend-tf-row select {
-    width: 100%; padding: 6px 8px; font-size: 12px; font-family: inherit;
-    background: var(--surface-2); color: var(--ink);
+  .trend-head .spacer { flex: 1; }
+  .trend-head .mv-choice { flex: none; }
+  .tgoto {
+    flex: none; width: 26px; height: 26px; padding: 0;
+    font-size: 13px; font-family: inherit; cursor: pointer;
+    background: transparent; color: var(--ink-muted);
     border: 1px solid var(--border); border-radius: 8px;
   }
-  .trend-tf-row select:disabled { opacity: 0.4; cursor: not-allowed; }
-  .trend-state-btn { padding: 6px 4px !important; font-size: 11.5px !important; }
-  .trend-state-btn.on.up    { background: var(--good-soft); color: var(--good); border-color: var(--good); }
-  .trend-state-btn.on.down  { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
-  .trend-state-btn.on.range { background: var(--surface);   color: var(--ink-muted); border-color: var(--ink-muted); }
-  .trend-detail .goto { width: 100%; margin-top: 8px; }
+  .tgoto:hover { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+
+  /* 最終更新の鮮度。1日4回の巡回に対し 12h 超で警告色、36h 超で「1日抜けた」扱い。 */
+  .fresh {
+    font-size: 10.5px; font-weight: 700; flex: none;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--surface); color: var(--ink-muted);
+    border: 1px solid var(--border);
+  }
+  .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
+
+  /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル。 */
+  .trend-tf {
+    display: grid; grid-template-columns: 30px auto auto 1fr;
+    gap: 6px; align-items: center; padding: 4px 11px 4px 9px;
+  }
+  .trend-tf:last-child { padding-bottom: 9px; }
+  .trend-tf .tf {
+    font-size: 10.5px; font-weight: 700; color: var(--ink-muted); text-align: right;
+  }
+  .trend-tf .tgroup { display: inline-flex; gap: 4px; }
+
+  .tstate-btn, .tzone-btn, .tgv {
+    font-family: inherit; cursor: pointer; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--ink-muted); padding: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .tstate-btn:hover, .tzone-btn:hover, .tgv:hover:not(:disabled) { background: var(--surface); }
+
+  .tstate-btn { width: 30px; height: 28px; font-size: 13px; font-weight: 700; }
+  .tstate-btn.on.up    { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+  .tstate-btn.on.down  { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
+  .tstate-btn.on.range { background: var(--surface);   color: var(--ink);  border-color: var(--ink-muted); }
+
+  /* EMAゾーンは色そのものが情報なので、選択前から下地の色を薄く見せる。 */
+  .tzone-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+  .tzone-btn .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; opacity: 0.35; }
+  .tzone-btn.green { color: var(--good); }
+  .tzone-btn.red   { color: var(--bad); }
+  .tzone-btn.gray  { color: var(--ink-muted); }
+  .tzone-btn.on .dot { opacity: 1; }
+  .tzone-btn.on.green { background: var(--good-soft); border-color: var(--good); }
+  .tzone-btn.on.red   { background: var(--bad-soft);  border-color: var(--bad); }
+  .tzone-btn.on.gray  { background: var(--surface);   border-color: var(--ink-muted); }
+
+  .tgv {
+    justify-self: start; height: 28px; padding: 0 10px;
+    font-size: 11.5px; font-weight: 700;
+  }
+  .tgv.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .tgv:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* 判定ボタンはヘッダ内で小さく詰める（色は .mv-judge-btn.on.* 側で付く） */
+  .trend-state-btn { padding: 6px 8px !important; font-size: 11.5px !important; flex: none !important; }
+
+  /* グランビル・ピッカー */
+  .gv-meta { font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+  .gv-img {
+    display: block; width: 100%; max-height: 42vh; object-fit: contain;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); margin-bottom: 12px;
+  }
+  .gv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .gv-opt {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 6px; font-family: inherit; cursor: pointer;
+    background: var(--surface-2); color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: 10px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .gv-opt:hover { background: var(--surface); }
+  .gv-opt .s { font-size: 15px; font-weight: 700; }
+  .gv-opt .l { font-size: 10px; color: var(--ink-muted); line-height: 1.35; text-align: center; }
+  .gv-opt.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .gv-opt.on .l { color: var(--accent); }
 
   @media (max-width: 520px) {
     body { padding: 16px 10px 96px; }
@@ -738,12 +787,22 @@
     .mv-tf-select-row { grid-template-columns: 52px 1fr; }
     .mv-tf-checks { margin-left: 8px; }
     .mv-tfcheck-row { grid-template-columns: 78px 1fr; }
-    /* スマホでは折りたたみ行を2段に落とす（ペア＋トレンド／アラート＋判定） */
-    .trend-row { gap: 6px 8px; padding: 9px 9px; }
-    .trend-row .pair { min-width: 66px; font-size: 13px; }
-    .trend-row .spacer { flex-basis: 100%; height: 0; }
-    .trend-tf-row { grid-template-columns: 52px 1fr; }
-    .trend-tf-row select { grid-column: 2; }
+    /* スマホではヘッダを2段に落とす（ペア＋鮮度／アラート＋判定） */
+    .trend-head { gap: 6px 8px; padding: 8px 9px 6px; }
+    .trend-head .pair { min-width: 66px; font-size: 13px; }
+    .trend-head .spacer { flex-basis: 100%; height: 0; }
+    /* 入力行は1段のまま保つ（22ペア分の縦スクロールを増やさない）。
+       375pxで 24 + 3×27 + 3×26 + グランビル ≒ 280px となり、カード内幅に収まる。 */
+    .trend-tf { grid-template-columns: 24px auto auto 1fr; gap: 5px; padding-left: 7px; padding-right: 7px; }
+    .trend-tf .tgroup { gap: 3px; }
+    .tstate-btn { width: 27px; height: 27px; }
+    .tzone-btn  { width: 26px; height: 27px; }
+    .tgv { height: 27px; padding: 0 8px; font-size: 11px; }
+    .gv-grid { grid-template-columns: repeat(2, 1fr); }
+    /* 狭い画面では「すべて表示」を1行取らせ、クリア／閉じるが2行に割れないようにする */
+    #trendGvModal .modal-actions { flex-wrap: wrap; }
+    #trendGvAll { flex-basis: 100%; }
+    #trendGvModal .modal-actions button { white-space: nowrap; }
   }
 </style>
 </head>
@@ -907,11 +966,14 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">監視中の全ペアについて、上位足（日足・4時間足）のトレンド方向とグランビルの位置を並べて比較します。日足と4時間足の向きが揃っているペアほど環境が整っている＝エントリーに近い、という見方です。行をタップすると、その場でトレンドを記録できます。</div>
+    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。日足と4時間足の向きが揃っているペアほど環境が整っている＝エントリーに近い、という見方で自動的に上へ並びます。週足・月足は必要なときだけ表示してください。</div>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🔥 揃っているペアのみ</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <span class="spacer"></span>
+      <span class="trend-tf-label">表示する足</span>
+      <span class="trend-tf-toggles" id="trendTfToggles"></span>
     </div>
     <div id="trendList"></div>
   </section>
@@ -1033,6 +1095,22 @@
   </div>
 </div>
 
+<!-- ============ グランビルの波ピッカー（トレンド一覧・S24） ============ -->
+<!-- 巡回中に図と照合して波を選べるようにする。画像は開いたときに初めて読み込む。 -->
+<div class="modal-backdrop" id="trendGvModal">
+  <div class="modal wide">
+    <h3>グランビルの波 <span class="gv-meta" id="trendGvMeta"></span></h3>
+    <img class="gv-img" id="trendGvImg" alt="グランビルの法則">
+    <div class="gv-grid" id="trendGvGrid"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendGvAll">売買8つすべて表示</button>
+      <span class="spacer"></span>
+      <button class="btn-secondary" type="button" id="trendGvClear">クリア</button>
+      <button class="btn-secondary" type="button" id="trendGvCancel">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1099,15 +1177,24 @@ const MV_JUDGES = [
 ];
 const MV_JUDGE_LABELS = Object.fromEntries(MV_JUDGES.map(j => [j.v, j.label]));
 
-/* ============ 🔭 トレンド一覧の定数（セッション23） ============ */
-/* 上位足のトレンド状況を全ペア横断で比較するための記録。日足・4時間足を常に固定で持つ。
-   環境認識ボードの「上位足」はユーザーが選んだ任意の1つ（週足〜1時間足）であり意味が違うため、
-   checksHigher.granville とは別フィールド（w.trend）に保存し、既存の記録・CSV・統計には影響させない。
+/* ============ 🔭 トレンド一覧の定数（セッション23、S24で拡張） ============ */
+/* チャート巡回（1日約4回）で、上位足ごとに「トレンド方向 / EMAゾーンの色 / グランビルの波」の
+   3点をその場で記録するための領域。環境認識ボードの「上位足」はユーザーが選んだ任意の1つ
+   （週足〜1時間足）であり意味が違うため、checksHigher.granville とは別フィールド（w.trend）に
+   保存し、既存の記録・CSV・統計には一切影響させない。
    MV_TREND_TFS に1行足せば、一覧の行・移行処理・集計すべてに自動反映される。 */
 const MV_TREND_TFS = [
   { k: 'd',  label: '日足',    short: '日' },
   { k: 'h4', label: '4時間足', short: '4H' },
+  { k: 'w',  label: '週足',    short: '週', optional: true },
+  { k: 'mn', label: '月足',    short: '月', optional: true },
 ];
+/* ⚠️ trendRank はこの2足だけを見る。週足・月足は表示トグルで出入りするため、
+   ランクに入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
+   また記録済み4足すべてを見ると、月足が未記録なだけで全ペアが 🔥 から落ちる（初日は必ずそうなる）。
+   週足・月足はあくまで参考情報であってランクの入力ではない。 */
+const MV_TREND_DEFAULT_TFS = MV_TREND_TFS.filter(t => !t.optional);
+
 const MV_TREND_STATES = [
   { v: 'up',    label: '↗ 上昇',  mark: '↗' },
   { v: 'down',  label: '↘ 下降',  mark: '↘' },
@@ -1117,17 +1204,32 @@ const MV_TREND_STATE_MAP = Object.fromEntries(MV_TREND_STATES.map(s => [s.v, s])
 /* トレンド発生中（＝グランビルの位置を問える状態）かどうか。レンジと未記録は対象外。 */
 function isTrendingState(state) { return state === 'up' || state === 'down'; }
 
+/* EMAゾーンの色（S24）。トレンド方向とは別に記録する ── 構造の向きとEMAの並びが
+   食い違っている状態そのものが判断材料になるため、片方から導出せず独立して持つ。 */
+const MV_TREND_ZONES = [
+  { v: 'green', label: '緑' },
+  { v: 'red',   label: '赤' },
+  { v: 'gray',  label: 'グレー' },
+];
+const MV_TREND_ZONE_MAP = Object.fromEntries(MV_TREND_ZONES.map(z => [z.v, z]));
+
+/* 表示する時間足の設定キー（端末ごとの表示設定なので市場データとは別に持つ）と、鮮度のしきい値。 */
+const TREND_TFS_KEY = 'mochipoyo_trend_tfs_v1';
+const TREND_STALE_H = 12;   // 1日4回の巡回で「1回抜けた」目安
+const TREND_COLD_H  = 36;   // 「1日抜けた」目安
+
 /* グランビルの法則8パターン。1〜4が買い、5〜8が売り。
-   文言は解説ドロワー（guide-granville）の basics の説明と用語を揃えている。 */
+   文言は解説ドロワー（guide-granville）の basics の説明と用語を揃えている。
+   side はピッカーで記録済みの方向に合わせて4択に絞るために使う。 */
 const MV_GRANVILLE_POSITIONS = [
-  { v: '1', short: '買①', label: '買① 上抜け（EMAが上向きに転換）' },
-  { v: '2', short: '買②', label: '買② 押し目（一時下抜けてもすぐ戻る）' },
-  { v: '3', short: '買③', label: '買③ 反発（EMAを割り込まず反発）' },
-  { v: '4', short: '買④', label: '買④ 乖離戻し（下に大きく乖離）' },
-  { v: '5', short: '売①', label: '売① 下抜け（EMAが下向きに転換）' },
-  { v: '6', short: '売②', label: '売② 戻り（一時上抜けてもすぐ戻る）' },
-  { v: '7', short: '売③', label: '売③ 反落（EMAを超えられず反落）' },
-  { v: '8', short: '売④', label: '売④ 乖離戻し（上に大きく乖離）' },
+  { v: '1', side: 'buy',  short: '買①', label: '買① 上抜け（EMAが上向きに転換）' },
+  { v: '2', side: 'buy',  short: '買②', label: '買② 押し目（一時下抜けてもすぐ戻る）' },
+  { v: '3', side: 'buy',  short: '買③', label: '買③ 反発（EMAを割り込まず反発）' },
+  { v: '4', side: 'buy',  short: '買④', label: '買④ 乖離戻し（下に大きく乖離）' },
+  { v: '5', side: 'sell', short: '売①', label: '売① 下抜け（EMAが下向きに転換）' },
+  { v: '6', side: 'sell', short: '売②', label: '売② 戻り（一時上抜けてもすぐ戻る）' },
+  { v: '7', side: 'sell', short: '売③', label: '売③ 反落（EMAを超えられず反落）' },
+  { v: '8', side: 'sell', short: '売④', label: '売④ 乖離戻し（上に大きく乖離）' },
 ];
 const MV_GRANVILLE_MAP = Object.fromEntries(MV_GRANVILLE_POSITIONS.map(g => [g.v, g]));
 
@@ -2496,11 +2598,16 @@ function mvEnsureTrend(w) {
   let filled = false;
   if (!w.trend || typeof w.trend !== 'object') { w.trend = {}; filled = true; }
   MV_TREND_TFS.forEach(t => {
-    if (!w.trend[t.k] || typeof w.trend[t.k] !== 'object') {
-      w.trend[t.k] = { state: '', granville: '' };
-      filled = true;
-    }
+    let cur = w.trend[t.k];
+    if (!cur || typeof cur !== 'object') { cur = w.trend[t.k] = {}; filled = true; }
+    /* S24: zone を追加。フィールド単位で補うので、S23形式の {state, granville} だけの
+       既存記録もここで zone が埋まり、週足・月足の枠も同時に生える。 */
+    ['state', 'zone', 'granville'].forEach(f => {
+      if (typeof cur[f] !== 'string') { cur[f] = ''; filled = true; }
+    });
   });
+  /* S24: ペア単位の最終更新時刻。巡回の鮮度表示に使う。 */
+  if (typeof w.trendAt !== 'string') { w.trendAt = ''; filled = true; }
   return filled;
 }
 
@@ -2575,8 +2682,10 @@ function loadMarket() {
       });
     });
 
-    /* セッション23移行：上位足トレンド（日足・4時間足の状態＋グランビル位置）を追加。
-       既存ペアには空の trend を補う。既存フィールドには一切触れない。 */
+    /* セッション23/24移行：上位足トレンドを追加・拡張。
+       S23 = 日足・4時間足の {state, granville}、S24 = zone フィールド／週足・月足の枠／trendAt。
+       mvEnsureTrend がフィールド単位で補うので、どの世代の記録でもこの1行で追いつく。
+       既存フィールドには一切触れない。 */
     pairs.forEach(w => { if (mvEnsureTrend(w)) changed = true; });
 
     if (changed) saveMarket({ pairs, snapshots, judgeLog });
@@ -2813,6 +2922,28 @@ function mvSetJudge(watchId, value) {
   renderStats();
 }
 
+/* トレンド3項目（方向 / EMAゾーン / グランビル）の唯一の書き込み口（S24）。
+   更新時刻を必ず打つので、鮮度表示はこの関数を通す限り自動で正しくなる。
+   ⚠️ 判定は mvSetJudge、アラートは mvToggleAlert を通すこと（judgeLog を落とさないため）。
+   ⚠️ ここは環境認識ボードの checksHigher / checksEntry には一切触れない（別データ）。
+   ボードはトレンドを表示しないので renderMarket() も呼ばない（巡回中の再描画を最小にする）。 */
+function mvWriteTrend(watchId, tfKey, patch) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return null;
+  mvEnsureTrend(w);
+  const cur = w.trend[tfKey];
+  Object.assign(cur, patch);
+  /* その足のグランビルが意味を失ったら落とす。方向が消えた（レンジ／未記録）ときに加えて、
+     方向が反転したときも ── 上昇に買②を記録したあと下降に変えたなら、その買いの波はもう成立しない。 */
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  const side = cur.state === 'down' ? 'sell' : 'buy';
+  if (!isTrendingState(cur.state) || (g && g.side !== side)) cur.granville = '';
+  w.trendAt = new Date().toISOString();
+  if (!saveMarket(data)) return null;
+  return w;
+}
+
 mvListEl.addEventListener('click', (e) => {
   /* 根拠チェックのラベル 📖 から解説ドロワーを開く。背後のスクロール位置は保たれる。 */
   const guideLink = e.target.closest('[data-guide-link]');
@@ -2886,7 +3017,6 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
   data.snapshots = data.snapshots.filter(s => s.watchId !== mvPendingDeleteId);
   if (saveMarket(data)) {
     if (loadSelectedPairId() === mvPendingDeleteId) saveSelectedPairId('');
-    if (trendOpenId === mvPendingDeleteId) trendOpenId = '';
     renderMarket();
     renderTrendList();
     showToast('データを削除しました');
@@ -2895,25 +3025,62 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
   mvPendingDeleteId = null;
 });
 
-/* ============ 🔭 トレンド一覧（セッション23） ============ */
-/* 環境認識ボードは1ペアずつしか見られないため、監視ペアが増えると巡回が現実的でなくなる。
-   この一覧は data.pairs（一度でも選択したペア）を横断して上位足のトレンド方向を並べ、
-   「日足と4時間足が同じ向きに揃っているペア＝環境が整っている」を先頭に押し上げる。
-   アラートと判定は折りたたみ行のまま操作でき、巡回チェックが1画面で完結する。 */
+/* ============ 🔭 トレンド一覧（セッション23、S24で巡回ツールに作り直し） ============ */
+/* トレンドフォローの最初の工程は「トレンドが発生している通貨を探すチャート巡回」で、
+   監視22ペアを1日約4回見る。1回に長い時間はかけられないので、この画面は
+   「チャートを一目見て、行を開かずその場でタップして次へ」を最優先に設計している。
+   記録するのは上位足ごとに3点 ── トレンド方向 / EMAゾーンの色 / グランビルの波。
+   アラートと判定も同じ行で操作でき、巡回チェックが1画面で完結する。 */
 const trendListEl    = document.getElementById('trendList');
 const trendSummaryEl = document.getElementById('trendSummary');
 const trendFilterBtn = document.getElementById('trendFilterAligned');
+const trendStaleBtn  = document.getElementById('trendFilterStale');
+const trendTfBar     = document.getElementById('trendTfToggles');
 
-let trendOpenId = '';        // 展開中の行（一度に1つだけ開く）
 let trendAlignedOnly = false; // 「揃っているペアのみ」の絞り込み。永続化しない
+let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 
-/* 並び順のグループ分け。0 が最も「エントリーに近い」。 */
+/* 表示する時間足。日足・4時間足が既定で、週足・月足は希望時だけ出す。
+   端末ごとの表示設定にすぎないので、市場データ（saveMarket）ではなく専用キーに持つ。 */
+function loadTrendTfs() {
+  try {
+    const a = JSON.parse(localStorage.getItem(TREND_TFS_KEY) || 'null');
+    if (Array.isArray(a)) return MV_TREND_TFS.filter(t => a.includes(t.k));
+  } catch (e) { /* 壊れていたら既定に戻す */ }
+  return MV_TREND_DEFAULT_TFS.slice();
+}
+function saveTrendTfs() {
+  try { localStorage.setItem(TREND_TFS_KEY, JSON.stringify(trendVisibleTfs.map(t => t.k))); }
+  catch (e) { /* 保存できなくても表示は続行する */ }
+}
+let trendVisibleTfs = loadTrendTfs();
+
+/* 並び順のグループ分け。0 が最も「エントリーに近い」。
+   ⚠️ 見るのは MV_TREND_DEFAULT_TFS（日足・4時間足）だけ。理由は定数側のコメント参照。 */
 function trendRank(w) {
-  const states = MV_TREND_TFS.map(t => (w.trend && w.trend[t.k] || {}).state || '');
+  const states = MV_TREND_DEFAULT_TFS.map(t => (w.trend && w.trend[t.k] || {}).state || '');
   const trending = states.filter(isTrendingState);
   if (trending.length === states.length && new Set(trending).size === 1) return 0; // 全上位足が同じ向き
   if (trending.length) return 1;                                                   // 一部だけトレンド発生
   return 2;                                                                        // レンジ・未記録
+}
+
+/* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
+function trendAgeHours(w) {
+  if (!w.trendAt) return Infinity;
+  const t = Date.parse(w.trendAt);
+  if (isNaN(t)) return Infinity;
+  return (Date.now() - t) / 3600000;
+}
+function isTrendStale(w) { return trendAgeHours(w) > TREND_STALE_H; }
+
+function trendFreshChip(w) {
+  const h = trendAgeHours(w);
+  if (!isFinite(h)) return '<span class="fresh cold">未記録</span>';
+  const cls = h > TREND_COLD_H ? ' cold' : (h > TREND_STALE_H ? ' stale' : '');
+  const text = h < 1 ? 'たった今' : (h < 24 ? Math.floor(h) + 'h' : Math.floor(h / 24) + 'd');
+  return '<span class="fresh' + cls + '" title="最終更新 ' + esc(fmtDatetime(w.trendAt)) + '">' +
+    esc(text) + '</span>';
 }
 const TREND_GROUPS = [
   { rank: 0, head: '🔥 上位足が揃っている（日足と4時間足が同じ向き）' },
@@ -2921,16 +3088,69 @@ const TREND_GROUPS = [
   { rank: 2, head: '💤 レンジ・未記録' },
 ];
 
-function renderTrendList() {
-  const data = loadMarket();
-  const pairs = data.pairs.slice().sort((a, b) =>
-    trendRank(a) - trendRank(b) || String(a.pair).localeCompare(String(b.pair)));
+/* アラートバッジと判定ボタンは環境認識ボードと同じ data 属性を出す。
+   ⚠️ 属性を変えると共有ハンドラ（mvToggleAlert / mvSetJudge）から外れ、
+   judgeLog が落ちて振り返りタブの時間足別統計が壊れるので触らないこと。 */
+function trendAlertBadgesHtml(w) {
+  const alerts = w.alerts || {};
+  return MV_ALERT_TFS.map(t =>
+    '<button type="button" class="mv-alert-badge' + (alerts[t.k] && alerts[t.k].on ? ' on' : '') + '"' +
+    ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
+    t.label + '</button>').join('');
+}
+function trendJudgeBtnsHtml(w) {
+  return MV_JUDGES.map(j =>
+    '<button type="button" class="mv-judge-btn trend-state-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
+    ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '" title="' + esc(j.label) + '">' +
+    esc(j.label.slice(0, 1)) + '</button>').join('');
+}
 
-  /* ---- 上部サマリー：今どの状態が何件かを一目で把握する ---- */
-  const counts = { aligned: 0, up: 0, down: 0, range: 0, none: 0 };
+/* 1ペア分の行。ヘッダ（ペア名・鮮度・アラート・判定）＋可視時間足ごとの入力行。
+   入力はすべてこの行の中で完結する（展開操作なし）。 */
+function trendItemHtml(w) {
+  const tfRows = trendVisibleTfs.map(t => {
+    const cur = (w.trend && w.trend[t.k]) || {};
+    const trending = isTrendingState(cur.state);
+    const g = trending ? MV_GRANVILLE_MAP[cur.granville] : null;
+    const states = MV_TREND_STATES.map(s =>
+      '<button type="button" class="tstate-btn ' + s.v + (cur.state === s.v ? ' on' : '') + '"' +
+      ' data-trend-state="' + esc(w.id) + '" data-tf="' + t.k + '" data-value="' + s.v + '"' +
+      ' title="' + esc(t.label) + ' ' + esc(s.label) + '">' + esc(s.mark) + '</button>').join('');
+    const zones = MV_TREND_ZONES.map(z =>
+      '<button type="button" class="tzone-btn ' + z.v + (cur.zone === z.v ? ' on' : '') + '"' +
+      ' data-trend-zone="' + esc(w.id) + '" data-tf="' + t.k + '" data-value="' + z.v + '"' +
+      ' title="' + esc(t.label) + ' EMAゾーン ' + esc(z.label) + '"><span class="dot"></span></button>').join('');
+    /* グランビルは方向が決まっている足でだけ意味を持つ。レンジ・未記録では押せない。 */
+    return '<div class="trend-tf">' +
+      '<span class="tf">' + esc(t.short) + '</span>' +
+      '<span class="tgroup">' + states + '</span>' +
+      '<span class="tgroup zones">' + zones + '</span>' +
+      '<button type="button" class="tgv' + (g ? ' on' : '') + '"' + (trending ? '' : ' disabled') +
+        ' data-trend-granville-open="' + esc(w.id) + '" data-tf="' + t.k + '"' +
+        ' title="' + esc(g ? g.label : 'グランビルの波を選ぶ') + '">' +
+        (g ? esc(g.short) : '波?') + '</button>' +
+    '</div>';
+  }).join('');
+  return '<div class="trend-item" data-trend-item="' + esc(w.id) + '">' +
+    '<div class="trend-head">' +
+      '<span class="pair">' + esc(w.pair) + '</span>' +
+      trendFreshChip(w) +
+      '<span class="spacer"></span>' +
+      '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
+      '<span class="mv-choice">' + trendJudgeBtnsHtml(w) + '</span>' +
+      '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
+        ' title="このペアの環境認識ボードへ">→</button>' +
+    '</div>' + tfRows +
+  '</div>';
+}
+
+/* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。 */
+function renderTrendSummary(pairs) {
+  const counts = { aligned: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
   pairs.forEach(w => {
     if (trendRank(w) === 0) counts.aligned++;
-    MV_TREND_TFS.forEach(t => {
+    if (isTrendStale(w)) counts.stale++;
+    MV_TREND_DEFAULT_TFS.forEach(t => {
       const s = (w.trend && w.trend[t.k] || {}).state || '';
       if (s === 'up') counts.up++;
       else if (s === 'down') counts.down++;
@@ -2944,116 +3164,92 @@ function renderTrendList() {
     { cls: '', label: '↘ 下降',   n: counts.down,  unit: '' },
     { cls: '', label: '─ レンジ', n: counts.range, unit: '' },
     { cls: '', label: '未記録',   n: counts.none,  unit: '' },
+    { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア' },
   ];
   trendSummaryEl.innerHTML = pairs.length
     ? summaryItems.map(i =>
         '<span class="item' + (i.cls ? ' ' + i.cls : '') + '">' + esc(i.label) +
         '<span class="n">' + i.n + '</span>' + esc(i.unit) + '</span>').join('')
     : '';
+}
+
+/* 週足・月足の表示トグル。 */
+function renderTrendTfToggles() {
+  trendTfBar.innerHTML = MV_TREND_TFS.filter(t => t.optional).map(t =>
+    '<button type="button" class="btn-ghost trend-filter-btn' +
+    (trendVisibleTfs.some(v => v.k === t.k) ? ' on' : '') + '"' +
+    ' data-trend-tf-toggle="' + t.k + '">' + esc(t.label) + '</button>').join('');
+}
+
+function renderTrendList() {
+  const data = loadMarket();
+  const pairs = data.pairs.slice().sort((a, b) =>
+    trendRank(a) - trendRank(b) || String(a.pair).localeCompare(String(b.pair)));
+
+  renderTrendSummary(pairs);
+  renderTrendTfToggles();
   trendFilterBtn.classList.toggle('on', trendAlignedOnly);
+  trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
   if (!pairs.length) {
     trendListEl.innerHTML = '<div class="empty-state">まだ監視ペアがありません。🎯トレードタブの環境認識ボードで通貨ペアを選択すると、ここに並びます。</div>';
     return;
   }
 
-  const shown = trendAlignedOnly ? pairs.filter(w => trendRank(w) === 0) : pairs;
+  let shown = pairs;
+  if (trendAlignedOnly) shown = shown.filter(w => trendRank(w) === 0);
+  if (trendStaleOnly)   shown = shown.filter(isTrendStale);
   if (!shown.length) {
-    trendListEl.innerHTML = '<div class="empty-state">日足と4時間足の向きが揃っているペアはまだありません。</div>';
+    trendListEl.innerHTML = '<div class="empty-state">条件に当てはまるペアはありません。</div>';
     return;
   }
 
-  /* 折りたたみ行に出すトレンドの要約チップ。方向で色が変わり、グランビル位置も併記する。 */
-  function trendMark(w, t) {
-    const cur = (w.trend && w.trend[t.k]) || {};
-    const st = MV_TREND_STATE_MAP[cur.state];
-    const g = isTrendingState(cur.state) ? MV_GRANVILLE_MAP[cur.granville] : null;
-    return '<span class="trend-mark ' + (cur.state || 'none') + '">' +
-      '<span class="tf">' + esc(t.short) + '</span>' +
-      (st ? esc(st.mark) : '・') +
-      (g ? '<span class="g">' + esc(g.short) + '</span>' : '') +
-    '</span>';
-  }
-
-  /* 展開部：トレンド状態のトグル＋グランビル位置のプルダウン。
-     グランビルは上昇・下降のときだけ意味を持つため、レンジ／未記録では無効化する。 */
-  function trendDetail(w) {
-    const rows = MV_TREND_TFS.map(t => {
-      const cur = (w.trend && w.trend[t.k]) || {};
-      const trending = isTrendingState(cur.state);
-      const states = MV_TREND_STATES.map(s =>
-        '<button type="button" class="trend-state-btn ' + s.v + (cur.state === s.v ? ' on' : '') + '"' +
-        ' data-trend-state="' + esc(w.id) + '" data-tf="' + t.k + '" data-value="' + s.v + '">' +
-        esc(s.label) + '</button>').join('');
-      const gOpts = '<option value="">グランビル位置を選択</option>' +
-        MV_GRANVILLE_POSITIONS.map(g =>
-          '<option value="' + g.v + '"' + (cur.granville === g.v ? ' selected' : '') + '>' +
-          esc(g.label) + '</option>').join('');
-      return '<div class="trend-tf-row">' +
-        '<span class="tf">' + esc(t.label) + '</span>' +
-        '<div class="mv-choice">' + states + '</div>' +
-        '<select data-trend-granville="' + esc(w.id) + '" data-tf="' + t.k + '"' +
-          (trending ? '' : ' disabled') + '>' + gOpts + '</select>' +
-      '</div>';
-    }).join('');
-    return '<div class="trend-detail">' + rows +
-      '<button class="btn-ghost goto" type="button" data-trend-goto-board="' + esc(w.id) + '">' +
-      '→ このペアの環境認識ボードへ</button></div>';
-  }
-
-  const alerts = w => w.alerts || {};
   let html = '';
   TREND_GROUPS.forEach(g => {
     const inGroup = shown.filter(w => trendRank(w) === g.rank);
     if (!inGroup.length) return;
     html += '<div class="trend-group-head">' + esc(g.head) + '（' + inGroup.length + '）</div>';
-    html += inGroup.map(w => {
-      const open = trendOpenId === w.id;
-      const alertBadges = MV_ALERT_TFS.map(t =>
-        '<button type="button" class="mv-alert-badge' + (alerts(w)[t.k] && alerts(w)[t.k].on ? ' on' : '') + '"' +
-        ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
-        t.label + '</button>').join('');
-      const judgeBtns = MV_JUDGES.map(j =>
-        '<button type="button" class="mv-judge-btn trend-state-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
-        ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '" title="' + esc(j.label) + '">' +
-        esc(j.label.slice(0, 1)) + '</button>').join('');
-      return '<div class="trend-item' + (open ? ' open' : '') + '">' +
-        '<div class="trend-row" data-trend-row="' + esc(w.id) + '">' +
-          '<span class="caret">▶</span>' +
-          '<span class="pair">' + esc(w.pair) + '</span>' +
-          '<span class="trend-marks">' + MV_TREND_TFS.map(t => trendMark(w, t)).join('') + '</span>' +
-          '<span class="spacer"></span>' +
-          '<span class="mv-alert-badges">' + alertBadges + '</span>' +
-          '<span class="mv-choice">' + judgeBtns + '</span>' +
-        '</div>' +
-        (open ? trendDetail(w) : '') +
-      '</div>';
-    }).join('');
+    html += inGroup.map(trendItemHtml).join('');
   });
   trendListEl.innerHTML = html;
+}
+
+/* タップ1回ごとの差し替えは「その行だけ」。全体を作り直さない理由：
+   22ペア×最大4足×3コントロールでは毎タップで千単位のノードを捨てることになるうえ、
+   並べ替えが走ると2足目を記録した瞬間に行がグループ間を移動して指の下から消える。
+   「タップして次へ」の巡回では致命的なので、グループ分けは次の全描画
+   （タブ切替・フィルタ操作）まで意図的に古いままにしておく。 */
+function trendPatchItem(w) {
+  const items = trendListEl.querySelectorAll('[data-trend-item]');
+  let el = null;
+  items.forEach(n => { if (n.dataset.trendItem === w.id) el = n; });
+  if (!el) { renderTrendList(); return; }
+  el.outerHTML = trendItemHtml(w);
+  renderTrendSummary(loadMarket().pairs);
 }
 
 trendFilterBtn.addEventListener('click', () => {
   trendAlignedOnly = !trendAlignedOnly;
   renderTrendList();
 });
-
-trendListEl.addEventListener('change', (e) => {
-  /* グランビル位置のプルダウン。選んだ瞬間に保存する。 */
-  const sel = e.target.closest('[data-trend-granville]');
-  if (!sel) return;
-  const data = loadMarket();
-  const w = data.pairs.find(p => p.id === sel.dataset.trendGranville);
-  if (!w) return;
-  mvEnsureTrend(w);
-  w.trend[sel.dataset.tf].granville = sel.value;
-  if (!saveMarket(data)) return;
+trendStaleBtn.addEventListener('click', () => {
+  trendStaleOnly = !trendStaleOnly;
+  renderTrendList();
+});
+trendTfBar.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-trend-tf-toggle]');
+  if (!btn) return;
+  const k = btn.dataset.trendTfToggle;
+  trendVisibleTfs = trendVisibleTfs.some(t => t.k === k)
+    ? trendVisibleTfs.filter(t => t.k !== k)
+    : MV_TREND_TFS.filter(t => trendVisibleTfs.some(v => v.k === t.k) || t.k === k); // 定義順を保つ
+  saveTrendTfs();
   renderTrendList();
 });
 
 trendListEl.addEventListener('click', (e) => {
-  /* アラート・判定は環境認識ボードと同じ data 属性なので、共有ハンドラをそのまま使える。
-     行の展開トグルより先に処理し、行タップの巻き添えで開閉しないようにする。 */
+  /* アラート・判定は環境認識ボードと同じ data 属性なので、共有ハンドラをそのまま使う。
+     ⚠️ ここで w.judge を直接書かないこと（judgeLog が落ちて統計が壊れる）。 */
   const alertBadge = e.target.closest('[data-mv-alert-toggle]');
   if (alertBadge) {
     mvToggleAlert(alertBadge.dataset.mvAlertToggle, alertBadge.dataset.tf);
@@ -3065,20 +3261,31 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
-  /* トレンド状態のトグル。同じものを再度押すと未選択に戻せる（根拠チェックと同じ挙動）。
-     トレンドが外れたらグランビル位置は意味を失うのでクリアする。 */
+  /* トレンド方向。同じものを再度押すと未選択に戻せる（根拠チェックと同じ挙動）。
+     方向が外れたときのグランビルのクリアは mvWriteTrend が引き受ける。 */
   const stateBtn = e.target.closest('[data-trend-state]');
   if (stateBtn) {
-    const { trendState: watchId, tf, value } = stateBtn.dataset;
-    const data = loadMarket();
-    const w = data.pairs.find(p => p.id === watchId);
-    if (!w) return;
-    mvEnsureTrend(w);
-    const cur = w.trend[tf];
-    cur.state = cur.state === value ? '' : value;
-    if (!isTrendingState(cur.state)) cur.granville = '';
-    if (!saveMarket(data)) return;
-    renderTrendList();
+    const { trendState: id, tf, value } = stateBtn.dataset;
+    const cur = ((loadMarket().pairs.find(p => p.id === id) || {}).trend || {})[tf] || {};
+    const w = mvWriteTrend(id, tf, { state: cur.state === value ? '' : value });
+    if (w) trendPatchItem(w);
+    return;
+  }
+
+  /* EMAゾーンの色。同じ色の再タップで解除。 */
+  const zoneBtn = e.target.closest('[data-trend-zone]');
+  if (zoneBtn) {
+    const { trendZone: id, tf, value } = zoneBtn.dataset;
+    const cur = ((loadMarket().pairs.find(p => p.id === id) || {}).trend || {})[tf] || {};
+    const w = mvWriteTrend(id, tf, { zone: cur.zone === value ? '' : value });
+    if (w) trendPatchItem(w);
+    return;
+  }
+
+  /* グランビルの波は図を見ながら選びたいので、その場でピッカーを開く。 */
+  const gvBtn = e.target.closest('[data-trend-granville-open]');
+  if (gvBtn) {
+    openTrendGv(gvBtn.dataset.trendGranvilleOpen, gvBtn.dataset.tf);
     return;
   }
 
@@ -3088,16 +3295,75 @@ trendListEl.addEventListener('click', (e) => {
     saveSelectedPairId(goto.dataset.trendGotoBoard);
     renderMarket();
     setActiveTab('trade');
-    return;
   }
+});
 
-  /* 行タップで展開・折りたたみ。一度に1行だけ開く。 */
-  const row = e.target.closest('[data-trend-row]');
-  if (row) {
-    const id = row.dataset.trendRow;
-    trendOpenId = trendOpenId === id ? '' : id;
-    renderTrendList();
-  }
+/* ---- グランビル・ピッカー（S24） ---- */
+/* 巡回中に「この波は狙い目か」を図と照合して決めたいので、選択肢だけでなく図も出す。
+   方向は直前のコントロールで既に決めているため、既定では該当する4択に絞る
+   （買いか売りかの判断を二度させない・375pxでも4つを大きく置ける）。 */
+const trendGvModal = document.getElementById('trendGvModal');
+const trendGvGrid  = document.getElementById('trendGvGrid');
+const trendGvMeta  = document.getElementById('trendGvMeta');
+const trendGvImg   = document.getElementById('trendGvImg');
+const trendGvAll   = document.getElementById('trendGvAll');
+let trendGvTarget = null;   // { id, tf }
+let trendGvShowAll = false;
+
+function openTrendGv(watchId, tfKey) {
+  const w = loadMarket().pairs.find(p => p.id === watchId);
+  if (!w) return;
+  const cur = (w.trend && w.trend[tfKey]) || {};
+  if (!isTrendingState(cur.state)) return;   // 方向未記録では開かない
+  trendGvTarget = { id: watchId, tf: tfKey };
+  trendGvShowAll = false;
+  /* 巨大な base64 は初回描画に載せず、ここで初めて代入する。 */
+  if (!trendGvImg.src) trendGvImg.src = IMG_GRANVILLE;
+  renderTrendGv();
+  trendGvModal.classList.add('show');
+}
+
+function renderTrendGv() {
+  if (!trendGvTarget) return;
+  const w = loadMarket().pairs.find(p => p.id === trendGvTarget.id);
+  if (!w) return;
+  const t = MV_TREND_TFS.find(x => x.k === trendGvTarget.tf);
+  const cur = (w.trend && w.trend[trendGvTarget.tf]) || {};
+  const side = cur.state === 'down' ? 'sell' : 'buy';
+  trendGvMeta.textContent = w.pair + ' / ' + (t ? t.label : trendGvTarget.tf);
+  trendGvAll.classList.toggle('on', trendGvShowAll);
+  const opts = MV_GRANVILLE_POSITIONS.filter(g => trendGvShowAll || g.side === side);
+  trendGvGrid.innerHTML = opts.map(g =>
+    '<button type="button" class="gv-opt' + (cur.granville === g.v ? ' on' : '') + '"' +
+    ' data-gv-pick="' + g.v + '">' +
+    '<span class="s">' + esc(g.short) + '</span>' +
+    '<span class="l">' + esc(g.label.replace(/^[^（]*（/, '').replace(/）$/, '')) + '</span>' +
+    '</button>').join('');
+}
+
+function closeTrendGv() {
+  trendGvModal.classList.remove('show');
+  trendGvTarget = null;
+}
+
+trendGvGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-gv-pick]');
+  if (!btn || !trendGvTarget) return;
+  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf, { granville: btn.dataset.gvPick });
+  closeTrendGv();
+  if (w) trendPatchItem(w);
+});
+trendGvAll.addEventListener('click', () => { trendGvShowAll = !trendGvShowAll; renderTrendGv(); });
+document.getElementById('trendGvClear').addEventListener('click', () => {
+  if (!trendGvTarget) return;
+  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf, { granville: '' });
+  closeTrendGv();
+  if (w) trendPatchItem(w);
+});
+document.getElementById('trendGvCancel').addEventListener('click', closeTrendGv);
+trendGvModal.addEventListener('click', (e) => { if (e.target === trendGvModal) closeTrendGv(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && trendGvModal.classList.contains('show')) closeTrendGv();
 });
 
 /* ============ タブ切替 ============ */
@@ -3117,6 +3383,9 @@ function setActiveTab(name, opts) {
   });
   tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
   localStorage.setItem(TAB_KEY, name);
+  /* 一覧タブは巡回中の記録では行単位でしか差し替えず、並べ替えを意図的に保留している。
+     タブに戻ってきたこのタイミングが、グループ分けを最新にする自然な区切りになる。 */
+  if (name === 'trend') renderTrendList();
   if (!opts || !opts.keepScroll) {
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   }
