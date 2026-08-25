@@ -909,46 +909,11 @@
     <div class="section-note">通貨ペアを選び、上位足・エントリー足とその根拠、アラート発生足、判定をここで記録します。記録フォームはこの内容を引き継ぎます。</div>
 
     <div class="mv-toolbar">
-      <select id="mvPairSelect">
+      <select id="mvGroupSelect">
+        <option value="">グループを選択…</option>
+      </select>
+      <select id="mvPairSelect" disabled>
         <option value="">通貨ペアを選択…</option>
-        <optgroup label="株価先物">
-          <option>SPX500</option>
-          <option>NAS100</option>
-          <option>US30</option>
-          <option>JP225</option>
-          <option>UK100</option>
-          <option>DAX40</option>
-        </optgroup>
-        <optgroup label="仮想通貨">
-          <option>BTCUSDT</option>
-          <option>ETHUSDT</option>
-          <option>XRPUSDT</option>
-          <option>SOLUSDT</option>
-          <option>BNBUSDT</option>
-          <option>DOGEUSDT</option>
-        </optgroup>
-        <optgroup label="金・銀・原油">
-          <option>GOLD</option>
-          <option>SILVER</option>
-          <option>OIL</option>
-        </optgroup>
-        <optgroup label="USD・EUR・GBP">
-          <option>USDJPY</option>
-          <option>EURJPY</option>
-          <option>GBPJPY</option>
-          <option>EURUSD</option>
-          <option>GBPUSD</option>
-        </optgroup>
-        <optgroup label="AUD・NZD・CHF・CAD">
-          <option>AUDUSD</option>
-          <option>AUDJPY</option>
-          <option>NZDUSD</option>
-          <option>NZDJPY</option>
-          <option>USDCHF</option>
-          <option>CHFJPY</option>
-          <option>USDCAD</option>
-          <option>CADJPY</option>
-        </optgroup>
       </select>
       <span class="spacer"></span>
     </div>
@@ -3163,23 +3128,44 @@ const MV_PAIR_GROUPS = [
 ];
 const MV_PRESET_PAIRS = MV_PAIR_GROUPS.flatMap(g => g.pairs);
 
-/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。グループごとに optgroup 化。 */
+/* グループに属するペア名一覧。「自由入力」はプリセット外の既存ペア（過去に自由入力で作成済みのもの）。 */
+function pairsInGroup(groupLabel, data) {
+  if (groupLabel === '自由入力') {
+    const known = new Set(MV_PRESET_PAIRS);
+    return data.pairs.map(w => w.pair).filter(p => !known.has(p));
+  }
+  const g = MV_PAIR_GROUPS.find(g => g.label === groupLabel);
+  return g ? g.pairs : [];
+}
+
+/* グループ選択に応じて銘柄プルダウンを差し替える。グループ未選択なら無効化。 */
+function syncPairOptionsForGroup(groupLabel, data, selectedPair) {
+  const pairs = pairsInGroup(groupLabel, data);
+  let html = '<option value="">通貨ペアを選択…</option>';
+  pairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
+  mvPairSelect.innerHTML = html;
+  mvPairSelect.disabled = !groupLabel;
+}
+
+/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。
+   グループ選択→銘柄選択の2段プルダウン（グループごとに optgroup 化する代わりにカスケード化）。 */
 function syncPairSelectOptions(data, selectedId) {
   const known = new Set(MV_PRESET_PAIRS);
   const customPairs = data.pairs.map(w => w.pair).filter(p => !known.has(p));
   const selectedPair = (data.pairs.find(w => w.id === selectedId) || {}).pair || '';
-  let html = '<option value="">通貨ペアを選択…</option>';
+  const presetGroup = selectedPair && MV_PAIR_GROUPS.find(g => g.pairs.includes(selectedPair));
+  const selectedGroup = presetGroup ? presetGroup.label : (selectedPair && customPairs.includes(selectedPair) ? '自由入力' : '');
+
+  let groupHtml = '<option value="">グループを選択…</option>';
   MV_PAIR_GROUPS.forEach(g => {
-    html += '<optgroup label="' + esc(g.label) + '">';
-    g.pairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
-    html += '</optgroup>';
+    groupHtml += '<option' + (g.label === selectedGroup ? ' selected' : '') + '>' + esc(g.label) + '</option>';
   });
   if (customPairs.length) {
-    html += '<optgroup label="自由入力">';
-    customPairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
-    html += '</optgroup>';
+    groupHtml += '<option' + (selectedGroup === '自由入力' ? ' selected' : '') + '>自由入力</option>';
   }
-  mvPairSelect.innerHTML = html;
+  mvGroupSelect.innerHTML = groupHtml;
+
+  syncPairOptionsForGroup(selectedGroup, data, selectedPair);
 }
 
 /* ボードの内容は記録フォームの入力元でもあるため、描画のたびにフォーム側も同期する。
@@ -3287,6 +3273,7 @@ function renderMarketBoard() {
 }
 
 /* ---- 通貨ペアの選択 ---- */
+const mvGroupSelect  = document.getElementById('mvGroupSelect');
 const mvPairSelect   = document.getElementById('mvPairSelect');
 
 /* 選択したペアの監視項目がなければ新規作成し、そのペア1枚だけをボードに表示する。 */
@@ -3308,6 +3295,9 @@ function selectPair(pair) {
   renderMarket();
 }
 
+mvGroupSelect.addEventListener('change', () => {
+  syncPairOptionsForGroup(mvGroupSelect.value, loadMarket(), '');
+});
 mvPairSelect.addEventListener('change', () => {
   if (mvPairSelect.value) selectPair(mvPairSelect.value);
 });
