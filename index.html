@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FX Entry Checklist</title>
+<!-- S28: PWA。ホーム画面から起動した状態にすると、iOS Safari の「7日でストレージを消す」
+     対象から外れる。記録が勝手に消える問題への本命の対策なので、必ず相対パスで参照する
+     （GitHub Pages はサブパス配信のため、絶対パスだと 404 になる）。 -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#1a1a19">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FX Check">
+<link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
 <style>
   /* ============ テーマトークン ============ */
   :root[data-theme="dark"] {
@@ -472,6 +481,23 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* ============ 破損検知バナー（S28） ============
+     データ読み込みに失敗して書き込みを停止している状態は、見逃すと復旧できない。
+     タブ切替に関係なく常に見える位置に出す。 */
+  #fatalBanner {
+    display: none; margin: 0 0 16px; padding: 12px 14px; border-radius: 10px;
+    background: var(--bad-soft); border: 1px solid var(--bad);
+    color: var(--bad); font-size: 13px; line-height: 1.6; font-weight: 600;
+  }
+  #fatalBanner.show { display: block; }
+  #fatalBanner .fatal-sub { font-weight: 400; color: var(--ink); margin-top: 6px; }
+
+  .settings-head {
+    font-size: 14px; margin: 26px 0 6px; padding-top: 18px;
+    border-top: 1px solid var(--hairline);
+  }
+  .settings-head:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
+
   /* ============ タブ ============ */
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
@@ -821,6 +847,9 @@
     <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
   </header>
 
+  <!-- S28: 保存済みデータを読めなかったときの警告。表示中は全書き込みが停止している -->
+  <div id="fatalBanner"></div>
+
   <!-- ============ 🎯 トレード（環境認識→チェック→記録の一連フロー） ============ -->
   <div class="tab-panel" id="tabPanel-trade">
   <nav class="step-nav" id="stepNav">
@@ -1002,7 +1031,27 @@
   <!-- ============ ⚙ 設定（CSV入出力） ============ -->
   <section class="card tab-panel" id="tabPanel-settings">
     <h2>⚙ 設定</h2>
-    <div class="section-note">トレード記録データのバックアップ・移行用です。環境認識ボードのデータは対象外です。</div>
+
+    <h3 class="settings-head">📱 アプリとして使う</h3>
+    <div class="section-note" id="pwaStatus"></div>
+
+    <h3 class="settings-head">💾 全データのバックアップ</h3>
+    <div class="section-note">トレード記録・環境認識ボード・トレンド一覧を含む<strong>すべてのデータ</strong>を1つのJSONファイルにまとめます。端末の乗り換えや、万一データが壊れたときの復旧に使います。定期的に取っておいてください。</div>
+    <div class="list-toolbar">
+      <button class="btn-ghost" type="button" id="exportJson">⬇ 全データJSONエクスポート</button>
+      <button class="btn-ghost" type="button" id="importJsonBtn">⬆ 全データJSONインポート</button>
+      <input type="file" id="importJsonFile" accept=".json,application/json" style="display:none">
+    </div>
+
+    <h3 class="settings-head">🛟 復旧</h3>
+    <div class="section-note">保存直前の内容を1世代だけ自動で控えています。誤って記録が減ったときに戻せます。</div>
+    <div class="list-toolbar">
+      <button class="btn-ghost" type="button" id="restoreBak">↩ 直前バックアップから復元</button>
+    </div>
+    <div class="section-note" id="storageInfo"></div>
+
+    <h3 class="settings-head">📄 CSV（トレード記録のみ）</h3>
+    <div class="section-note">表計算ソフトで開きたいとき用です。環境認識ボードのデータは含まれないため、バックアップ目的なら上のJSONを使ってください。</div>
     <div class="list-toolbar">
       <button class="btn-ghost" type="button" id="exportCsv">⬇ CSVエクスポート</button>
       <button class="btn-ghost" type="button" id="importCsvBtn">⬆ CSVインポート</button>
@@ -1438,25 +1487,77 @@ const INDICATOR_INFO = [
 ];
 
 /* ============ ストレージ ============ */
-function loadTrades() {
+
+/* ---- S28: 破損検知とキルスイッチ ----
+   これまで load 系は読み込みに失敗すると「空データ」を返していた。呼び出し側はそれを
+   正常な空データと区別できないため、直後の移行処理やプリセット自動生成が changed=true を
+   立てて保存に走り、一過性の読み込み失敗が本物のデータの恒久的な消滅に変わっていた。
+
+   対策は load 側ではなく save 側に置く。書き込み経路はすべて `if (!saveX(data)) return;`
+   の規約に既に乗っているので、save を止めれば全経路が自動的に止まる（load の呼び出し元
+   14箇所には一切手を入れなくて済む）。 */
+const STORAGE_FAILED = { trades: false, market: false };
+
+const fatalBannerEl = document.getElementById('fatalBanner');
+function showFatalBanner(msg) {
+  if (!fatalBannerEl) return;
+  fatalBannerEl.innerHTML = '⛔ ' + msg +
+    '<div class="fatal-sub">データを守るため、このタブでの保存をすべて停止しました。' +
+    'この状態で操作しても記録されません。⚙設定タブの「全データJSONインポート」または' +
+    '「直前バックアップから復元」で復旧してから、ページを再読み込みしてください。</div>';
+  fatalBannerEl.classList.add('show');
+}
+
+/* 読めなかった原文を退避して以降の書き込みを止める。原文を消さないことが復旧の生命線。 */
+function storageQuarantine(kind, key, raw, reason) {
+  /* loadMarket は1回の描画で十数回呼ばれる。2回目以降も退避コピーを作ると、
+     壊れた原文がストレージを埋め尽くして復旧の余地まで奪う。退避は1回だけ。 */
+  const first = !STORAGE_FAILED[kind];
+  STORAGE_FAILED[kind] = true;
+  if (!first) return null;
+  console.error('[storage] ' + key + ' の読み込みに失敗:', reason);
+  try { localStorage.setItem(key + '__corrupt_' + Date.now(), raw); } catch (e) { /* 退避すら無理でも停止は維持 */ }
+  showFatalBanner('保存済みデータ（' + key + '）を読み込めませんでした。');
+  return null;
+}
+
+/* 保存前に件数が減っていないかを見て、減るときだけ旧内容を1世代退避する。
+   ペア削除など正当な縮小もあるので保存自体は止めない（あくまで復旧用の控え）。 */
+function storageBackupIfShrinking(key, prevRaw, nextObj, counts) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(arr)) return [];
-    /* S21: エントリーチェックリスト（15項目 OK/NG）を廃止したため、旧 checks 配列を破棄する。
-       根拠は環境認識ボードから焼き込む mvChecks が引き継ぐ。 */
-    if (arr.some(t => t && 'checks' in t)) {
-      arr.forEach(t => { if (t) delete t.checks; });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-    }
-    return arr;
-  } catch (e) {
-    console.error('localStorage 読み込みエラー:', e);
-    return [];
+    if (!prevRaw) return;
+    const prev = JSON.parse(prevRaw);
+    const shrunk = counts.some(c => {
+      const a = c(prev), b = c(nextObj);
+      return typeof a === 'number' && typeof b === 'number' && b < a;
+    });
+    if (shrunk) localStorage.setItem(key + '__bak', prevRaw);
+  } catch (e) { /* 判定できないなら何もしない */ }
+}
+
+function loadTrades() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw == null || raw === '') return [];   /* 真の初回 */
+  let arr;
+  try { arr = JSON.parse(raw); }
+  catch (e) { return storageQuarantine('trades', STORAGE_KEY, raw, e) || []; }
+  if (!Array.isArray(arr)) return storageQuarantine('trades', STORAGE_KEY, raw, 'not an array') || [];
+  /* S21: エントリーチェックリスト（15項目 OK/NG）を廃止したため、旧 checks 配列を破棄する。
+     根拠は環境認識ボードから焼き込む mvChecks が引き継ぐ。 */
+  if (arr.some(t => t && 'checks' in t)) {
+    arr.forEach(t => { if (t) delete t.checks; });
+    saveTrades(arr);
   }
+  return arr;
 }
 function saveTrades(trades) {
+  if (STORAGE_FAILED.trades) {
+    showToast('⚠ 読み込みに失敗しているため保存を停止しています');
+    return false;
+  }
   try {
+    storageBackupIfShrinking(STORAGE_KEY, localStorage.getItem(STORAGE_KEY), trades,
+      [o => Array.isArray(o) ? o.length : null]);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
     return true;
   } catch (e) {
@@ -2474,6 +2575,133 @@ function csvField(v) {
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+/* ============ 全データ JSON バックアップ（S28） ============
+   CSV はトレード記録しか運べず、環境認識ボード・トレンド一覧のデータには
+   これまで持ち出す手段が一切なかった。端末を移すときも、データが壊れたときも、
+   ここが唯一の復旧経路になる。
+
+   対象キーは列挙せず接頭辞で拾う。キーを1つ増やすたびにバックアップから漏れる、
+   という事故を構造的に防ぐため（退避用の派生キーだけ除く）。 */
+const BACKUP_PREFIX = 'mochipoyo_';
+const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$/;
+const BACKUP_SCHEMA = 1;
+
+function backupKeys() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(BACKUP_PREFIX) && !BACKUP_SKIP.test(k)) keys.push(k);
+  }
+  return keys.sort();
+}
+
+document.getElementById('exportJson').addEventListener('click', () => {
+  const data = {};
+  backupKeys().forEach(k => { data[k] = localStorage.getItem(k); });
+  const payload = {
+    app: 'fx-entry-checklist', schema: BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(), data,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fx-checklist-backup_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('全データをエクスポートしました（' + Object.keys(data).length + '項目）');
+});
+
+const importJsonFile = document.getElementById('importJsonFile');
+document.getElementById('importJsonBtn').addEventListener('click', () => importJsonFile.click());
+importJsonFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    let payload;
+    try { payload = JSON.parse(ev.target.result); }
+    catch (err) { showToast('⚠ JSONとして読めませんでした'); importJsonFile.value = ''; return; }
+    if (!payload || payload.app !== 'fx-entry-checklist' || !payload.data || typeof payload.data !== 'object') {
+      showToast('⚠ このツールのバックアップファイルではありません');
+      importJsonFile.value = '';
+      return;
+    }
+    if (payload.schema > BACKUP_SCHEMA) {
+      showToast('⚠ 新しい形式のファイルです。アプリを更新してください');
+      importJsonFile.value = '';
+      return;
+    }
+    const incoming = Object.keys(payload.data);
+    const when = payload.exportedAt ? payload.exportedAt.slice(0, 16).replace('T', ' ') : '不明';
+    if (!confirm('バックアップ（' + when + ' 時点 / ' + incoming.length + '項目）で\n' +
+                 '現在のデータを置き換えます。\n\n' +
+                 '現在の内容は自動で控えを取るので、あとから戻せます。\n実行しますか？')) {
+      importJsonFile.value = '';
+      return;
+    }
+    try {
+      /* 置換前に現状を丸ごと退避する。ここを飛ばすと取り違えたファイルを入れた時点で詰む。 */
+      const stamp = Date.now();
+      backupKeys().forEach(k => {
+        const v = localStorage.getItem(k);
+        if (v != null) localStorage.setItem(k + '__preimport_' + stamp, v);
+      });
+      backupKeys().forEach(k => localStorage.removeItem(k));
+      incoming.forEach(k => {
+        if (!k.startsWith(BACKUP_PREFIX) || BACKUP_SKIP.test(k)) return;
+        const v = payload.data[k];
+        if (typeof v === 'string') localStorage.setItem(k, v);
+      });
+    } catch (err) {
+      alert('復元に失敗しました。\n' + err.message);
+      importJsonFile.value = '';
+      return;
+    }
+    alert('復元しました。ページを再読み込みします。');
+    location.reload();
+  };
+  reader.readAsText(file);
+});
+
+/* 縮小ガードが取った1世代前の控えに戻す。マージバグや誤操作の最後の逃げ道。 */
+document.getElementById('restoreBak').addEventListener('click', () => {
+  const targets = [
+    { key: MARKET_KEY, label: '環境認識ボード・トレンド一覧' },
+    { key: STORAGE_KEY, label: 'トレード記録' },
+  ].filter(t => localStorage.getItem(t.key + '__bak') != null);
+  if (!targets.length) { showToast('復元できる控えはありません'); return; }
+  const names = targets.map(t => t.label).join(' / ');
+  if (!confirm(names + ' を直前の控えに戻します。\n' +
+               '今の内容は控えに入れ替わるので、もう一度押せば元に戻せます。\n実行しますか？')) return;
+  targets.forEach(t => {
+    const bak = localStorage.getItem(t.key + '__bak');
+    const cur = localStorage.getItem(t.key);
+    if (cur != null) localStorage.setItem(t.key + '__bak', cur); else localStorage.removeItem(t.key + '__bak');
+    localStorage.setItem(t.key, bak);
+  });
+  alert('復元しました。ページを再読み込みします。');
+  location.reload();
+});
+
+/* 設定タブを開いたときに現状を出す。使用量は localStorage の上限（5〜10MB）の目安用。 */
+function renderStorageInfo() {
+  const el = document.getElementById('storageInfo');
+  if (!el) return;
+  let bytes = 0;
+  const corrupt = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(BACKUP_PREFIX)) continue;
+    bytes += (localStorage.getItem(k) || '').length + k.length;
+    if (/__corrupt_\d+$/.test(k)) corrupt.push(k);
+  }
+  const parts = ['使用量の目安 約 ' + (bytes / 1024).toFixed(0) + ' KB'];
+  const bak = [MARKET_KEY, STORAGE_KEY].filter(k => localStorage.getItem(k + '__bak') != null);
+  parts.push(bak.length ? '控えあり（' + bak.length + '件）' : '控えなし');
+  if (corrupt.length) parts.push('⚠ 読めなかったデータの退避が ' + corrupt.length + '件あります');
+  el.textContent = parts.join(' ／ ');
+}
+
 document.getElementById('exportCsv').addEventListener('click', () => {
   const trades = loadTrades();
   if (trades.length === 0) { showToast('エクスポートする記録がありません'); return; }
@@ -2633,8 +2861,29 @@ function mvEnsureTrend(w) {
 }
 
 function loadMarket() {
+  const raw = localStorage.getItem(MARKET_KEY);
+  /* S28: ここから先に来る時点で「保存済みの何かがある」か「真の初回」かを確定させておく。
+     この区別が無かったために、読み込み失敗で空になったデータへプリセット自動生成が走り、
+     末尾の `if (changed) saveMarket(...)` が本物のデータを空で上書きしていた。 */
+  if (raw != null && raw !== '') {
+    let probe;
+    try { probe = JSON.parse(raw); }
+    catch (e) { storageQuarantine('market', MARKET_KEY, raw, e); return { pairs: [], snapshots: [], judgeLog: [] }; }
+    if (!probe || typeof probe !== 'object' || Array.isArray(probe)) {
+      storageQuarantine('market', MARKET_KEY, raw, 'not an object');
+      return { pairs: [], snapshots: [], judgeLog: [] };
+    }
+    /* キー自体が無いのは新フィールドなので [] で補ってよい。
+       キーがあるのに配列でない＝壊れている、として隔離する。 */
+    for (const k of ['pairs', 'snapshots', 'judgeLog']) {
+      if (k in probe && !Array.isArray(probe[k])) {
+        storageQuarantine('market', MARKET_KEY, raw, k + ' is not an array');
+        return { pairs: [], snapshots: [], judgeLog: [] };
+      }
+    }
+  }
   try {
-    const o = JSON.parse(localStorage.getItem(MARKET_KEY) || '{}');
+    const o = JSON.parse(raw || '{}');
     let pairs = Array.isArray(o.pairs) ? o.pairs : [];
     let snapshots = Array.isArray(o.snapshots) ? o.snapshots : [];
     let judgeLog = Array.isArray(o.judgeLog) ? o.judgeLog : [];
@@ -2727,7 +2976,10 @@ function loadMarket() {
 
     return { pairs, snapshots, judgeLog };
   } catch (e) {
-    console.error('環境認識データの読み込みエラー:', e);
+    /* S28: 移行処理の途中で落ちた場合もここに来る。空を返すこと自体は避けられないが、
+       隔離フラグを立てて以降の saveMarket を止めるので、この空データが保存されることはない。 */
+    if (raw != null && raw !== '') storageQuarantine('market', MARKET_KEY, raw, e);
+    else console.error('環境認識データの読み込みエラー:', e);
     return { pairs: [], snapshots: [], judgeLog: [] };
   }
 }
@@ -2739,7 +2991,18 @@ function saveSelectedPairId(id) {
   try { localStorage.setItem(MARKET_SELECTED_KEY, id || ''); } catch (e) { /* noop */ }
 }
 function saveMarket(data) {
+  /* S28: 読み込みに失敗している間は絶対に書かない。全書き込み経路が
+     `if (!saveMarket(data)) return;` の規約に乗っているので、ここ1箇所で全部止まる。 */
+  if (STORAGE_FAILED.market) {
+    showToast('⚠ 読み込みに失敗しているため保存を停止しています');
+    return false;
+  }
   try {
+    storageBackupIfShrinking(MARKET_KEY, localStorage.getItem(MARKET_KEY), data, [
+      o => Array.isArray(o.pairs) ? o.pairs.length : null,
+      o => Array.isArray(o.judgeLog) ? o.judgeLog.length : null,
+      o => Array.isArray(o.snapshots) ? o.snapshots.length : null,
+    ]);
     localStorage.setItem(MARKET_KEY, JSON.stringify(data));
     return true;
   } catch (e) {
@@ -2924,7 +3187,9 @@ mvListEl.addEventListener('change', (e) => {
     const w = data.pairs.find(p => p.id === watchId);
     if (!w) return;
     w[field] = tfSelect.value;
-    saveMarket(data);
+    /* S28: ここだけ戻り値を見ていなかった。保存が止まっているのに選択が残ると、
+       UI と保存内容が食い違ったまま気づけない。 */
+    if (!saveMarket(data)) { renderMarket(); return; }
     return;
   }
 });
@@ -3458,6 +3723,7 @@ function setActiveTab(name, opts) {
   /* 一覧タブは巡回中の記録では行単位でしか差し替えず、並べ替えを意図的に保留している。
      タブに戻ってきたこのタイミングが、グループ分けを最新にする自然な区切りになる。 */
   if (name === 'trend') renderTrendList();
+  if (name === 'settings') { renderStorageInfo(); renderPwaStatus(); }
   if (!opts || !opts.keepScroll) {
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   }
@@ -3523,6 +3789,52 @@ document.querySelectorAll('.type-filter').forEach(el => {
   });
 });
 renderAll();
+
+/* ============ PWA 登録・ストレージ保護（S28） ============ */
+
+/* localStorage は容量が逼迫すると OS/ブラウザ側の判断で捨てられる。
+   persist() が通れば「勝手に消してよいデータ」から外れる。Chrome/Android では
+   ホーム画面追加や利用頻度で自動的に許可される。iOS Safari は未対応なので、
+   そちらは PWA 化（ホーム画面起動）が唯一の対策になる。 */
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persisted().then(already => {
+    if (!already) navigator.storage.persist().catch(() => {});
+  }).catch(() => {});
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    /* 相対パス必須。GitHub Pages の /fx-entry-checklist/ 配下で絶対パスは 404 になる。 */
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      /* 復帰のたびに更新を確認する。ブラウザ任せだと最大24時間まで古いままになりうる。 */
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch(e => console.warn('SW 登録に失敗:', e));
+  });
+}
+
+/* 設定タブに、ホーム画面追加が済んでいるかを出す。
+   済んでいないと iOS で7日後にデータが消えるため、状態が見えることに意味がある。 */
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+function renderPwaStatus() {
+  const el = document.getElementById('pwaStatus');
+  if (!el) return;
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isStandalone()) {
+    el.innerHTML = '✅ <strong>ホーム画面から起動しています。</strong>この状態ならデータが自動削除されることはありません。';
+    return;
+  }
+  el.innerHTML = '⚠️ <strong>ブラウザのタブから開いています。</strong>' +
+    (ios
+      ? 'iPhone / iPad ではこの状態だと、最後に開いてから7日で Safari が記録を自動削除します。' +
+        '<br>共有ボタン <strong>［</strong>↑<strong>］→「ホーム画面に追加」</strong>を実行し、' +
+        '以後はそのアイコンから起動してください。'
+      : 'ブラウザメニューの<strong>「アプリをインストール」/「ホーム画面に追加」</strong>を実行すると、' +
+        'データが保護され、アイコンから起動できるようになります。');
+}
 </script>
 </body>
 </html>
