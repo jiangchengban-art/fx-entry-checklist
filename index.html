@@ -682,8 +682,22 @@
   .mv-tfcheck-btn.on {
     background: var(--accent-soft); color: var(--accent); border-color: var(--accent);
   }
+  .mv-choice.wrap { flex-wrap: wrap; }
 
-  .mv-goto-checklist { width: 100%; margin-top: 12px; }
+  /* S29: グランビルが🔭一覧と連動しているときの読み取り専用表示 */
+  .mv-gv-synced { justify-content: space-between; align-items: center; flex-wrap: wrap; }
+  .mv-gv-synced-value {
+    font-size: 12px; font-weight: 600; color: var(--ink-muted);
+  }
+  .mv-gv-synced-value.on { color: var(--accent); }
+  .mv-gv-synced-tag {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: transparent; border: 1px solid var(--accent); border-radius: 10px;
+    padding: 3px 8px; white-space: nowrap;
+  }
+
+  .mv-goto-row { display: flex; gap: 8px; margin-top: 12px; }
+  .mv-goto-row .mv-goto-checklist { flex: 1; margin-top: 0; }
 
   /* 判定の3択トグル */
   .mv-choice { display: flex; gap: 6px; }
@@ -737,7 +751,10 @@
   .trend-item {
     border: 1px solid var(--border); border-radius: 10px;
     background: var(--surface-2); margin-bottom: 6px; overflow: hidden;
+    transition: background-color .3s, border-color .3s;
   }
+  /* S29: ボードの「🔭一覧と連動」から飛んできたとき、該当ペアを一瞬強調する */
+  .trend-item.trend-highlight { border-color: var(--accent); background: var(--accent-soft); }
 
   /* バンドA：ペア名／鮮度／アラート／判定／ボードへ */
   .trend-head {
@@ -1273,8 +1290,27 @@ const MV_TF_ENTRY_OPTIONS  = ['5分足', '15分足', '1時間足', '4時間足']
    選んだ時間足ごとに独立して保存され（checksHigher / checksEntry）、ペア切り替え時に復元される。
    項目を増やしたいときはこの配列に1行足せば、両方の時間足のカード・履歴・CSV に自動反映される。
    link を持つ項目はラベルが 📖 ボタンになり、解説ドロワーの該当箇所へジャンプする。 */
+/* グランビルの法則8パターン。1〜4が買い、5〜8が売り。
+   文言は解説ドロワー（guide-granville）の basics の説明と用語を揃えている。
+   side はトレンド一覧のピッカーで記録済みの方向に合わせて4択に絞るために使う。
+   ⚠️ MV_TF_CHECKS より前で宣言する必要がある（ボードのグランビル選択肢がこの8択を使うため）。 */
+const MV_GRANVILLE_POSITIONS = [
+  { v: '1', side: 'buy',  short: '買①', label: '買① 上抜け（EMAが上向きに転換）' },
+  { v: '2', side: 'buy',  short: '買②', label: '買② 押し目（一時下抜けてもすぐ戻る）' },
+  { v: '3', side: 'buy',  short: '買③', label: '買③ 反発（EMAを割り込まず反発）' },
+  { v: '4', side: 'buy',  short: '買④', label: '買④ 乖離戻し（下に大きく乖離）' },
+  { v: '5', side: 'sell', short: '売①', label: '売① 下抜け（EMAが下向きに転換）' },
+  { v: '6', side: 'sell', short: '売②', label: '売② 戻り（一時上抜けてもすぐ戻る）' },
+  { v: '7', side: 'sell', short: '売③', label: '売③ 反落（EMAを超えられず反落）' },
+  { v: '8', side: 'sell', short: '売④', label: '売④ 乖離戻し（上に大きく乖離）' },
+];
+const MV_GRANVILLE_MAP = Object.fromEntries(MV_GRANVILLE_POSITIONS.map(g => [g.v, g]));
+
 const MV_TF_CHECKS = [
-  { k: 'granville',    label: 'グランビル',       opts: ['1', '2', '❌'], link: 'granville' },
+  /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
+     選択肢はトレンド一覧と同じ8パターン（買①〜④／売①〜④）＋❌を使う。
+     ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
+  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
   { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '下限', '❌'] },
   { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '下限', '❌'] },
   { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '下限', '❌'] },
@@ -1283,6 +1319,22 @@ const MV_TF_CHECKS = [
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'] },
 ];
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
+
+/* ボードの上位足・エントリー足ラベル → トレンド一覧の時間足キー。
+   一致するものだけ「🔭一覧と連動」表示になり、一覧のグランビル記録が自動で流れ込む。
+   一覧は日足・4時間足（＋週足・月足）しか持たないため、1時間足・5分足・15分足は対象外＝従来どおり手動選択。 */
+const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4' };
+/* トレンド一覧の該当足からボードの checksHigher/checksEntry.granville へ書き込む唯一の入り口。
+   一覧が入力元・ボードは複製という向きを守るため、ボード側からここへは書き込まない。 */
+function mvGranvilleSyncField(w, field) {
+  const tfKey = MV_TF_TO_TREND_KEY[w[field]];
+  if (!tfKey) return;
+  const checksField = MV_CHECK_FIELDS[field];
+  if (!w[checksField]) w[checksField] = {};
+  const cur = (w.trend && w.trend[tfKey]) || {};
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  w[checksField].granville = g ? g.short : '';
+}
 
 /* 記録に焼き込む根拠スナップショットの区分。CSV列の接頭辞も兼ねる */
 const MV_CHECK_SNAPSHOTS = [
@@ -1353,21 +1405,6 @@ const MV_TREND_ZONE_MAP = Object.fromEntries(MV_TREND_ZONES.map(z => [z.v, z]));
 const TREND_TFS_KEY = 'mochipoyo_trend_tfs_v1';
 const TREND_STALE_H = 12;   // 1日4回の巡回で「1回抜けた」目安
 const TREND_COLD_H  = 36;   // 「1日抜けた」目安
-
-/* グランビルの法則8パターン。1〜4が買い、5〜8が売り。
-   文言は解説ドロワー（guide-granville）の basics の説明と用語を揃えている。
-   side はピッカーで記録済みの方向に合わせて4択に絞るために使う。 */
-const MV_GRANVILLE_POSITIONS = [
-  { v: '1', side: 'buy',  short: '買①', label: '買① 上抜け（EMAが上向きに転換）' },
-  { v: '2', side: 'buy',  short: '買②', label: '買② 押し目（一時下抜けてもすぐ戻る）' },
-  { v: '3', side: 'buy',  short: '買③', label: '買③ 反発（EMAを割り込まず反発）' },
-  { v: '4', side: 'buy',  short: '買④', label: '買④ 乖離戻し（下に大きく乖離）' },
-  { v: '5', side: 'sell', short: '売①', label: '売① 下抜け（EMAが下向きに転換）' },
-  { v: '6', side: 'sell', short: '売②', label: '売② 戻り（一時上抜けてもすぐ戻る）' },
-  { v: '7', side: 'sell', short: '売③', label: '売③ 反落（EMAを超えられず反落）' },
-  { v: '8', side: 'sell', short: '売④', label: '売④ 乖離戻し（上に大きく乖離）' },
-];
-const MV_GRANVILLE_MAP = Object.fromEntries(MV_GRANVILLE_POSITIONS.map(g => [g.v, g]));
 
 /* ============ 利確ポイント（RR分析） ============ */
 /* 利確の根拠。1行追加するだけで選択肢・統計集計の両方に反映される */
@@ -3175,19 +3212,32 @@ function renderMarketBoard() {
   }
   /* 各時間足の下に根拠チェックを並べる。上位足とエントリー足で別々の値を保持するため、
      保存先フィールド（checksHigher / checksEntry）を data 属性で持ち回る。 */
-  function tfCheckBlock(field, checks) {
-    return '<div class="mv-tf-checks">' + MV_TF_CHECKS.map(c =>
-      '<div class="mv-tfcheck-row">' +
+  /* S29: グランビルは対応する時間足（週足・日足・4時間足）を選んでいる間、
+     🔭一覧タブの記録を映すだけの読み取り専用行になる（クリックすると一覧側の値と食い違うため）。 */
+  function tfCheckBlock(field, checks, tfLabel) {
+    const gvTfKey = MV_TF_TO_TREND_KEY[tfLabel];
+    return '<div class="mv-tf-checks">' + MV_TF_CHECKS.map(c => {
+      const synced = c.k === 'granville' && gvTfKey;
+      return '<div class="mv-tfcheck-row">' +
         (c.link
           ? '<button type="button" class="label mv-guide-link" data-guide-link="' + c.link + '">' +
             esc(c.label) + ' 📖</button>'
           : '<span class="label">' + esc(c.label) + '</span>') +
-        '<div class="mv-choice">' + c.opts.map(o =>
-          '<button type="button" class="mv-tfcheck-btn' + (checks[c.k] === o ? ' on' : '') + '"' +
-          ' data-mv-tfcheck="' + esc(w.id) + '" data-field="' + field + '"' +
-          ' data-key="' + c.k + '" data-value="' + esc(o) + '">' + esc(o) + '</button>').join('') +
-        '</div>' +
-      '</div>').join('') + '</div>';
+        (synced
+          ? '<div class="mv-choice mv-gv-synced">' +
+              '<span class="mv-gv-synced-value' + (checks[c.k] ? ' on' : '') + '">' +
+                (checks[c.k] ? esc(checks[c.k]) : '🔭未記録') + '</span>' +
+              '<button type="button" class="mv-gv-synced-tag" data-mv-gv-goto-trend="' + esc(w.id) + '"' +
+                ' data-tf="' + esc(gvTfKey) + '" title="🔭一覧タブのグランビル記録から自動反映。変更は一覧側で行う">' +
+                '🔭一覧と連動 →</button>' +
+            '</div>'
+          : '<div class="mv-choice' + (c.opts.length > 3 ? ' wrap' : '') + '">' + c.opts.map(o =>
+              '<button type="button" class="mv-tfcheck-btn' + (checks[c.k] === o ? ' on' : '') + '"' +
+              ' data-mv-tfcheck="' + esc(w.id) + '" data-field="' + field + '"' +
+              ' data-key="' + c.k + '" data-value="' + esc(o) + '">' + esc(o) + '</button>').join('') +
+            '</div>') +
+      '</div>';
+    }).join('') + '</div>';
   }
   function tfSection(label, field, options, selected) {
     return '<div class="mv-tf-block">' +
@@ -3197,7 +3247,7 @@ function renderMarketBoard() {
           tfSelectOptions(options, selected) +
         '</select>' +
       '</div>' +
-      tfCheckBlock(field, w[MV_CHECK_FIELDS[field]] || {}) +
+      tfCheckBlock(field, w[MV_CHECK_FIELDS[field]] || {}, selected) +
     '</div>';
   }
   const rows =
@@ -3226,7 +3276,10 @@ function renderMarketBoard() {
       alertTimesRow +
     '</div>' +
     rows +
-    '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-form="' + esc(w.id) + '">📝 記録フォームへ</button>' +
+    '<div class="mv-goto-row">' +
+      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-form="' + esc(w.id) + '">📝 記録フォームへ</button>' +
+      '<button class="btn-ghost mv-goto-checklist" type="button" data-mv-goto-trend="' + esc(w.id) + '" title="このペアを🔭一覧タブで見る">🔭 一覧タブへ</button>' +
+    '</div>' +
     '<div class="mv-judge-row">' +
       '<span class="label">判定</span>' +
       '<div class="mv-choice">' +
@@ -3295,6 +3348,9 @@ mvListEl.addEventListener('change', (e) => {
     if (!w) return;
     w[field] = tfSelect.value;
     w.tfAt = new Date().toISOString();   /* S28: 端末間マージ用 */
+    /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
+       （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
+    mvGranvilleSyncField(w, field);
     /* S28: ここだけ戻り値を見ていなかった。保存が止まっているのに選択が残ると、
        UI と保存内容が食い違ったまま気づけない。 */
     if (!saveMarket(data)) { renderMarket(); return; }
@@ -3368,6 +3424,9 @@ function mvWriteTrend(watchId, tfKey, patch) {
      端末間のマージが見るのはこちら（時間足ごとに独立して新旧を判定するため）。 */
   cur.at = new Date().toISOString();
   w.trendAt = cur.at;
+  /* S29: この足を上位足・エントリー足として選んでいるボードがあれば、グランビルを自動反映する。 */
+  mvGranvilleSyncField(w, 'tfHigher');
+  mvGranvilleSyncField(w, 'tfEntry');
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3386,6 +3445,39 @@ mvListEl.addEventListener('click', (e) => {
     setActiveTab('trade', { keepScroll: true });
     requestAnimationFrame(() => {
       document.getElementById('tabPanel-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return;
+  }
+
+  /* S29: 「🔭一覧タブへ」— ボードからトレンド一覧タブへの逆導線。一覧側にある「→ボードへ」の対になる。 */
+  const gotoTrend = e.target.closest('[data-mv-goto-trend]');
+  if (gotoTrend) {
+    const watchId = gotoTrend.dataset.mvGotoTrend;
+    setActiveTab('trend', { keepScroll: true });
+    requestAnimationFrame(() => {
+      const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(watchId) + '"]');
+      if (!item) return;
+      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      item.classList.add('trend-highlight');
+      setTimeout(() => item.classList.remove('trend-highlight'), 1600);
+    });
+    return;
+  }
+
+  /* S29: 「🔭一覧と連動」タグから、このペア・この足のグランビル記録元へ移動する（ボード→一覧の逆導線）。 */
+  const gvGotoTrend = e.target.closest('[data-mv-gv-goto-trend]');
+  if (gvGotoTrend) {
+    const watchId = gvGotoTrend.dataset.mvGvGotoTrend;
+    const tfKey = gvGotoTrend.dataset.tf;
+    setActiveTab('trend', { keepScroll: true });
+    requestAnimationFrame(() => {
+      const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(watchId) + '"]');
+      if (!item) return;
+      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      item.classList.add('trend-highlight');
+      setTimeout(() => item.classList.remove('trend-highlight'), 1600);
+      const gvBtn = item.querySelector('[data-trend-granville-open][data-tf="' + CSS.escape(tfKey) + '"]');
+      if (gvBtn) gvBtn.focus({ preventScroll: true });
     });
     return;
   }
