@@ -949,10 +949,7 @@
           <option>USDCAD</option>
           <option>CADJPY</option>
         </optgroup>
-        <option value="__custom__">その他（自由入力）</option>
       </select>
-      <input type="text" id="mvPairCustom" class="hidden" placeholder="例: CAD/JPY">
-      <button class="btn-ghost hidden" type="button" id="mvPairCustomOk">決定</button>
       <span class="spacer"></span>
     </div>
 
@@ -3182,7 +3179,6 @@ function syncPairSelectOptions(data, selectedId) {
     customPairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
     html += '</optgroup>';
   }
-  html += '<option value="__custom__">その他（自由入力）</option>';
   mvPairSelect.innerHTML = html;
 }
 
@@ -3292,8 +3288,6 @@ function renderMarketBoard() {
 
 /* ---- 通貨ペアの選択 ---- */
 const mvPairSelect   = document.getElementById('mvPairSelect');
-const mvPairCustom   = document.getElementById('mvPairCustom');
-const mvPairCustomOk = document.getElementById('mvPairCustomOk');
 
 /* 選択したペアの監視項目がなければ新規作成し、そのペア1枚だけをボードに表示する。 */
 function selectPair(pair) {
@@ -3315,22 +3309,7 @@ function selectPair(pair) {
 }
 
 mvPairSelect.addEventListener('change', () => {
-  const custom = mvPairSelect.value === '__custom__';
-  mvPairCustom.classList.toggle('hidden', !custom);
-  mvPairCustomOk.classList.toggle('hidden', !custom);
-  if (custom) { mvPairCustom.focus(); return; }
   if (mvPairSelect.value) selectPair(mvPairSelect.value);
-});
-function confirmCustomPair() {
-  if (!mvPairCustom.value.trim()) { showToast('⚠ 通貨ペアを入力してください'); return; }
-  selectPair(mvPairCustom.value);
-  mvPairCustom.value = '';
-  mvPairCustom.classList.add('hidden');
-  mvPairCustomOk.classList.add('hidden');
-}
-mvPairCustomOk.addEventListener('click', confirmCustomPair);
-mvPairCustom.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); confirmCustomPair(); }
 });
 
 /* ---- 一覧内の操作 ---- */
