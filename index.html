@@ -498,6 +498,32 @@
   }
   .settings-head:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
 
+  /* ============ 同期（S28） ============ */
+  .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .sync-chip {
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2);
+    border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; font-family: inherit;
+  }
+  .sync-chip.ok   { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .sync-chip.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .sync-chip.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .sync-chip.busy { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+  .sync-form { display: grid; gap: 8px; margin-bottom: 12px; }
+  .sync-form label { font-size: 12px; color: var(--ink-muted); }
+  .sync-form input {
+    width: 100%; padding: 9px 11px; font-size: 14px; font-family: inherit;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  #syncAccount { font-size: 13px; line-height: 1.7; }
+  #syncAccount .em { font-weight: 700; color: var(--ink); }
+  .sync-log {
+    font-size: 12px; color: var(--ink-muted); margin-top: 8px;
+    white-space: pre-wrap; line-height: 1.6;
+  }
+
   /* ============ タブ ============ */
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
@@ -844,7 +870,11 @@
       <h1>📋 FX Entry Checklist</h1>
       <div class="subtitle">エントリーチェックリスト ＆ トレード記録（ローカル保存）</div>
     </div>
-    <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
+    <div class="header-actions">
+      <!-- S28: 同期の状態。押すと設定タブへ飛ぶ -->
+      <button class="sync-chip" id="syncChip" type="button" title="同期の状態"></button>
+      <button class="theme-toggle" id="themeToggle" type="button">☀️ ライト</button>
+    </div>
   </header>
 
   <!-- S28: 保存済みデータを読めなかったときの警告。表示中は全書き込みが停止している -->
@@ -1034,6 +1064,42 @@
 
     <h3 class="settings-head">📱 アプリとして使う</h3>
     <div class="section-note" id="pwaStatus"></div>
+
+    <h3 class="settings-head">☁ 複数端末で同期</h3>
+    <div class="section-note">iPhone・PC・Android で同じ記録を見られるようにします。設定するとクラウドに複製が保存され、どの端末で記録しても他の端末に反映されます。オフラインでもこれまで通り記録でき、通信が戻ったときにまとめて反映されます。</div>
+
+    <div id="syncSetup">
+      <div class="sync-form">
+        <label for="syncUrl">Supabase の Project URL（https://xxxx.supabase.co）</label>
+        <input type="url" id="syncUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
+        <label for="syncKey">Supabase の anon public key</label>
+        <input type="text" id="syncKey" placeholder="eyJhbGci..." autocomplete="off">
+      </div>
+      <div class="list-toolbar">
+        <button class="btn-ghost" type="button" id="syncSaveConfig">接続先を保存</button>
+      </div>
+    </div>
+
+    <div id="syncLogin" class="hidden">
+      <div class="sync-form">
+        <label for="syncEmail">メールアドレス（3端末とも同じものを使ってください）</label>
+        <input type="email" id="syncEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="list-toolbar">
+        <button class="btn-accent-solid" type="button" id="syncSendLink">📧 ログインリンクを送る</button>
+        <button class="btn-ghost" type="button" id="syncResetConfig">接続先を変更</button>
+      </div>
+      <div class="section-note">⚠️ iPhone の場合、届いたリンクは<strong>必ず Safari で開いてください</strong>。メールアプリの中で開くと別扱いになり、ログインが引き継がれません。</div>
+    </div>
+
+    <div id="syncActive" class="hidden">
+      <div id="syncAccount"></div>
+      <div class="list-toolbar">
+        <button class="btn-accent-solid" type="button" id="syncNow">⟳ 今すぐ同期</button>
+        <button class="btn-ghost" type="button" id="syncLogout">ログアウト</button>
+      </div>
+      <div class="sync-log" id="syncLog"></div>
+    </div>
 
     <h3 class="settings-head">💾 全データのバックアップ</h3>
     <div class="section-note">トレード記録・環境認識ボード・トレンド一覧を含む<strong>すべてのデータ</strong>を1つのJSONファイルにまとめます。端末の乗り換えや、万一データが壊れたときの復旧に使います。定期的に取っておいてください。</div>
@@ -2617,7 +2683,9 @@ function csvField(v) {
    対象キーは列挙せず接頭辞で拾う。キーを1つ増やすたびにバックアップから漏れる、
    という事故を構造的に防ぐため（退避用の派生キーだけ除く）。 */
 const BACKUP_PREFIX = 'mochipoyo_';
-const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$/;
+/* 退避用の派生キーに加え、ログイン情報（他人に渡してはいけない）と
+   同期の巻き戻し用スナップショット（重いだけで復元に要らない）を除く。 */
+const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$|^mochipoyo_sync_(auth|lastpush)_v1$/;
 const BACKUP_SCHEMA = 1;
 
 function backupKeys() {
@@ -3845,6 +3913,434 @@ document.querySelectorAll('.type-filter').forEach(el => {
   });
 });
 renderAll();
+
+/* ============================================================
+   複数端末の同期（S28）
+
+   考え方：localStorage が常に「正」で、クラウドはその複製。オフラインでも従来どおり
+   記録でき、つながったときに双方をマージする。
+
+   ⚠️ 全体を「後から書いた方が勝ち」にはしない。3端末が別々に記録するので、
+   まるごと上書きすると片方の巡回記録が丸ごと消える。要素キー単位でマージする。
+   ============================================================ */
+
+const SYNC_CFG_KEY   = 'mochipoyo_sync_config_v1';
+const SYNC_AUTH_KEY  = 'mochipoyo_sync_auth_v1';
+const SYNC_STATE_KEY = 'mochipoyo_sync_state_v1';
+
+function syncReadJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
+  catch (e) { return fallback; }
+}
+function syncWriteJson(key, v) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* noop */ }
+}
+const syncCfg   = () => syncReadJson(SYNC_CFG_KEY, null);
+const syncAuth  = () => syncReadJson(SYNC_AUTH_KEY, null);
+const syncState = () => syncReadJson(SYNC_STATE_KEY, { lastAt: '', dirty: false });
+
+/* ---- マージ ----
+   時刻は文字列比較ではなく数値化して比べる。未記録（空文字）は 0 として扱い、
+   「記録がある方」が常に勝つようにする。 */
+function ts(v) { const n = Date.parse(v || ''); return isNaN(n) ? 0 : n; }
+
+/* トレード記録：id で突き合わせ、更新の新しい方を採る。
+   削除は墓標が記録より新しいときだけ有効（消したあとに他端末で編集したなら編集が残る）。 */
+function mergeTrades(local, remote, tomb) {
+  const map = new Map();
+  const stamp = t => ts(t.updatedAt) || ts(t.createdAt);
+  [local, remote].forEach(list => (list || []).forEach(t => {
+    if (!t || !t.id) return;
+    const prev = map.get(t.id);
+    if (!prev || stamp(t) > stamp(prev)) map.set(t.id, t);
+  }));
+  const out = [];
+  map.forEach((t, id) => {
+    const dead = ts((tomb.trades || {})[id]);
+    if (dead && dead >= stamp(t)) return;
+    out.push(t);
+  });
+  return out;
+}
+
+/* id 付きの純追記ログ（judgeLog / snapshots）。競合が起きないので単純に集合和。 */
+function mergeLog(local, remote) {
+  const map = new Map();
+  [local, remote].forEach(list => (list || []).forEach(x => {
+    if (x && x.id && !map.has(x.id)) map.set(x.id, x);
+  }));
+  return Array.from(map.values()).sort((a, b) => ts(a.at) - ts(b.at));
+}
+
+/* 監視ペア1件のマージ。フィールド群ごとに独立して新旧を判定する。
+   ⚠️ 突き合わせのキーは id ではなくペア名。id は端末ごとに別々に採番されるため、
+   id で突き合わせると全ペアが二重になる。id はローカルのものを保つ
+   （選択中ペアの記憶が id を指しているため）。 */
+function mergePair(a, b) {
+  const out = JSON.parse(JSON.stringify(a));
+
+  if (ts(b.judgeAt) > ts(a.judgeAt)) { out.judge = b.judge || ''; out.judgeAt = b.judgeAt; }
+  if (ts(b.tfAt) > ts(a.tfAt)) {
+    out.tfHigher = b.tfHigher || ''; out.tfEntry = b.tfEntry || ''; out.tfAt = b.tfAt;
+  }
+
+  /* アラートは時間足キーごと。chAt（切り替え時刻）で比べるので OFF も正しく伝わる。 */
+  out.alerts = out.alerts || {};
+  MV_ALERT_TFS.forEach(t => {
+    const B = (b.alerts || {})[t.k];
+    if (B && ts(B.chAt) > ts((out.alerts[t.k] || {}).chAt)) out.alerts[t.k] = B;
+  });
+
+  /* トレンドは時間足ごと。ここをペア単位にすると、別の端末が入れた別の足が消える。 */
+  mvEnsureTrend(out);
+  MV_TREND_TFS.forEach(t => {
+    const B = (b.trend || {})[t.k];
+    if (B && ts(B.at) > ts((out.trend[t.k] || {}).at)) out.trend[t.k] = B;
+  });
+  /* 鮮度表示はペア単位なので、マージ後に最新の足から作り直す。 */
+  out.trendAt = MV_TREND_TFS.reduce((max, t) => {
+    const v = (out.trend[t.k] || {}).at || '';
+    return ts(v) > ts(max) ? v : max;
+  }, '');
+
+  /* 根拠チェックはチェック項目1つずつ。値は checksHigher/checksEntry、
+     時刻は並行マップ checksAt（'checksHigher.granville' のような複合キー）。 */
+  out.checksAt = out.checksAt || {};
+  Object.keys(b.checksAt || {}).forEach(ck => {
+    if (ts(b.checksAt[ck]) <= ts(out.checksAt[ck])) return;
+    const dot = ck.indexOf('.');
+    if (dot < 0) return;
+    const store = ck.slice(0, dot), key = ck.slice(dot + 1);
+    if (store !== 'checksHigher' && store !== 'checksEntry') return;
+    if (!out[store] || typeof out[store] !== 'object') out[store] = {};
+    out[store][key] = ((b[store] || {})[key]) || '';
+    out.checksAt[ck] = b.checksAt[ck];
+  });
+
+  return out;
+}
+
+function mergePairs(local, remote, tomb) {
+  const byName = new Map();
+  (local || []).forEach(p => { if (p && p.pair) byName.set(p.pair, p); });
+  const out = (local || []).slice();
+  (remote || []).forEach(rp => {
+    if (!rp || !rp.pair) return;
+    const lp = byName.get(rp.pair);
+    if (lp) {
+      const merged = mergePair(lp, rp);
+      out[out.indexOf(lp)] = merged;
+      return;
+    }
+    /* ローカルに無いペア。こちらで消したものなら、削除より古い内容は連れ戻さない。 */
+    const dead = ts((tomb.pairs || {})[rp.pair]);
+    if (dead) {
+      const newest = Math.max(ts(rp.trendAt), ts(rp.judgeAt), ts(rp.tfAt),
+        ...Object.values(rp.checksAt || {}).map(ts),
+        ...Object.values(rp.alerts || {}).map(a => ts(a && a.chAt)));
+      if (dead >= newest) return;
+    }
+    /* 取り込む側で id を振り直す。他端末の id をそのまま使うと衝突しうる。 */
+    out.push(Object.assign({}, rp, { id: mvGenId('w') }));
+  });
+  return out;
+}
+
+/* ローカルとリモートを1つにまとめる。差分の件数も返して、何が起きたか見えるようにする。 */
+function mergeDoc(localDoc, remoteDoc, tomb) {
+  const r = remoteDoc || {};
+  const rm = r.market || {};
+  const lm = localDoc.market;
+  const merged = {
+    trades: mergeTrades(localDoc.trades, r.trades, tomb),
+    market: {
+      pairs:     mergePairs(lm.pairs, rm.pairs, tomb),
+      snapshots: mergeLog(lm.snapshots, rm.snapshots),
+      judgeLog:  mergeLog(lm.judgeLog, rm.judgeLog),
+    },
+    tombstones: {
+      trades: Object.assign({}, (r.tombstones || {}).trades, tomb.trades),
+      pairs:  Object.assign({}, (r.tombstones || {}).pairs,  tomb.pairs),
+    },
+  };
+  const stats = {
+    trades:   merged.trades.length - (localDoc.trades || []).length,
+    pairs:    merged.market.pairs.length - (lm.pairs || []).length,
+    judgeLog: merged.market.judgeLog.length - (lm.judgeLog || []).length,
+  };
+  return { merged, stats };
+}
+
+function localDoc() {
+  const m = loadMarket();
+  return {
+    trades: loadTrades(),
+    market: { pairs: m.pairs, snapshots: m.snapshots, judgeLog: m.judgeLog },
+  };
+}
+
+/* ---- Supabase REST ----
+   SDK は使わない（単一HTMLを保つため）。必要なのは認証3本とテーブル3操作だけ。 */
+async function sbFetch(path, opts, useAuth) {
+  const cfg = syncCfg();
+  if (!cfg) throw new Error('接続先が未設定です');
+  const headers = Object.assign({ apikey: cfg.key, 'Content-Type': 'application/json' },
+                                (opts && opts.headers) || {});
+  if (useAuth !== false) {
+    const a = await syncValidToken();
+    headers.Authorization = 'Bearer ' + a.access_token;
+  }
+  const res = await fetch(cfg.url.replace(/\/+$/, '') + path, Object.assign({}, opts, { headers }));
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error('HTTP ' + res.status + ' ' + body.slice(0, 200));
+  }
+  return res.status === 204 ? null : res.json().catch(() => null);
+}
+
+/* 期限が近ければ更新してから返す。期限切れのまま投げると同期がまるごと失敗する。 */
+async function syncValidToken() {
+  const a = syncAuth();
+  if (!a) throw new Error('ログインしていません');
+  if (a.expires_at && a.expires_at - Date.now() > 60000) return a;
+  const cfg = syncCfg();
+  const res = await fetch(cfg.url.replace(/\/+$/, '') + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: { apikey: cfg.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: a.refresh_token }),
+  });
+  if (!res.ok) {
+    localStorage.removeItem(SYNC_AUTH_KEY);
+    renderSyncUi();
+    throw new Error('ログインの有効期限が切れました。もう一度ログインしてください');
+  }
+  const j = await res.json();
+  const next = {
+    access_token: j.access_token, refresh_token: j.refresh_token,
+    expires_at: Date.now() + (j.expires_in || 3600) * 1000,
+    email: (j.user && j.user.email) || a.email,
+    user_id: (j.user && j.user.id) || a.user_id,
+  };
+  syncWriteJson(SYNC_AUTH_KEY, next);
+  return next;
+}
+
+/* ---- 同期1サイクル ---- */
+let syncRunning = false;
+
+async function runSync(opts) {
+  const dryRun = !!(opts && opts.dryRun);
+  if (syncRunning) return;
+  if (!syncCfg() || !syncAuth()) return;
+  /* ⚠️ ここが最重要の安全弁。ローカルの読み込みに失敗している状態で同期すると、
+     空になったローカルでクラウドの本物を潰す。段階0のフラグをそのまま効かせる。 */
+  if (STORAGE_FAILED.market || STORAGE_FAILED.trades) {
+    setSyncChip('bad', '⛔ 停止中');
+    return;
+  }
+  syncRunning = true;
+  setSyncChip('busy', '⟳ 同期中');
+  try {
+    const a = await syncValidToken();
+    const q = '?user_id=eq.' + encodeURIComponent(a.user_id);
+    const rows = await sbFetch('/rest/v1/app_state' + q + '&select=doc,rev');
+    const row = rows && rows[0];
+
+    const local = localDoc();
+    const tomb = loadTombstones();
+    const { merged, stats } = mergeDoc(local, row ? row.doc : null, tomb);
+
+    if (dryRun) {
+      syncLog('【確認のみ】マージ結果 … トレード ' + merged.trades.length + '件' +
+              '／ペア ' + merged.market.pairs.length + '件' +
+              '／判定ログ ' + merged.market.judgeLog.length + '件' +
+              '（保存はしていません）');
+      setSyncChip('ok', '✔ 確認のみ');
+      return;
+    }
+
+    /* ⚠️ 先にローカルを確定させてから送る。順序を逆にすると、送信は成功したのに
+       手元に反映されていない、という食い違いが残る。 */
+    saveMarket({ pairs: merged.market.pairs, snapshots: merged.market.snapshots,
+                 judgeLog: merged.market.judgeLog });
+    saveTrades(merged.trades);
+    syncWriteJson(TOMBSTONE_KEY, merged.tombstones);
+    /* マージ結果は1世代だけ控える（マージに不具合があったときの巻き戻し用）。 */
+    syncWriteJson('mochipoyo_sync_lastpush_v1', { at: new Date().toISOString(), doc: merged });
+
+    const body = JSON.stringify({ doc: merged, rev: (row ? row.rev : 0) + 1,
+                                  updated_at: new Date().toISOString() });
+    if (!row) {
+      await sbFetch('/rest/v1/app_state', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: a.user_id, doc: merged, rev: 1 }),
+      });
+    } else {
+      /* rev を条件に入れることで、他端末が割り込んだ場合に 0 件更新として検出できる。 */
+      const upd = await sbFetch('/rest/v1/app_state' + q + '&rev=eq.' + row.rev, {
+        method: 'PATCH', headers: { Prefer: 'return=representation' }, body,
+      });
+      if (!upd || upd.length === 0) {
+        syncRunning = false;
+        const n = (opts && opts.retry) || 0;
+        if (n < 3) return runSync(Object.assign({}, opts, { retry: n + 1 }));
+        throw new Error('他の端末と同時に更新されました。もう一度お試しください');
+      }
+    }
+
+    syncWriteJson(SYNC_STATE_KEY, { lastAt: new Date().toISOString(), dirty: false });
+    const delta = [];
+    if (stats.trades)   delta.push('トレード +' + stats.trades);
+    if (stats.pairs)    delta.push('ペア +' + stats.pairs);
+    if (stats.judgeLog) delta.push('判定ログ +' + stats.judgeLog);
+    syncLog('最終同期 ' + new Date().toLocaleString('ja-JP') +
+            (delta.length ? '　（受信：' + delta.join(' / ') + '）' : '　（変更なし）'));
+    if (delta.length) { renderAll(); showToast('☁ 他の端末の記録を取り込みました'); }
+    setSyncChip('ok', '✔ ' + new Date().toTimeString().slice(0, 5));
+  } catch (e) {
+    console.warn('[sync]', e);
+    syncLog('⚠ ' + e.message);
+    setSyncChip('warn', '⚠ 未同期');
+  } finally {
+    syncRunning = false;
+    renderSyncUi();
+  }
+}
+
+/* ---- 表示 ---- */
+const syncChipEl = document.getElementById('syncChip');
+function setSyncChip(kind, text) {
+  syncChipEl.className = 'sync-chip ' + kind;
+  syncChipEl.textContent = text;
+}
+function syncLog(msg) {
+  const el = document.getElementById('syncLog');
+  if (el) el.textContent = msg;
+}
+function refreshSyncChip() {
+  if (STORAGE_FAILED.market || STORAGE_FAILED.trades) { setSyncChip('bad', '⛔ 停止中'); return; }
+  if (!syncCfg()) { setSyncChip('', '☁ 未設定'); return; }
+  if (!syncAuth()) { setSyncChip('warn', '☁ 未ログイン'); return; }
+  const s = syncState();
+  if (!navigator.onLine) { setSyncChip('warn', '⚠ オフライン'); return; }
+  setSyncChip(s.lastAt ? 'ok' : 'warn', s.lastAt ? '✔ ' + new Date(s.lastAt).toTimeString().slice(0, 5) : '☁ 未同期');
+}
+function renderSyncUi() {
+  const cfg = syncCfg(), auth = syncAuth();
+  document.getElementById('syncSetup').classList.toggle('hidden', !!cfg);
+  document.getElementById('syncLogin').classList.toggle('hidden', !cfg || !!auth);
+  document.getElementById('syncActive').classList.toggle('hidden', !cfg || !auth);
+  if (cfg) {
+    document.getElementById('syncUrl').value = cfg.url;
+    document.getElementById('syncKey').value = cfg.key;
+  }
+  if (auth) {
+    const s = syncState();
+    document.getElementById('syncAccount').innerHTML =
+      '<span class="em">' + esc(auth.email || '') + '</span> でログイン中<br>' +
+      '最終同期：' + (s.lastAt ? new Date(s.lastAt).toLocaleString('ja-JP') : 'まだ同期していません');
+  }
+  refreshSyncChip();
+}
+
+/* ---- 操作 ---- */
+syncChipEl.addEventListener('click', () => setActiveTab('settings'));
+
+document.getElementById('syncSaveConfig').addEventListener('click', () => {
+  const url = document.getElementById('syncUrl').value.trim().replace(/\/+$/, '');
+  const key = document.getElementById('syncKey').value.trim();
+  if (!/^https:\/\/.+/.test(url)) { showToast('⚠ Project URL は https:// から始まります'); return; }
+  if (key.length < 20) { showToast('⚠ anon key を貼り付けてください'); return; }
+  syncWriteJson(SYNC_CFG_KEY, { url, key });
+  renderSyncUi();
+  showToast('接続先を保存しました');
+});
+document.getElementById('syncResetConfig').addEventListener('click', () => {
+  localStorage.removeItem(SYNC_CFG_KEY);
+  renderSyncUi();
+});
+
+document.getElementById('syncSendLink').addEventListener('click', async () => {
+  const email = document.getElementById('syncEmail').value.trim();
+  if (!email) { showToast('⚠ メールアドレスを入力してください'); return; }
+  const cfg = syncCfg();
+  const redirect = location.href.split('#')[0];
+  try {
+    await sbFetch('/auth/v1/otp?redirect_to=' + encodeURIComponent(redirect), {
+      method: 'POST', body: JSON.stringify({ email, create_user: true }),
+    }, false);
+    alert('ログインリンクを送りました。\n\nメールを開いて「Log In」を押してください。\n' +
+          '※ iPhone の場合は必ず Safari で開いてください。');
+  } catch (e) {
+    alert('送信に失敗しました。\n' + e.message);
+  }
+});
+
+document.getElementById('syncLogout').addEventListener('click', () => {
+  if (!confirm('ログアウトします。この端末の記録は消えません。よろしいですか？')) return;
+  localStorage.removeItem(SYNC_AUTH_KEY);
+  localStorage.removeItem(SYNC_STATE_KEY);
+  renderSyncUi();
+});
+
+document.getElementById('syncNow').addEventListener('click', () => runSync());
+
+/* ---- ログイン後の戻り（#access_token=... で返ってくる） ---- */
+function syncCaptureAuthHash() {
+  if (!location.hash || location.hash.indexOf('access_token') < 0) return false;
+  const p = new URLSearchParams(location.hash.slice(1));
+  const access = p.get('access_token');
+  if (!access) return false;
+  /* JWT の中身からユーザーIDとメールを取る。1往復減らすためだけの用途。 */
+  let payload = {};
+  try { payload = JSON.parse(atob(access.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); }
+  catch (e) { /* noop */ }
+  syncWriteJson(SYNC_AUTH_KEY, {
+    access_token: access,
+    refresh_token: p.get('refresh_token') || '',
+    expires_at: Date.now() + Number(p.get('expires_in') || 3600) * 1000,
+    email: payload.email || '', user_id: payload.sub || '',
+  });
+  /* トークンが URL に残ったままだと、履歴や共有から漏れる。すぐ消す。 */
+  history.replaceState(null, '', location.pathname + location.search);
+  return true;
+}
+
+/* ---- 自動同期のきっかけ ----
+   書き込みのたびに送ると通信が増えるので、少し待ってからまとめて送る。 */
+let syncDebounce = null;
+function syncMarkDirty() {
+  const s = syncState();
+  syncWriteJson(SYNC_STATE_KEY, { lastAt: s.lastAt, dirty: true });
+  refreshSyncChip();
+  clearTimeout(syncDebounce);
+  syncDebounce = setTimeout(() => runSync(), 3000);
+}
+
+window.addEventListener('online', () => { refreshSyncChip(); runSync(); });
+window.addEventListener('offline', refreshSyncChip);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const s = syncState();
+  /* 戻ってくるたびに通信すると無駄なので、前回から1分あいたときだけ。 */
+  if (s.dirty || !s.lastAt || Date.now() - ts(s.lastAt) > 60000) runSync();
+});
+
+/* 保存が起きたことを検知して同期予約する。全書き込み経路が saveMarket / saveTrades を
+   通る規約になっているので、この2つを包むだけで漏れなく拾える。 */
+['saveMarket', 'saveTrades'].forEach(name => {
+  const orig = window[name];
+  window[name] = function () {
+    const r = orig.apply(this, arguments);
+    if (r && !syncRunning) syncMarkDirty();
+    return r;
+  };
+});
+
+const syncJustLoggedIn = syncCaptureAuthHash();
+renderSyncUi();
+if (syncJustLoggedIn) showToast('☁ ログインしました');
+if (syncCfg() && syncAuth()) runSync();
 
 /* ============ PWA 登録・ストレージ保護（S28） ============ */
 
