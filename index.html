@@ -1566,6 +1566,35 @@ function saveTrades(trades) {
   }
 }
 
+/* ---- S28: 削除の記録（トゥームストーン） ----
+   同期は「両方にあるものを残す」方向に働くので、削除だけは別に覚えておかないと、
+   まだ同期していない端末から消したはずの記録が復活してしまう。
+   何を消したかと、いつ消したかだけを持つ。 */
+const TOMBSTONE_KEY = 'mochipoyo_tombstones_v1';
+const TOMBSTONE_TTL_DAYS = 90;
+
+function loadTombstones() {
+  try {
+    const o = JSON.parse(localStorage.getItem(TOMBSTONE_KEY) || '{}');
+    return {
+      trades: (o && typeof o.trades === 'object' && o.trades) || {},
+      pairs:  (o && typeof o.pairs  === 'object' && o.pairs)  || {},
+    };
+  } catch (e) { return { trades: {}, pairs: {} }; }
+}
+function markDeleted(kind, key) {
+  const t = loadTombstones();
+  t[kind][key] = new Date().toISOString();
+  /* 古い墓標は刈る。残し続けても意味がないうえ、ストレージを食う。 */
+  const cutoff = Date.now() - TOMBSTONE_TTL_DAYS * 86400000;
+  ['trades', 'pairs'].forEach(k => {
+    Object.keys(t[k]).forEach(id => {
+      if (Date.parse(t[k][id]) < cutoff) delete t[k][id];
+    });
+  });
+  try { localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(t)); } catch (e) { /* noop */ }
+}
+
 /* ============ テーマ ============ */
 const themeToggle = document.getElementById('themeToggle');
 function applyTheme(theme) {
@@ -1825,6 +1854,9 @@ function doSave() {
     /* 決済データは振り返りタブの「💰 決済」で管理するため、編集時は既存値を引き継ぐ */
     exits:      existing ? existing.exits : [],
     createdAt:  existing ? existing.createdAt : new Date().toISOString(),
+    /* S28: 端末間マージ用。同じ id の記録が両方にあるとき、どちらを採るかの判断に使う。
+       統計・CSV はこの値を一切参照しないので、既存記録の集計結果は動かない。 */
+    updatedAt:  new Date().toISOString(),
   });
 
   if (existing) {
@@ -2176,6 +2208,7 @@ document.getElementById('deleteConfirm').addEventListener('click', () => {
   deleteModal.classList.remove('show');
   if (!pendingDeleteId) return;
   const trades = loadTrades().filter(t => t.id !== pendingDeleteId);
+  markDeleted('trades', pendingDeleteId);   /* S28: 他端末から復活させないため */
   saveTrades(trades);
   pendingDeleteId = null;
   renderAll();
@@ -2511,6 +2544,7 @@ document.getElementById('exitSave').addEventListener('click', () => {
   target.exits = exits;
   /* 実際に枚を記録したときだけ分割モデルとして確定させる */
   if (exits.some(x => x.slot)) target.splitCount = SPLIT_COUNT;
+  target.updatedAt = new Date().toISOString();   /* S28: 端末間マージ用 */
   if (!saveTrades(trades)) return;
 
   exitModal.classList.remove('show');
@@ -2807,6 +2841,8 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
              列が1つも無い旧CSVは null のままにし、履歴で根拠行を出さない。 */
           mvChecks:   parseBasisCsv(r, get),
           createdAt:  get(r, 'createdAt') || new Date().toISOString(),
+          /* S28: CSV には持たせない（列は位置配列なので触らない）。取り込んだ時刻を入れる。 */
+          updatedAt:  new Date().toISOString(),
         });
         existing.add(id);
         added++;
@@ -2850,8 +2886,11 @@ function mvEnsureTrend(w) {
     let cur = w.trend[t.k];
     if (!cur || typeof cur !== 'object') { cur = w.trend[t.k] = {}; filled = true; }
     /* S24: zone を追加。フィールド単位で補うので、S23形式の {state, granville} だけの
-       既存記録もここで zone が埋まり、週足・月足の枠も同時に生える。 */
-    ['state', 'zone', 'granville'].forEach(f => {
+       既存記録もここで zone が埋まり、週足・月足の枠も同時に生える。
+       S28: at（この足の最終更新時刻）を追加。端末間のマージをペア単位ではなく
+       時間足単位で行うために要る ── ペア単位だと「PCで日足、iPhoneで4時間足」と
+       別々に記録したとき、後から同期した側の1足のために他方の足が丸ごと消える。 */
+    ['state', 'zone', 'granville', 'at'].forEach(f => {
       if (typeof cur[f] !== 'string') { cur[f] = ''; filled = true; }
     });
   });
@@ -3187,6 +3226,7 @@ mvListEl.addEventListener('change', (e) => {
     const w = data.pairs.find(p => p.id === watchId);
     if (!w) return;
     w[field] = tfSelect.value;
+    w.tfAt = new Date().toISOString();   /* S28: 端末間マージ用 */
     /* S28: ここだけ戻り値を見ていなかった。保存が止まっているのに選択が残ると、
        UI と保存内容が食い違ったまま気づけない。 */
     if (!saveMarket(data)) { renderMarket(); return; }
@@ -3203,7 +3243,10 @@ function mvToggleAlert(watchId, tfKey) {
   if (!w) return;
   if (!w.alerts) w.alerts = {};
   const cur = w.alerts[tfKey] || { on: false, at: '' };
-  w.alerts[tfKey] = cur.on ? { on: false, at: '' } : { on: true, at: new Date().toISOString() };
+  /* S28: chAt は「切り替えた時刻」。at は OFF にすると消える（発生日時なので当然）ため、
+     OFF 操作そのものの新しさが残らず、端末間で「消したはずのONが復活する」ことになる。 */
+  const chAt = new Date().toISOString();
+  w.alerts[tfKey] = cur.on ? { on: false, at: '', chAt } : { on: true, at: chAt, chAt };
   if (!saveMarket(data)) return;
   renderMarket();
   renderTrendList();
@@ -3219,6 +3262,7 @@ function mvSetJudge(watchId, value) {
   if (!w) return;
   const newJudge = w.judge === value ? '' : value;
   w.judge = newJudge;
+  w.judgeAt = new Date().toISOString();   /* S28: 端末間マージ用。判定解除も新しさを持つ */
   if (newJudge) {
     data.judgeLog.push({
       id: mvGenId('jl'),
@@ -3252,7 +3296,10 @@ function mvWriteTrend(watchId, tfKey, patch) {
   const g = MV_GRANVILLE_MAP[cur.granville];
   const side = cur.state === 'down' ? 'sell' : 'buy';
   if (!isTrendingState(cur.state) || (g && g.side !== side)) cur.granville = '';
-  w.trendAt = new Date().toISOString();
+  /* S28: この足の更新時刻。ペア単位の trendAt は鮮度表示用に残すが、
+     端末間のマージが見るのはこちら（時間足ごとに独立して新旧を判定するため）。 */
+  cur.at = new Date().toISOString();
+  w.trendAt = cur.at;
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3287,6 +3334,11 @@ mvListEl.addEventListener('click', (e) => {
     if (!store) return;
     if (!w[store] || typeof w[store] !== 'object') w[store] = {};
     w[store][key] = w[store][key] === value ? '' : value;
+    /* S28: 端末間マージ用。チェック項目1つ単位で新旧を判定するため、
+       値とは別の並行マップに時刻を持つ（checksHigher/checksEntry の形は変えない ──
+       CSV スナップショット mvChecks がこの形をそのまま焼き込んでいるため）。 */
+    if (!w.checksAt || typeof w.checksAt !== 'object') w.checksAt = {};
+    w.checksAt[store + '.' + key] = new Date().toISOString();
     if (!saveMarket(data)) return;
     renderMarket();
     return;
@@ -3326,6 +3378,10 @@ document.getElementById('mvDeleteCancel').addEventListener('click', () => {
 document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
   if (!mvPendingDeleteId) return;
   const data = loadMarket();
+  /* S28: ペアのマージキーは id ではなくペア名（id は端末ごとに別々に採番されるため）。
+     墓標もペア名で置く。 */
+  const gone = data.pairs.find(p => p.id === mvPendingDeleteId);
+  if (gone) markDeleted('pairs', gone.pair);
   data.pairs = data.pairs.filter(p => p.id !== mvPendingDeleteId);
   data.snapshots = data.snapshots.filter(s => s.watchId !== mvPendingDeleteId);
   if (saveMarket(data)) {

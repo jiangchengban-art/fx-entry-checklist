@@ -282,6 +282,135 @@ async function newPage() {
   await ctx.close();
 }
 
+/* ---------- 11. タイムスタンプ地ならし（段階2） ---------- */
+{
+  console.log('\n[11] タイムスタンプ');
+  const { ctx, page, errors } = await newPage();
+  await page.goto(URL);
+  await page.waitForTimeout(400);
+
+  // トレンド：時間足単位の at
+  await page.click('.tab-btn[data-tab="trend"]');
+  await page.waitForTimeout(300);
+  await page.locator('.tstate-btn').first().click();
+  await page.waitForTimeout(250);
+  let d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  const touched = d.pairs.find(p => Object.values(p.trend).some(t => t.at));
+  ok('trend[tf].at が入る', !!touched);
+  const stamped = Object.entries(touched.trend).filter(([, t]) => t.at);
+  ok('記録した足だけに at が付く（他の足は空のまま）', stamped.length === 1, stamped.map(x => x[0]));
+  ok('trendAt = その足の at', touched.trendAt === stamped[0][1].at);
+
+  // アラート：chAt が ON/OFF どちらでも入る
+  await page.locator('.mv-alert-badge').first().click();
+  await page.waitForTimeout(250);
+  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  let withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
+  ok('alerts[tf].chAt が入る（ON）', !!withAlert);
+  const onAt = Object.values(withAlert.alerts).find(a => a.chAt).chAt;
+  await page.waitForTimeout(1100);
+  await page.locator('.mv-alert-badge').first().click();
+  await page.waitForTimeout(250);
+  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
+  const offEntry = Object.values(withAlert.alerts).find(a => a.chAt);
+  ok('OFF にしても chAt が更新される（消した新しさが残る）',
+     offEntry.on === false && offEntry.at === '' && offEntry.chAt > onAt,
+     offEntry);
+
+  // 判定：judgeAt
+  await page.locator('.mv-judge-btn').first().click();
+  await page.waitForTimeout(250);
+  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  ok('judgeAt が入る', d.pairs.some(p => p.judgeAt));
+  ok('judgeLog に記録される（統計が壊れていない）', d.judgeLog.length === 1, d.judgeLog.length);
+
+  // 根拠チェック：checksAt（項目単位）
+  await page.click('.tab-btn[data-tab="trade"]');
+  await page.waitForTimeout(200);
+  await page.selectOption('#mvPairSelect', 'USDJPY');
+  await page.waitForTimeout(400);
+  await page.locator('.mv-tfcheck-btn').first().click();
+  await page.waitForTimeout(250);
+  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  const wc = d.pairs.find(p => p.checksAt && Object.keys(p.checksAt).length);
+  ok('checksAt が項目単位で入る', !!wc && Object.keys(wc.checksAt)[0].includes('.'),
+     wc && Object.keys(wc.checksAt));
+  ok('checksHigher の形は変わっていない（CSV スナップショット互換）',
+     wc && typeof wc.checksHigher === 'object' && !Array.isArray(wc.checksHigher));
+
+  // 上位足プルダウン：tfAt
+  await page.selectOption('[data-mv-tf-select="tfHigher"]', { index: 1 });
+  await page.waitForTimeout(250);
+  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+  ok('tfAt が入る', d.pairs.some(p => p.tfAt));
+
+  ok('JSエラーなし', errors.length === 0, errors);
+  await ctx.close();
+}
+
+/* ---------- 12. 既存データの統計が動かない（レガシー保護） ---------- */
+{
+  console.log('\n[12] 既存記録の統計不変');
+  const { ctx, page } = await newPage();
+  await page.goto(URL);
+  await page.waitForTimeout(300);
+
+  // S22 形式（updatedAt なし）の記録を流し込む
+  const legacy = [
+    { id: 't1', tradeType: 'real', result: 'entered', pair: 'USDJPY', direction: 'long',
+      datetime: '2026-08-01T09:00', entryPrice: '150.00', slPrice: '149.00', slBasis: 'swing',
+      splitCount: 3, createdAt: '2026-08-01T09:00:00.000Z',
+      exits: [ { slot: 1, actual: true, basis: 'target', price: '152.00' },
+               { slot: 2, actual: true, basis: 'target', price: '153.00' },
+               { slot: 3, actual: true, basis: 'target', price: '154.00' } ] },
+    { id: 't2', tradeType: 'real', result: 'through', pair: 'EURUSD',
+      datetime: '2026-08-02T09:00', createdAt: '2026-08-02T09:00:00.000Z', exits: [] },
+  ];
+  await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [TRADES_KEY, legacy]);
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.click('.tab-btn[data-tab="review"]');
+  await page.waitForTimeout(400);
+
+  const tiles = await page.locator('.stat-tile, .stat').allInnerTexts().catch(() => []);
+  ok('統計タイルが描画される', tiles.length > 0, tiles.length);
+  const joined = tiles.join(' | ');
+  ok('合成RR が計算される（+3.00 = (2+3+4)/3）', joined.includes('3.00'), joined.slice(0, 300));
+
+  const stored = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), TRADES_KEY);
+  ok('読み込むだけでは updatedAt が生えない（既存記録を書き換えない）',
+     stored.every(t => !('updatedAt' in t)), stored.map(t => t.updatedAt));
+  await ctx.close();
+}
+
+/* ---------- 13. 削除のトゥームストーン ---------- */
+{
+  console.log('\n[13] トゥームストーン');
+  const { ctx, page } = await newPage();
+  await page.goto(URL);
+  await page.waitForTimeout(300);
+  await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)),
+    [TRADES_KEY, [{ id: 'tX', tradeType: 'real', result: 'through', pair: 'USDJPY',
+                    datetime: '2026-08-01T09:00', createdAt: '2026-08-01T09:00:00.000Z', exits: [] }]]);
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.click('.tab-btn[data-tab="review"]');
+  await page.waitForTimeout(400);
+  const del = page.locator('[data-del], .record-del, button:has-text("削除")').first();
+  if (await del.count()) {
+    await del.click();
+    await page.waitForTimeout(300);
+    await page.click('#deleteConfirm');
+    await page.waitForTimeout(400);
+  }
+  const tomb = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_tombstones_v1') || '{}'));
+  ok('削除した記録の墓標が残る', tomb.trades && !!tomb.trades.tX, tomb);
+  const left = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), TRADES_KEY);
+  ok('記録自体は消えている', Array.isArray(left) && left.length === 0, left);
+  await ctx.close();
+}
+
 await browser.close();
 console.log('\n=== ' + pass + ' passed / ' + fail + ' failed ===');
 process.exit(fail ? 1 : 0);
