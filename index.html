@@ -1095,6 +1095,10 @@
     </div>
     <div class="section-note" id="storageInfo"></div>
 
+    <h3 class="settings-head">🔍 ストレージ診断</h3>
+    <div class="section-note">データが毎回消える場合、複数の異なるURLから開いていないか確認できます。同じURLの「ホーム画面アイコン」から毎回起動してください。</div>
+    <div id="storageDiagnostics" style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; color: var(--ink-2);"></div>
+
     <h3 class="settings-head">📄 CSV（トレード記録のみ）</h3>
     <div class="section-note">表計算ソフトで開きたいとき用です。環境認識ボードのデータは含まれないため、バックアップ目的なら上のJSONを使ってください。</div>
     <div class="list-toolbar">
@@ -1624,6 +1628,7 @@ function saveTrades(trades) {
     storageBackupIfShrinking(STORAGE_KEY, localStorage.getItem(STORAGE_KEY), trades,
       [o => Array.isArray(o) ? o.length : null]);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+    localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
     return true;
   } catch (e) {
     alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
@@ -2803,6 +2808,64 @@ function renderStorageInfo() {
   el.textContent = parts.join(' ／ ');
 }
 
+function renderStorageDiagnostics() {
+  const el = document.getElementById('storageDiagnostics');
+  if (!el) return;
+
+  const parts = [];
+
+  /* 1. 開いているオリジン */
+  const origin = location.origin;
+  parts.push(`<strong>📍 URL</strong>: ${esc(origin)}`);
+
+  /* 2. localStorage のサイズ */
+  let bytes = 0;
+  let mochiKeyCount = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    const v = localStorage.getItem(k) || '';
+    bytes += k.length + v.length;
+    if (k.startsWith('mochipoyo_')) mochiKeyCount++;
+  }
+  const sizeKb = (bytes / 1024).toFixed(1);
+  parts.push(`<strong>💾 データサイズ</strong>: ${sizeKb} KB (${mochiKeyCount} キー)`);
+
+  /* 3. 最終書き込み時刻 */
+  const lastWriteKey = 'mochipoyo_lastwrite_v1';
+  const lastWrite = localStorage.getItem(lastWriteKey);
+  if (lastWrite) {
+    const dt = new Date(lastWrite);
+    parts.push(`<strong>⏰ 最終書き込み</strong>: ${fmtDatetime(lastWrite)}`);
+  } else {
+    parts.push(`<strong>⏰ 最終書き込み</strong>: まだ書き込みがありません`);
+  }
+
+  /* 4. 書き込み検証（write-through verify） */
+  const testKey = '__storage_verify_' + Date.now();
+  const testValue = 'test_' + Math.random();
+  try {
+    localStorage.setItem(testKey, testValue);
+    const readBack = localStorage.getItem(testKey);
+    if (readBack === testValue) {
+      parts.push(`<strong>✅ 書き込み検証</strong>: 正常`);
+      localStorage.removeItem(testKey);
+    } else {
+      parts.push(`<strong>⚠️ 書き込み検証</strong>: 不一致（データが化けている可能性）`);
+    }
+  } catch (e) {
+    parts.push(`<strong>❌ 書き込み検証</strong>: ${esc(e.message)}`);
+  }
+
+  /* 5. ガイダンス */
+  parts.push(`<br><strong>📌 ガイダンス</strong>:<br>` +
+    `• 数日で消える場合、複数の異なるURLから開いていないか確認してください<br>` +
+    `• <strong>ホーム画面にアイコンを追加</strong>して、そこから毎回起動することをお勧めします<br>` +
+    `• 現在のURL: <code>${esc(location.href.slice(0, 80))}</code>`);
+
+  el.innerHTML = parts.join('<br>');
+}
+
 document.getElementById('exportCsv').addEventListener('click', () => {
   const trades = loadTrades();
   if (trades.length === 0) { showToast('エクスポートする記録がありません'); return; }
@@ -3110,6 +3173,7 @@ function saveMarket(data) {
       o => Array.isArray(o.snapshots) ? o.snapshots.length : null,
     ]);
     localStorage.setItem(MARKET_KEY, JSON.stringify(data));
+    localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
     return true;
   } catch (e) {
     alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
@@ -3908,7 +3972,7 @@ function setActiveTab(name, opts) {
   /* 一覧タブは巡回中の記録では行単位でしか差し替えず、並べ替えを意図的に保留している。
      タブに戻ってきたこのタイミングが、グループ分けを最新にする自然な区切りになる。 */
   if (name === 'trend') renderTrendList();
-  if (name === 'settings') { renderStorageInfo(); renderPwaStatus(); }
+  if (name === 'settings') { renderStorageInfo(); renderStorageDiagnostics(); renderPwaStatus(); }
   if (!opts || !opts.keepScroll) {
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   }
