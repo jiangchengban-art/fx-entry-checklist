@@ -726,8 +726,10 @@
     font-size: 13.5px; font-weight: 700; color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
-  .trend-summary .item.aligned { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .trend-summary .item.aligned .n { color: var(--accent); }
+  .trend-summary .item.go   { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+  .trend-summary .item.go .n { color: var(--good); }
+  .trend-summary .item.wait { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+  .trend-summary .item.wait .n { color: var(--warn); }
 
   .trend-toolbar {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
@@ -784,6 +786,21 @@
   }
   .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
+
+  /* S32: セットアップ自動判定のバッジ。「日 GO 買②」「4H WAIT ゾーン待ち」の形で、
+     どちらの上位足で狙えるか＋あと何を見れば GO になるかを行内で示す。 */
+  .setup-badges { display: inline-flex; gap: 5px; flex: none; }
+  .sbadge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 2px 7px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
+  }
+  .sbadge b { font-weight: 700; opacity: 0.72; }
+  .sbadge i { font-style: normal; font-weight: 600; font-size: 10px; opacity: 0.85; }
+  .sbadge.go   { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .sbadge.wait { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .sbadge.no   { opacity: 0.6; }
 
   /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル。 */
   .trend-tf {
@@ -864,6 +881,10 @@
     .trend-head { gap: 6px 8px; padding: 8px 9px 6px; }
     .trend-head .pair { min-width: 66px; font-size: 13px; }
     .trend-head .spacer { flex-basis: 100%; height: 0; }
+    /* 判定バッジは1段目に鮮度と並ぶ。理由まで出すと 375px で折り返して
+       2段目のタップ位置がズレるため、理由は隠して「足＋GO/WAIT/NO」だけ残す（title で読める）。 */
+    .sbadge i { display: none; }
+    .setup-badges { gap: 4px; }
     /* 入力行は1段のまま保つ（22ペア分の縦スクロールを増やさない）。
        375pxで 24 + 3×27 + 3×26 + グランビル ≒ 280px となり、カード内幅に収まる。 */
     .trend-tf { grid-template-columns: 24px auto auto 1fr; gap: 5px; padding-left: 7px; padding-right: 7px; }
@@ -1024,10 +1045,10 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。日足と4時間足の向きが揃っているペアほど環境が整っている＝エントリーに近い、という見方で自動的に上へ並びます。週足・月足は必要なときだけ表示してください。</div>
+    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。</div>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🔥 揃っているペアのみ</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🟢 GO のみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
       <span class="spacer"></span>
@@ -1343,10 +1364,11 @@ const MV_TREND_TFS = [
   { k: 'w',  label: '週足',    short: '週', optional: true },
   { k: 'mn', label: '月足',    short: '月', optional: true },
 ];
-/* ⚠️ trendRank はこの2足だけを見る。週足・月足は表示トグルで出入りするため、
-   ランクに入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
-   また記録済み4足すべてを見ると、月足が未記録なだけで全ペアが 🔥 から落ちる（初日は必ずそうなる）。
-   週足・月足はあくまで参考情報であってランクの入力ではない。 */
+/* ⚠️ 並び順・サマリーの主軸はこの2足。週足・月足は表示トグルで出入りするため、
+   主軸に入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
+   また記録済み4足すべてを必須にすると、月足が未記録なだけで全ペアが最上位から落ちる（初日は必ずそうなる）。
+   S32 の判定（MV_SETUPS / setupVerdict）が週足を見るのは「1つ上の足が逆行していないか」の
+   減点材料としてだけで、未記録なら見逃す。表示トグルの状態は判定に影響しない。 */
 const MV_TREND_DEFAULT_TFS = MV_TREND_TFS.filter(t => !t.optional);
 
 const MV_TREND_STATES = [
@@ -1366,6 +1388,25 @@ const MV_TREND_ZONES = [
   { v: 'gray',  label: 'グレー' },
 ];
 const MV_TREND_ZONE_MAP = Object.fromEntries(MV_TREND_ZONES.map(z => [z.v, z]));
+
+/* ============ セットアップ自動判定（S32） ============
+   巡回で記録した trend の内容から「その通貨が今どの状態か」を GO / WAIT / NO に自動分類する。
+   ⚠️ 判定は w に一切保存しない純粋な導出。localStorage のスキーマ・CSV・端末間マージ（S28）を
+      触らずに済ませるための最重要方針で、ここを破ると同期のマージ表に行が増える。
+
+   上位足に日足を使う場合と4時間足を使う場合の2通りでトレードするため、判定はペア単位ではなく
+   セットアップ単位で別々に出す。tf がそのセットアップの主軸、above が「1つ上の足」。
+   MV_TREND_TFS に足を増やしたらここに1行足すだけで判定・バッジ・集計すべてに反映される。 */
+const MV_SETUPS = [
+  { k: 'd',  tf: 'd',  above: 'w', label: '日足セットアップ', short: '日' },
+  { k: 'h4', tf: 'h4', above: 'd', label: '4Hセットアップ',   short: '4H' },
+];
+/* トレンド方向 → 整合するEMAゾーンの色 / グランビルの side。 */
+const SETUP_SIDE = { up: { zone: 'green', side: 'buy' }, down: { zone: 'red', side: 'sell' } };
+/* GO にするグランビルの波＝押し目（買②③）と戻り（売②③）だけ。
+   ①上抜け・④乖離戻しは「方向はあるがトレンドフォローの入り所ではない」ため WAIT に回す。 */
+const SETUP_GO_WAVES = ['2', '3', '6', '7'];
+const SETUP_STATUSES = { go: 0, wait: 1, no: 2 };
 
 /* 表示する時間足の設定キー（端末ごとの表示設定なので市場データとは別に持つ）と、鮮度のしきい値。 */
 const TREND_TFS_KEY = 'mochipoyo_trend_tfs_v1';
@@ -3316,6 +3357,9 @@ function renderMarketBoard() {
   mvListEl.innerHTML = '<div class="mv-card">' +
     '<div class="mv-card-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
+      /* S32: 🔭一覧の記録から導出したセットアップ判定。上のプルダウンで選んだ上位足と
+         突き合わせて「今このペアは狙える状態か」をボードでも確認できるようにする。 */
+      trendSetupBadgesHtml(w) +
       '<div class="mv-alert-badges">' + alertBadges + '</div>' +
       '<span class="spacer"></span>' +
       '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">このペアのデータを削除</button>' +
@@ -3600,7 +3644,7 @@ const trendStaleBtn  = document.getElementById('trendFilterStale');
 const trendTfBar     = document.getElementById('trendTfToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 
-let trendAlignedOnly = false; // 「揃っているペアのみ」の絞り込み。永続化しない
+let trendGoOnly = false;      // 「GO のみ」の絞り込み。永続化しない
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 
@@ -3625,14 +3669,39 @@ function saveTrendTfs() {
 }
 let trendVisibleTfs = loadTrendTfs();
 
-/* 並び順のグループ分け。0 が最も「エントリーに近い」。
-   ⚠️ 見るのは MV_TREND_DEFAULT_TFS（日足・4時間足）だけ。理由は定数側のコメント参照。 */
-function trendRank(w) {
-  const states = MV_TREND_DEFAULT_TFS.map(t => (w.trend && w.trend[t.k] || {}).state || '');
-  const trending = states.filter(isTrendingState);
-  if (trending.length === states.length && new Set(trending).size === 1) return 0; // 全上位足が同じ向き
-  if (trending.length) return 1;                                                   // 一部だけトレンド発生
-  return 2;                                                                        // レンジ・未記録
+/* 1セットアップ分の判定。w.trend から導出するだけで、何も保存しない。
+   原則は「未記録=WAIT（あと何を見ればいいかが分かる）／逆行=NO（矛盾しているので当面なし）」。
+   ただし主軸の足の方向そのものが未記録・レンジのときは判断の起点が無いので NO に落とす。
+   ⚠️ 見るのは MV_SETUPS が名指しした足だけで、表示トグル（週足・月足の出し入れ）とは無関係。
+      週足を非表示にしても w.trend.w は読めるので、表示を変えただけで判定が動くことはない。 */
+function setupVerdict(w, setup) {
+  const cur   = (w.trend && w.trend[setup.tf])    || {};
+  const above = (w.trend && w.trend[setup.above]) || {};
+  const S = SETUP_SIDE[cur.state];
+  if (!S) return { status: 'no', reason: cur.state === 'range' ? 'レンジ' : '未記録' };
+
+  /* 1つ上の足が逆向きに記録されていたら、条件が揃っても GO にしない（未記録のときは見逃す）。 */
+  if (above.state && isTrendingState(above.state) && above.state !== cur.state)
+    return { status: 'wait', reason: '上位足が逆行' };
+
+  if (cur.zone && cur.zone !== 'gray' && cur.zone !== S.zone)
+    return { status: 'no', reason: 'ゾーンが逆' };
+  if (!cur.zone || cur.zone === 'gray')
+    return { status: 'wait', reason: 'ゾーン待ち' };
+
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  if (g && g.side !== S.side) return { status: 'no', reason: '波が逆' };
+  if (!g) return { status: 'wait', reason: '波の確認待ち' };
+  if (SETUP_GO_WAVES.indexOf(g.v) < 0) return { status: 'wait', reason: g.short + 'は待ち' };
+
+  return { status: 'go', reason: g.short };
+}
+
+/* ペア単位の総合＝セットアップのうち最も良い方。グループ分けとソートに使う。 */
+function pairVerdicts(w) { return MV_SETUPS.map(s => ({ setup: s, v: setupVerdict(w, s) })); }
+function pairStatus(w) {
+  return pairVerdicts(w).reduce((best, r) =>
+    SETUP_STATUSES[r.v.status] < SETUP_STATUSES[best] ? r.v.status : best, 'no');
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -3653,9 +3722,9 @@ function trendFreshChip(w) {
     esc(text) + '</span>';
 }
 const TREND_GROUPS = [
-  { rank: 0, head: '🔥 上位足が揃っている（日足と4時間足が同じ向き）' },
-  { rank: 1, head: '👀 片方だけトレンド発生' },
-  { rank: 2, head: '💤 レンジ・未記録' },
+  { status: 'go',   head: '🟢 GO ── 条件クリア' },
+  { status: 'wait', head: '🟡 WAIT ── 条件待ち' },
+  { status: 'no',   head: '⚪ NO ── 当面なし' },
 ];
 
 /* アラートバッジと判定ボタンは環境認識ボードと同じ data 属性を出す。
@@ -3675,7 +3744,17 @@ function trendJudgeBtnsHtml(w) {
     esc(j.label.slice(0, 1)) + '</button>').join('');
 }
 
-/* 1ペア分の行。ヘッダ（ペア名・鮮度・アラート・判定）＋可視時間足ごとの入力行。
+/* セットアップごとの判定バッジ。理由まで出すのは「あと何を見れば GO になるか」が
+   巡回中にその場で分かるようにするため（スマホ幅では CSS で理由だけ隠す）。 */
+function trendSetupBadgesHtml(w) {
+  return '<span class="setup-badges">' + pairVerdicts(w).map(r =>
+    '<span class="sbadge ' + r.v.status + '" title="' + esc(r.setup.label + '：' + r.v.reason) + '">' +
+      '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() +
+      '<i>' + esc(r.v.reason) + '</i>' +
+    '</span>').join('') + '</span>';
+}
+
+/* 1ペア分の行。ヘッダ（ペア名・鮮度・判定バッジ・アラート・判定）＋可視時間足ごとの入力行。
    入力はすべてこの行の中で完結する（展開操作なし）。 */
 function trendItemHtml(w) {
   const tfRows = trendVisibleTfs.map(t => {
@@ -3705,6 +3784,7 @@ function trendItemHtml(w) {
     '<div class="trend-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendFreshChip(w) +
+      trendSetupBadgesHtml(w) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<span class="mv-choice">' + trendJudgeBtnsHtml(w) + '</span>' +
@@ -3716,9 +3796,9 @@ function trendItemHtml(w) {
 
 /* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。 */
 function renderTrendSummary(pairs) {
-  const counts = { aligned: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
+  const counts = { go: 0, wait: 0, no: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
   pairs.forEach(w => {
-    if (trendRank(w) === 0) counts.aligned++;
+    counts[pairStatus(w)]++;
     if (isTrendStale(w)) counts.stale++;
     MV_TREND_DEFAULT_TFS.forEach(t => {
       const s = (w.trend && w.trend[t.k] || {}).state || '';
@@ -3729,7 +3809,9 @@ function renderTrendSummary(pairs) {
     });
   });
   const summaryItems = [
-    { cls: 'aligned', label: '🔥 揃っている', n: counts.aligned, unit: 'ペア' },
+    { cls: 'go',   label: '🟢 GO',   n: counts.go,   unit: 'ペア' },
+    { cls: 'wait', label: '🟡 WAIT', n: counts.wait, unit: 'ペア' },
+    { cls: 'no',   label: '⚪ NO',   n: counts.no,   unit: 'ペア' },
     { cls: '', label: '↗ 上昇',   n: counts.up,    unit: '' },
     { cls: '', label: '↘ 下降',   n: counts.down,  unit: '' },
     { cls: '', label: '─ レンジ', n: counts.range, unit: '' },
@@ -3764,12 +3846,13 @@ function renderTrendCategoryOptions() {
 function renderTrendList() {
   const data = loadMarket();
   const pairs = data.pairs.slice().sort((a, b) =>
-    trendRank(a) - trendRank(b) || String(a.pair).localeCompare(String(b.pair)));
+    SETUP_STATUSES[pairStatus(a)] - SETUP_STATUSES[pairStatus(b)] ||
+    String(a.pair).localeCompare(String(b.pair)));
 
   renderTrendSummary(pairs);
   renderTrendTfToggles();
   renderTrendCategoryOptions();
-  trendFilterBtn.classList.toggle('on', trendAlignedOnly);
+  trendFilterBtn.classList.toggle('on', trendGoOnly);
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
   if (!pairs.length) {
@@ -3778,7 +3861,7 @@ function renderTrendList() {
   }
 
   let shown = pairs;
-  if (trendAlignedOnly) shown = shown.filter(w => trendRank(w) === 0);
+  if (trendGoOnly) shown = shown.filter(w => pairStatus(w) === 'go');
   if (trendStaleOnly)   shown = shown.filter(isTrendStale);
   if (trendCategory)    shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   if (!shown.length) {
@@ -3788,7 +3871,7 @@ function renderTrendList() {
 
   let html = '';
   TREND_GROUPS.forEach(g => {
-    const inGroup = shown.filter(w => trendRank(w) === g.rank);
+    const inGroup = shown.filter(w => pairStatus(w) === g.status);
     if (!inGroup.length) return;
     html += '<div class="trend-group-head">' + esc(g.head) + '（' + inGroup.length + '）</div>';
     html += inGroup.map(trendItemHtml).join('');
@@ -3811,7 +3894,7 @@ function trendPatchItem(w) {
 }
 
 trendFilterBtn.addEventListener('click', () => {
-  trendAlignedOnly = !trendAlignedOnly;
+  trendGoOnly = !trendGoOnly;
   renderTrendList();
 });
 trendStaleBtn.addEventListener('click', () => {
