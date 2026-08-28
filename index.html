@@ -801,6 +801,54 @@
   .sbadge.go   { color: var(--good); border-color: var(--good); background: var(--good-soft); }
   .sbadge.wait { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .sbadge.no   { opacity: 0.6; }
+  /* S33: バッジは根拠パネルの開閉ボタンを兼ねる（ボードでは span のまま＝押せない）。 */
+  button.sbadge { cursor: pointer; font-family: inherit; }
+  button.sbadge:active { transform: scale(0.96); }
+  .sbadge.open { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
+
+  /* S33: 根拠パネル。上位足とエントリー足を横並び2列にして、375pxでも縦に伸ばさない。 */
+  .trend-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface-2); padding: 9px 11px 11px;
+  }
+  .tp-grid { display: flex; flex-direction: column; gap: 4px; }
+  .tp-row {
+    display: grid; grid-template-columns: 82px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px; align-items: center;
+  }
+  .tp-head { padding-bottom: 5px; margin-bottom: 2px; border-bottom: 1px dashed var(--border); }
+  .tp-label {
+    font-size: 11px; color: var(--ink-muted); text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tp-label.link {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--accent); font-family: inherit; font-size: 11px; text-align: right;
+  }
+  select.tp-cell {
+    min-width: 0; width: 100%; font-size: 12px; padding: 4px 6px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); color: var(--ink); font-family: inherit;
+  }
+  .tp-fixed {
+    font-size: 12px; font-weight: 700; color: var(--ink);
+    padding: 4px 6px; border-radius: 6px; background: var(--accent-soft);
+    text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 🔭一覧の記録から自動反映される読み取り専用セル（S29 と同じ向き：一覧が入力元）。 */
+  .tp-synced {
+    font-size: 12px; padding: 4px 6px; border-radius: 6px;
+    border: 1px dashed var(--border); color: var(--ink-muted); text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tp-synced.on { color: var(--ink); font-weight: 700; border-style: solid; }
+  .tp-foot {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border);
+  }
+  .tp-foot .tp-goto { margin-left: auto; font-size: 12px; padding: 6px 12px; }
+  .tp-foot .tp-goto:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tp-hint { margin-top: 6px; font-size: 11px; color: var(--warn); text-align: right; }
 
   /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル。 */
   .trend-tf {
@@ -892,6 +940,12 @@
     .tstate-btn { width: 27px; height: 27px; }
     .tzone-btn  { width: 26px; height: 27px; }
     .tgv { height: 27px; padding: 0 8px; font-size: 11px; }
+    /* S33: 根拠パネルは 375px でも2列を維持する（縦積みにすると14行になり巡回が重くなる）。
+       ラベル列を詰め、MV_TF_CHECKS の short で文言を短くして収める。 */
+    .trend-panel { padding: 8px 8px 9px; }
+    .tp-row { grid-template-columns: 62px minmax(0, 1fr) minmax(0, 1fr); gap: 5px; }
+    .tp-label, .tp-label.link { font-size: 10.5px; }
+    select.tp-cell, .tp-fixed, .tp-synced { font-size: 11.5px; padding: 4px 4px; }
     .gv-grid { grid-template-columns: repeat(2, 1fr); }
     /* 狭い画面では「すべて表示」を1行取らせ、クリア／閉じるが2行に割れないようにする */
     #trendGvModal .modal-actions { flex-wrap: wrap; }
@@ -1297,13 +1351,15 @@ const MV_TF_CHECKS = [
   /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
      選択肢はトレンド一覧と同じ8パターン（買①〜④／売①〜④）＋❌を使う。
      ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
+  /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
+     省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
   { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
   { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '下限', '❌'] },
   { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '下限', '❌'] },
   { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '下限', '❌'] },
   { k: 'macd',         label: 'MACD',             opts: ['レギュラー', 'ヒドゥン', '❌'], link: 'macd' },
-  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'] },
-  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'] },
+  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
+  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
 ];
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
 
@@ -1311,6 +1367,9 @@ const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
    一致するものだけ「🔭一覧と連動」表示になり、一覧のグランビル記録が自動で流れ込む。
    一覧は日足・4時間足（＋週足・月足）しか持たないため、1時間足・5分足・15分足は対象外＝従来どおり手動選択。 */
 const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4' };
+/* S33: 上の逆引き。🔭一覧のセットアップバッジ（MV_SETUPS の tf = 'd' / 'h4'）から
+   ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。 */
+const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足' };
 /* トレンド一覧の該当足からボードの checksHigher/checksEntry.granville へ書き込む唯一の入り口。
    一覧が入力元・ボードは複製という向きを守るため、ボード側からここへは書き込まない。 */
 function mvGranvilleSyncField(w, field) {
@@ -3418,24 +3477,45 @@ mvListEl.addEventListener('change', (e) => {
   /* 上位足・エントリー足のプルダウン。選んだ瞬間にそのペアへ即保存する。 */
   const tfSelect = e.target.closest('[data-mv-tf-select]');
   if (tfSelect) {
-    const watchId = tfSelect.dataset.watch;
-    const field = tfSelect.dataset.mvTfSelect;
-    const data = loadMarket();
-    const w = data.pairs.find(p => p.id === watchId);
-    if (!w) return;
-    w[field] = tfSelect.value;
-    w.tfAt = new Date().toISOString();   /* S28: 端末間マージ用 */
-    /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
-       （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
-    mvGranvilleSyncField(w, field);
-    /* S28: ここだけ戻り値を見ていなかった。保存が止まっているのに選択が残ると、
-       UI と保存内容が食い違ったまま気づけない。 */
-    if (!saveMarket(data)) { renderMarket(); return; }
+    /* S28: 保存が止まっているのに選択が残ると、UI と保存内容が食い違ったまま気づけない。 */
+    if (!mvSetTf(tfSelect.dataset.watch, tfSelect.dataset.mvTfSelect, tfSelect.value)) renderMarket();
     return;
   }
 });
 
 /* ---- アラート・判定の共有ハンドラ（環境認識ボード / トレンド一覧の両方から呼ぶ） ---- */
+
+/* 上位足・エントリー足の設定（S33でボードのハンドラから切り出し）。
+   ボードのプルダウンと🔭一覧の根拠パネルの両方がここを通る。戻り値は更新後の w（失敗時 null）。 */
+function mvSetTf(watchId, field, value) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return null;
+  w[field] = value;
+  w.tfAt = new Date().toISOString();   /* S28: 端末間マージ用 */
+  /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
+     （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
+  mvGranvilleSyncField(w, field);
+  if (!saveMarket(data)) return null;
+  return w;
+}
+
+/* 根拠チェック1項目の書き込み（S33でボードのハンドラから切り出し）。
+   value に現在値と同じものを渡すと未選択に戻る（ボードのボタン再タップ相当）。
+   ⚠️ checksAt の複合キー形式は S28 の端末間マージ（mergePair）が見ているので変えないこと。 */
+function mvWriteCheck(watchId, field, key, value) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return null;
+  const store = MV_CHECK_FIELDS[field];
+  if (!store) return null;
+  if (!w[store]) w[store] = {};
+  w[store][key] = w[store][key] === value ? '' : value;
+  if (!w.checksAt) w.checksAt = {};
+  w.checksAt[store + '.' + key] = new Date().toISOString();
+  if (!saveMarket(data)) return null;
+  return w;
+}
 
 /* 複数時間足のアラート発生トグル。ONにした瞬間の日時を記録し、OFFに戻すと日時もクリアする。 */
 function mvToggleAlert(watchId, tfKey) {
@@ -3564,20 +3644,7 @@ mvListEl.addEventListener('click', (e) => {
   const tfCheckBtn = e.target.closest('[data-mv-tfcheck]');
   if (tfCheckBtn) {
     const { mvTfcheck: watchId, field, key, value } = tfCheckBtn.dataset;
-    const data = loadMarket();
-    const w = data.pairs.find(p => p.id === watchId);
-    if (!w) return;
-    const store = MV_CHECK_FIELDS[field];
-    if (!store) return;
-    if (!w[store] || typeof w[store] !== 'object') w[store] = {};
-    w[store][key] = w[store][key] === value ? '' : value;
-    /* S28: 端末間マージ用。チェック項目1つ単位で新旧を判定するため、
-       値とは別の並行マップに時刻を持つ（checksHigher/checksEntry の形は変えない ──
-       CSV スナップショット mvChecks がこの形をそのまま焼き込んでいるため）。 */
-    if (!w.checksAt || typeof w.checksAt !== 'object') w.checksAt = {};
-    w.checksAt[store + '.' + key] = new Date().toISOString();
-    if (!saveMarket(data)) return;
-    renderMarket();
+    if (mvWriteCheck(watchId, field, key, value)) renderMarket();
     return;
   }
 
@@ -3647,6 +3714,9 @@ const trendCategorySelect = document.getElementById('trendCategorySelect');
 let trendGoOnly = false;      // 「GO のみ」の絞り込み。永続化しない
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
+/* S33: 開いている根拠パネル { id, setupKey }。一度に1つだけ。巡回中の一時状態なので永続化しない。
+   ⚠️ trendSetupBadgesHtml / trendItemHtml より前に宣言すること（描画時に参照する）。 */
+let trendPanel = null;
 
 /* ペア名 → MV_PAIR_GROUPS のラベル。プリセット外（自由入力）のペアは「その他」扱い。 */
 function trendCategoryOf(pairName) {
@@ -3745,13 +3815,87 @@ function trendJudgeBtnsHtml(w) {
 }
 
 /* セットアップごとの判定バッジ。理由まで出すのは「あと何を見れば GO になるか」が
-   巡回中にその場で分かるようにするため（スマホ幅では CSS で理由だけ隠す）。 */
-function trendSetupBadgesHtml(w) {
-  return '<span class="setup-badges">' + pairVerdicts(w).map(r =>
-    '<span class="sbadge ' + r.v.status + '" title="' + esc(r.setup.label + '：' + r.v.reason) + '">' +
-      '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() +
-      '<i>' + esc(r.v.reason) + '</i>' +
-    '</span>').join('') + '</span>';
+   巡回中にその場で分かるようにするため（スマホ幅では CSS で理由だけ隠す）。
+   S33: バッジ自体が根拠パネルの開閉ボタンを兼ねる。押した足がそのまま上位足になるので、
+   ボードで時間足を選び直す手間が消える。WAIT / NO でも開ける（「上位足は逆行だが今回は見たい」）。
+   ⚠️ ボードの mv-card-head でも使うが、あちらの trendListEl 用ハンドラは効かない。
+      ボード側は data-trend-setup-open を拾わないので、押しても何も起きない（無害）。 */
+function trendSetupBadgesHtml(w, interactive) {
+  return '<span class="setup-badges">' + pairVerdicts(w).map(r => {
+    const open = interactive && trendPanel && trendPanel.id === w.id && trendPanel.setupKey === r.setup.k;
+    const body = '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() +
+      '<i>' + esc(r.v.reason) + '</i>';
+    const title = esc(r.setup.label + '：' + r.v.reason);
+    /* ボードでは従来どおり表示専用（押しても開く先のパネルが無いため）。 */
+    if (!interactive) return '<span class="sbadge ' + r.v.status + '" title="' + title + '">' + body + '</span>';
+    return '<button type="button" class="sbadge ' + r.v.status + (open ? ' open' : '') + '"' +
+      ' data-trend-setup-open="' + esc(w.id) + '" data-setup="' + esc(r.setup.k) + '"' +
+      ' title="' + title + '（タップで根拠を記録）">' + body + '</button>';
+  }).join('') + '</span>';
+}
+
+/* 根拠チェック1項目のセル。上位足・エントリー足で同じ形を使う。
+   S29 と同じ判定式で、一覧が追跡している足（週足・日足・4時間足）のグランビルは
+   読み取り専用にする ── ここで手入力できると一覧側の記録と食い違うため。 */
+function trendCheckCell(w, field, c) {
+  const checks = w[MV_CHECK_FIELDS[field]] || {};
+  const cur = checks[c.k] || '';
+  if (c.k === 'granville' && MV_TF_TO_TREND_KEY[w[field]]) {
+    return '<span class="tp-synced' + (cur ? ' on' : '') + '"' +
+      ' title="🔭一覧のグランビル記録から自動反映。変更は上の行で行う">' +
+      (cur ? esc(cur) : '🔭未記録') + '</span>';
+  }
+  return '<select class="tp-cell" data-trend-check="' + esc(w.id) + '"' +
+    ' data-field="' + field + '" data-key="' + c.k + '">' +
+    '<option value="">—</option>' +
+    c.opts.map(o => '<option' + (cur === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') +
+    '</select>';
+}
+
+/* GOバッジから開く根拠パネル。ボードの14項目をここで完結させ、そのまま記録フォームへ送る。
+   ⚠️ 生成を trendItemHtml の中に置くのは、trendPatchItem が .trend-item を outerHTML ごと
+      差し替えるため。ここで trendPanel から作り直さないと、方向やゾーンを触った瞬間に
+      入力途中のパネルが消える。 */
+function trendPanelHtml(w) {
+  const setup = MV_SETUPS.find(s => s.k === trendPanel.setupKey);
+  if (!setup) return '';
+  const rows = MV_TF_CHECKS.map(c =>
+    '<div class="tp-row">' +
+      (c.link
+        ? '<button type="button" class="tp-label link" data-guide-link="' + c.link + '"' +
+          ' title="' + esc(c.label) + ' の解説を開く">' + esc(c.short || c.label) + ' 📖</button>'
+        : '<span class="tp-label" title="' + esc(c.label) + '">' + esc(c.short || c.label) + '</span>') +
+      trendCheckCell(w, 'tfHigher', c) +
+      trendCheckCell(w, 'tfEntry', c) +
+    '</div>').join('');
+
+  /* ⚠️ この条件は marketFieldsFromBoard() の null 判定と同じ式を保つこと。
+     片方だけ変えると、ここは押せるのにフォームの保存ボタンが disabled になる。 */
+  const ready = w.tfHigher && w.tfEntry && w.judge;
+  const missing = [];
+  if (!w.tfEntry) missing.push('エントリー足');
+  if (!w.judge)   missing.push('判定');
+
+  return '<div class="trend-panel">' +
+    '<div class="tp-grid">' +
+      '<div class="tp-row tp-head">' +
+        '<span class="tp-label">時間足</span>' +
+        '<span class="tp-fixed" title="' + esc(setup.label) + 'なので上位足は固定">' +
+          esc(w.tfHigher || MV_TREND_KEY_TO_TF[setup.tf]) + '</span>' +
+        '<select class="tp-cell" data-trend-tfentry="' + esc(w.id) + '">' +
+          '<option value="">エントリー足…</option>' +
+          MV_TF_ENTRY_OPTIONS.map(o =>
+            '<option' + (w.tfEntry === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') +
+        '</select>' +
+      '</div>' + rows +
+    '</div>' +
+    '<div class="tp-foot">' +
+      '<div class="mv-choice">' + trendJudgeBtnsHtml(w) + '</div>' +
+      '<button type="button" class="btn-accent-solid tp-goto"' + (ready ? '' : ' disabled') +
+        ' data-trend-goto-form="' + esc(w.id) + '">📝 記録フォームへ</button>' +
+    '</div>' +
+    (ready ? '' : '<div class="tp-hint">' + esc(missing.join('と') + 'を決めると記録に進めます') + '</div>') +
+  '</div>';
 }
 
 /* 1ペア分の行。ヘッダ（ペア名・鮮度・判定バッジ・アラート・判定）＋可視時間足ごとの入力行。
@@ -3780,16 +3924,17 @@ function trendItemHtml(w) {
         (g ? esc(g.short) : '波?') + '</button>' +
     '</div>';
   }).join('');
+  const panel = (trendPanel && trendPanel.id === w.id) ? trendPanelHtml(w) : '';
   return '<div class="trend-item" data-trend-item="' + esc(w.id) + '">' +
     '<div class="trend-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendFreshChip(w) +
-      trendSetupBadgesHtml(w) +
+      trendSetupBadgesHtml(w, true) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
         ' title="このペアの環境認識ボードへ">→</button>' +
-    '</div>' + tfRows +
+    '</div>' + tfRows + panel +
   '</div>';
 }
 
@@ -3915,7 +4060,57 @@ trendTfBar.addEventListener('click', (e) => {
   renderTrendList();
 });
 
+/* 行を1つだけ差し替える（該当行が今の絞り込みに出ていなければ何もしない）。 */
+function trendPatchById(id) {
+  const w = loadMarket().pairs.find(p => p.id === id);
+  if (w) trendPatchItem(w);
+}
+
 trendListEl.addEventListener('click', (e) => {
+  /* S33: セットアップバッジ＝根拠パネルの開閉。押した足がそのまま上位足になる。
+     ⚠️ 全体を描き直さない理由は trendPatchItem のコメントと同じ（並べ替えで行が指の下から消える）。
+        開閉で動くのは最大2行なので、その2行だけを差し替える。 */
+  const setupBtn = e.target.closest('[data-trend-setup-open]');
+  if (setupBtn) {
+    const id = setupBtn.dataset.trendSetupOpen;
+    const setupKey = setupBtn.dataset.setup;
+    const prev = trendPanel;
+    const same = prev && prev.id === id && prev.setupKey === setupKey;
+    if (same) {
+      trendPanel = null;
+    } else {
+      const setup = MV_SETUPS.find(s => s.k === setupKey);
+      if (!setup) return;
+      /* 上位足はこのセットアップで確定する。保存に失敗したら開かない（UIと保存内容の食い違いを防ぐ）。 */
+      if (!mvSetTf(id, 'tfHigher', MV_TREND_KEY_TO_TF[setup.tf])) return;
+      trendPanel = { id, setupKey };
+    }
+    if (prev && prev.id !== id) trendPatchById(prev.id);   /* 直前に開いていた別ペアを畳む */
+    trendPatchById(id);
+    return;
+  }
+
+  /* 根拠チェックのラベル 📖 から解説ドロワーを開く（ボードと同じ導線）。 */
+  const guideLink = e.target.closest('[data-guide-link]');
+  if (guideLink) {
+    openGuideDrawer('guide-' + guideLink.dataset.guideLink);
+    return;
+  }
+
+  /* S33: 5フィールドが揃ったので、そのまま記録フォームへ送る。
+     ⚠️ marketFieldsFromBoard() は「選択中のペア」しか見ないので、
+        saveSelectedPairId を renderMarket より先に呼ぶこと。 */
+  const gotoForm = e.target.closest('[data-trend-goto-form]');
+  if (gotoForm) {
+    saveSelectedPairId(gotoForm.dataset.trendGotoForm);
+    renderMarket();
+    setActiveTab('trade', { keepScroll: true });
+    requestAnimationFrame(() => {
+      document.getElementById('tabPanel-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return;
+  }
+
   /* アラート・判定は環境認識ボードと同じ data 属性なので、共有ハンドラをそのまま使う。
      ⚠️ ここで w.judge を直接書かないこと（judgeLog が落ちて統計が壊れる）。 */
   const alertBadge = e.target.closest('[data-mv-alert-toggle]');
@@ -3963,6 +4158,31 @@ trendListEl.addEventListener('click', (e) => {
     saveSelectedPairId(goto.dataset.trendGotoBoard);
     renderMarket();
     setActiveTab('trade');
+  }
+});
+
+/* S33: 根拠パネルのプルダウン。 */
+trendListEl.addEventListener('change', (e) => {
+  /* 根拠チェック。⚠️ ここでは再描画しない ── 判定（setupVerdict）が読むのは w.trend だけなので
+     バッジも並び順も動かず、選んだ値は <select> がそのまま表示している。
+     差し替えるとパネルごと作り直されてフォーカスが飛ぶ。 */
+  const check = e.target.closest('[data-trend-check]');
+  if (check) {
+    const { trendCheck: id, field, key } = check.dataset;
+    /* mvWriteCheck は同値でトグル解除する仕様なので、空欄に戻すときは現在値を渡して消す。 */
+    const w = loadMarket().pairs.find(p => p.id === id);
+    const cur = w ? ((w[MV_CHECK_FIELDS[field]] || {})[key] || '') : '';
+    if (!mvWriteCheck(id, field, key, check.value || cur)) trendPatchById(id);
+    return;
+  }
+
+  /* エントリー足。グランビルのセルが「🔭連動 ⇄ 選択可」で入れ替わるのでパネルを描き直す。 */
+  const tfEntry = e.target.closest('[data-trend-tfentry]');
+  if (tfEntry) {
+    const id = tfEntry.dataset.trendTfentry;
+    mvSetTf(id, 'tfEntry', tfEntry.value);
+    trendPatchById(id);   /* 保存が止まっていても描き直す（選択が残ると保存内容と食い違う） */
+    return;
   }
 });
 
