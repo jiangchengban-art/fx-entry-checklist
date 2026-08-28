@@ -842,6 +842,10 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .tp-synced.on { color: var(--ink); font-weight: 700; border-style: solid; }
+  /* S34: 根拠14項目をボードと同じボタン群に統一（旧: select）。狭い2列に収めるため折り返す。 */
+  .tp-row .tp-choice { row-gap: 4px; column-gap: 4px; min-width: 0; }
+  .tp-row .tp-choice .mv-tfcheck-btn { padding: 3px 3px !important; font-size: 10px !important; min-width: 0; }
+  .tp-row .tp-choice .mv-tfcheck-btn.tp-none { color: var(--ink-muted); }
   .tp-foot {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border);
@@ -3845,11 +3849,16 @@ function trendCheckCell(w, field, c) {
       ' title="🔭一覧のグランビル記録から自動反映。変更は上の行で行う">' +
       (cur ? esc(cur) : '🔭未記録') + '</span>';
   }
-  return '<select class="tp-cell" data-trend-check="' + esc(w.id) + '"' +
-    ' data-field="' + field + '" data-key="' + c.k + '">' +
-    '<option value="">—</option>' +
-    c.opts.map(o => '<option' + (cur === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') +
-    '</select>';
+  function btn(value, label) {
+    return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') +
+      (value === '' ? ' tp-none' : '') + '"' +
+      ' data-trend-check-btn="' + esc(w.id) + '" data-field="' + field + '"' +
+      ' data-key="' + c.k + '" data-value="' + esc(value) + '">' + esc(label) + '</button>';
+  }
+  return '<div class="mv-choice wrap tp-choice">' +
+    btn('', '—') +
+    c.opts.map(o => btn(o, o)).join('') +
+  '</div>';
 }
 
 /* GOバッジから開く根拠パネル。ボードの14項目をここで完結させ、そのまま記録フォームへ送る。
@@ -4090,6 +4099,22 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
+  /* S34: 根拠チェック。ボタン群に統一（旧: select の change イベント）。
+     ⚠️ ここでは再描画しない ── 判定（setupVerdict）が読むのは w.trend だけなのでバッジも並び順も動かず、
+     押したボタンの .on クラスだけ直接付け替える。差し替えるとパネルごと作り直されて位置がズレる。 */
+  const checkBtn = e.target.closest('[data-trend-check-btn]');
+  if (checkBtn) {
+    const { trendCheckBtn: id, field, key, value } = checkBtn.dataset;
+    const w = mvWriteCheck(id, field, key, value);
+    if (!w) { trendPatchById(id); return; }
+    const cur = (w[MV_CHECK_FIELDS[field]] || {})[key] || '';
+    const group = checkBtn.closest('.tp-choice');
+    if (group) group.querySelectorAll('.mv-tfcheck-btn').forEach(b => {
+      b.classList.toggle('on', b.dataset.value === cur);
+    });
+    return;
+  }
+
   /* 根拠チェックのラベル 📖 から解説ドロワーを開く（ボードと同じ導線）。 */
   const guideLink = e.target.closest('[data-guide-link]');
   if (guideLink) {
@@ -4161,21 +4186,9 @@ trendListEl.addEventListener('click', (e) => {
   }
 });
 
-/* S33: 根拠パネルのプルダウン。 */
+/* S33: 根拠パネルのプルダウン（S34: 根拠チェックはボタン群化してクリックハンドラへ移動、
+   ここに残るのはエントリー足の <select> のみ）。 */
 trendListEl.addEventListener('change', (e) => {
-  /* 根拠チェック。⚠️ ここでは再描画しない ── 判定（setupVerdict）が読むのは w.trend だけなので
-     バッジも並び順も動かず、選んだ値は <select> がそのまま表示している。
-     差し替えるとパネルごと作り直されてフォーカスが飛ぶ。 */
-  const check = e.target.closest('[data-trend-check]');
-  if (check) {
-    const { trendCheck: id, field, key } = check.dataset;
-    /* mvWriteCheck は同値でトグル解除する仕様なので、空欄に戻すときは現在値を渡して消す。 */
-    const w = loadMarket().pairs.find(p => p.id === id);
-    const cur = w ? ((w[MV_CHECK_FIELDS[field]] || {})[key] || '') : '';
-    if (!mvWriteCheck(id, field, key, check.value || cur)) trendPatchById(id);
-    return;
-  }
-
   /* エントリー足。グランビルのセルが「🔭連動 ⇄ 選択可」で入れ替わるのでパネルを描き直す。 */
   const tfEntry = e.target.closest('[data-trend-tfentry]');
   if (tfEntry) {
