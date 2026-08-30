@@ -726,6 +726,8 @@
     font-size: 13.5px; font-weight: 700; color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
+  .trend-summary .item.rd   { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .trend-summary .item.rd .n { color: var(--accent); }
   .trend-summary .item.go   { background: var(--good-soft); border-color: var(--good); color: var(--good); }
   .trend-summary .item.go .n { color: var(--good); }
   .trend-summary .item.wait { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
@@ -798,6 +800,7 @@
   }
   .sbadge b { font-weight: 700; opacity: 0.72; }
   .sbadge i { font-style: normal; font-weight: 600; font-size: 10px; opacity: 0.85; }
+  .sbadge.rd   { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
   .sbadge.go   { color: var(--good); border-color: var(--good); background: var(--good-soft); }
   .sbadge.wait { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .sbadge.no   { opacity: 0.6; }
@@ -865,13 +868,21 @@
   }
   .trend-tf .tgroup { display: inline-flex; gap: 4px; }
 
-  .tstate-btn, .tzone-btn, .tgv {
+  .tstate-btn, .tzone-btn, .tgv, .tmode-btn {
     font-family: inherit; cursor: pointer; border-radius: 7px;
     border: 1px solid var(--border); background: var(--surface-2);
     color: var(--ink-muted); padding: 0;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
-  .tstate-btn:hover, .tzone-btn:hover, .tgv:hover:not(:disabled) { background: var(--surface); }
+  .tstate-btn:hover, .tzone-btn:hover, .tgv:hover:not(:disabled), .tmode-btn:hover { background: var(--surface); }
+
+  /* S35: 目線3択。未選択のものは減光して、選ばれた1つだけが浮くようにする。 */
+  .tmode { display: inline-flex; gap: 3px; }
+  .tmode-btn { width: 26px; height: 24px; font-size: 12px; line-height: 1; opacity: 0.4; }
+  .tmode-btn.on { opacity: 1; background: var(--surface); border-color: var(--ink-muted); }
+  .tmode-btn.on.range { border-color: var(--ink-muted); }
+  .tmode-btn.on.rd    { background: var(--accent-soft); border-color: var(--accent); }
+  .tmode-btn.on.trend { background: var(--good-soft);   border-color: var(--good); }
 
   .tstate-btn { width: 30px; height: 28px; font-size: 13px; font-weight: 700; }
   .tstate-btn.on.up    { background: var(--good-soft); color: var(--good); border-color: var(--good); }
@@ -941,6 +952,8 @@
        375pxで 24 + 3×27 + 3×26 + グランビル ≒ 280px となり、カード内幅に収まる。 */
     .trend-tf { grid-template-columns: 24px auto auto 1fr; gap: 5px; padding-left: 7px; padding-right: 7px; }
     .trend-tf .tgroup { gap: 3px; }
+    .tmode { gap: 2px; }
+    .tmode-btn { width: 24px; height: 23px; font-size: 11px; }
     .tstate-btn { width: 27px; height: 27px; }
     .tzone-btn  { width: 26px; height: 27px; }
     .tgv { height: 27px; padding: 0 8px; font-size: 11px; }
@@ -1103,7 +1116,7 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。</div>
+    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。ペア名の右の3つのボタンで、まず<strong>目線</strong>（📈 トレンドフォロー / 〰 レンジ / 🔄 RD逆張り）を振り分けてください。レンジは自動で ⚪ NO に落ち、RD は最上段にまとまります。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。</div>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🟢 GO のみ</button>
@@ -1469,7 +1482,17 @@ const SETUP_SIDE = { up: { zone: 'green', side: 'buy' }, down: { zone: 'red', si
 /* GO にするグランビルの波＝押し目（買②③）と戻り（売②③）だけ。
    ①上抜け・④乖離戻しは「方向はあるがトレンドフォローの入り所ではない」ため WAIT に回す。 */
 const SETUP_GO_WAVES = ['2', '3', '6', '7'];
-const SETUP_STATUSES = { go: 0, wait: 1, no: 2 };
+const SETUP_STATUSES = { rd: 0, go: 1, wait: 2, no: 3 };
+
+/* S35: 巡回でカードの最初に押す「目線」。その通貨が今どの土俵にあるかを1タップで振り分ける。
+   未選択（''）は trend と同じ扱いなので、既存データの移行処理は要らない。
+   ⚠️ range / rd は setupVerdict() の冒頭で判定そのものを差し替える（表示だけのタグではない）。
+   rd は自動判定しない ── 逆張りの条件は目視で見るため、最上位グループに上げるだけ。 */
+const MV_TREND_MODES = [
+  { v: 'trend', icon: '📈', label: 'トレンドフォロー検討' },
+  { v: 'range', icon: '〰',  label: 'レンジ' },
+  { v: 'rd',    icon: '🔄', label: 'RD発生・逆張り検討' },
+];
 
 /* 表示する時間足の設定キー（端末ごとの表示設定なので市場データとは別に持つ）と、鮮度のしきい値。 */
 const TREND_TFS_KEY = 'mochipoyo_trend_tfs_v1';
@@ -3564,6 +3587,21 @@ function mvSetJudge(watchId, value) {
   renderStats();
 }
 
+/* 目線（トレンドフォロー / レンジ / RD逆張り）の唯一の書き込み口（S35）。
+   mvSetJudge / mvWriteTrend と同じ「書き込み口を1つにする」規約。同じものを再度押すと未選択に戻る。
+   ⚠️ 判定（setupVerdict）はこの値を読むだけで、判定結果そのものは相変わらず保存しない。
+   ⚠️ ここでは再描画しない。呼び出し側が trendPatchItem() で行だけ差し替える
+      （全描画すると行がグループ間を移動して指の下から消えるため。S24 の最重要仕様3）。 */
+function mvSetMode(watchId, value) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return null;
+  w.mode = (w.mode || '') === value ? '' : value;
+  w.modeAt = new Date().toISOString();   /* S28: 端末間マージ用 */
+  if (!saveMarket(data)) return null;
+  return w;
+}
+
 /* トレンド3項目（方向 / EMAゾーン / グランビル）の唯一の書き込み口（S24）。
    更新時刻を必ず打つので、鮮度表示はこの関数を通す限り自動で正しくなる。
    ⚠️ 判定は mvSetJudge、アラートは mvToggleAlert を通すこと（judgeLog を落とさないため）。
@@ -3749,6 +3787,13 @@ let trendVisibleTfs = loadTrendTfs();
    ⚠️ 見るのは MV_SETUPS が名指しした足だけで、表示トグル（週足・月足の出し入れ）とは無関係。
       週足を非表示にしても w.trend.w は読めるので、表示を変えただけで判定が動くことはない。 */
 function setupVerdict(w, setup) {
+  /* S35: 目線が先。レンジは方向を記録していても当面なし、RD は逆張り検討として最上位に上げる。
+     ⚠️ ここで短絡してもバッジは日足・4H の2つ出したままにする（trendSetupBadgesHtml を参照）。
+        バッジが根拠パネルの入口＝押した足がそのまま上位足になるため、選択肢を潰せない。 */
+  const mode = w.mode || 'trend';
+  if (mode === 'range') return { status: 'no', reason: 'レンジ' };
+  if (mode === 'rd')    return { status: 'rd', reason: '逆張り' };
+
   const cur   = (w.trend && w.trend[setup.tf])    || {};
   const above = (w.trend && w.trend[setup.above]) || {};
   const S = SETUP_SIDE[cur.state];
@@ -3796,6 +3841,7 @@ function trendFreshChip(w) {
     esc(text) + '</span>';
 }
 const TREND_GROUPS = [
+  { status: 'rd',   head: '🔄 RD ── 逆張り検討' },
   { status: 'go',   head: '🟢 GO ── 条件クリア' },
   { status: 'wait', head: '🟡 WAIT ── 条件待ち' },
   { status: 'no',   head: '⚪ NO ── 当面なし' },
@@ -3811,6 +3857,16 @@ function trendAlertBadgesHtml(w) {
     ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
     t.label + '</button>').join('');
 }
+/* S35: 目線3択。巡回で最初に押すのでペア名の直後に置く。
+   文言は出さずアイコンだけ（28銘柄×1日4回の巡回でヘッダの横幅を食わせないため。title で読める）。 */
+function trendModeBtnsHtml(w) {
+  const cur = w.mode || '';
+  return '<span class="tmode">' + MV_TREND_MODES.map(m =>
+    '<button type="button" class="tmode-btn' + (cur === m.v ? ' on ' + m.v : '') + '"' +
+    ' data-trend-mode="' + esc(w.id) + '" data-value="' + m.v + '" title="' + esc(m.label) + '">' +
+    m.icon + '</button>').join('') + '</span>';
+}
+
 function trendJudgeBtnsHtml(w) {
   return MV_JUDGES.map(j =>
     '<button type="button" class="mv-judge-btn trend-state-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
@@ -3937,6 +3993,7 @@ function trendItemHtml(w) {
   return '<div class="trend-item" data-trend-item="' + esc(w.id) + '">' +
     '<div class="trend-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
+      trendModeBtnsHtml(w) +
       trendFreshChip(w) +
       trendSetupBadgesHtml(w, true) +
       '<span class="spacer"></span>' +
@@ -3949,7 +4006,7 @@ function trendItemHtml(w) {
 
 /* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。 */
 function renderTrendSummary(pairs) {
-  const counts = { go: 0, wait: 0, no: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
+  const counts = { rd: 0, go: 0, wait: 0, no: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
   pairs.forEach(w => {
     counts[pairStatus(w)]++;
     if (isTrendStale(w)) counts.stale++;
@@ -3962,6 +4019,7 @@ function renderTrendSummary(pairs) {
     });
   });
   const summaryItems = [
+    { cls: 'rd',   label: '🔄 RD',   n: counts.rd,   unit: 'ペア' },
     { cls: 'go',   label: '🟢 GO',   n: counts.go,   unit: 'ペア' },
     { cls: 'wait', label: '🟡 WAIT', n: counts.wait, unit: 'ペア' },
     { cls: 'no',   label: '⚪ NO',   n: counts.no,   unit: 'ペア' },
@@ -4014,7 +4072,8 @@ function renderTrendList() {
   }
 
   let shown = pairs;
-  if (trendGoOnly) shown = shown.filter(w => pairStatus(w) === 'go');
+  /* S35: RD（逆張り検討）も「すぐチャンス」側なので GO のみ絞り込みでは残す。 */
+  if (trendGoOnly) shown = shown.filter(w => ['go', 'rd'].indexOf(pairStatus(w)) >= 0);
   if (trendStaleOnly)   shown = shown.filter(isTrendStale);
   if (trendCategory)    shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   if (!shown.length) {
@@ -4146,6 +4205,14 @@ trendListEl.addEventListener('click', (e) => {
   const judgeBtn = e.target.closest('[data-mv-judge]');
   if (judgeBtn) {
     mvSetJudge(judgeBtn.dataset.mvJudge, judgeBtn.dataset.value);
+    return;
+  }
+
+  /* S35: 目線3択。判定を差し替えるのでバッジも書き換わるが、行だけ差し替えて並べ替えはしない。 */
+  const modeBtn = e.target.closest('[data-trend-mode]');
+  if (modeBtn) {
+    const w = mvSetMode(modeBtn.dataset.trendMode, modeBtn.dataset.value);
+    if (w) trendPatchItem(w);
     return;
   }
 
@@ -4420,6 +4487,7 @@ function mergePair(a, b) {
   const out = JSON.parse(JSON.stringify(a));
 
   if (ts(b.judgeAt) > ts(a.judgeAt)) { out.judge = b.judge || ''; out.judgeAt = b.judgeAt; }
+  if (ts(b.modeAt)  > ts(a.modeAt))  { out.mode  = b.mode  || ''; out.modeAt  = b.modeAt;  }
   if (ts(b.tfAt) > ts(a.tfAt)) {
     out.tfHigher = b.tfHigher || ''; out.tfEntry = b.tfEntry || ''; out.tfAt = b.tfAt;
   }
@@ -4475,7 +4543,7 @@ function mergePairs(local, remote, tomb) {
     /* ローカルに無いペア。こちらで消したものなら、削除より古い内容は連れ戻さない。 */
     const dead = ts((tomb.pairs || {})[rp.pair]);
     if (dead) {
-      const newest = Math.max(ts(rp.trendAt), ts(rp.judgeAt), ts(rp.tfAt),
+      const newest = Math.max(ts(rp.trendAt), ts(rp.judgeAt), ts(rp.tfAt), ts(rp.modeAt),
         ...Object.values(rp.checksAt || {}).map(ts),
         ...Object.values(rp.alerts || {}).map(a => ts(a && a.chAt)));
       if (dead >= newest) return;
