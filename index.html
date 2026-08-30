@@ -1122,6 +1122,7 @@
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🟢 GO のみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
+      <select class="trend-category-select" id="trendModeSelect"></select>
       <span class="spacer"></span>
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
@@ -3752,10 +3753,12 @@ const trendFilterBtn = document.getElementById('trendFilterAligned');
 const trendStaleBtn  = document.getElementById('trendFilterStale');
 const trendTfBar     = document.getElementById('trendTfToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
+const trendModeSelect = document.getElementById('trendModeSelect');
 
 let trendGoOnly = false;      // 「GO のみ」の絞り込み。永続化しない
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
+let trendModeFilter  = '';    // 目線絞り込み（MV_TREND_MODES の v、空文字=すべて）。永続化しない
 /* S33: 開いている根拠パネル { id, setupKey }。一度に1つだけ。巡回中の一時状態なので永続化しない。
    ⚠️ trendSetupBadgesHtml / trendItemHtml より前に宣言すること（描画時に参照する）。 */
 let trendPanel = null;
@@ -4054,6 +4057,16 @@ function renderTrendCategoryOptions() {
   trendCategorySelect.innerHTML = html;
 }
 
+/* S36: 目線（📈/〰/🔄）で絞り込むプルダウン。未設定ペアは 'trend' 扱い（setupVerdict と同じ既定値）。 */
+function renderTrendModeOptions() {
+  let html = '<option value="">すべての目線</option>';
+  MV_TREND_MODES.forEach(m => {
+    html += '<option value="' + esc(m.v) + '"' + (trendModeFilter === m.v ? ' selected' : '') + '>' +
+      m.icon + ' ' + esc(m.label) + '</option>';
+  });
+  trendModeSelect.innerHTML = html;
+}
+
 function renderTrendList() {
   const data = loadMarket();
   const pairs = data.pairs.slice().sort((a, b) =>
@@ -4063,6 +4076,7 @@ function renderTrendList() {
   renderTrendSummary(pairs);
   renderTrendTfToggles();
   renderTrendCategoryOptions();
+  renderTrendModeOptions();
   trendFilterBtn.classList.toggle('on', trendGoOnly);
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
@@ -4076,6 +4090,7 @@ function renderTrendList() {
   if (trendGoOnly) shown = shown.filter(w => ['go', 'rd'].indexOf(pairStatus(w)) >= 0);
   if (trendStaleOnly)   shown = shown.filter(isTrendStale);
   if (trendCategory)    shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
+  if (trendModeFilter)  shown = shown.filter(w => (w.mode || 'trend') === trendModeFilter);
   if (!shown.length) {
     trendListEl.innerHTML = '<div class="empty-state">条件に当てはまるペアはありません。</div>';
     return;
@@ -4115,6 +4130,10 @@ trendStaleBtn.addEventListener('click', () => {
 });
 trendCategorySelect.addEventListener('change', () => {
   trendCategory = trendCategorySelect.value;
+  renderTrendList();
+});
+trendModeSelect.addEventListener('change', () => {
+  trendModeFilter = trendModeSelect.value;
   renderTrendList();
 });
 trendTfBar.addEventListener('click', (e) => {
