@@ -1372,10 +1372,10 @@ const MV_TF_CHECKS = [
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
   { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
-  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '下限', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '下限', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '下限', '❌'] },
-  { k: 'macd',         label: 'MACD',             opts: ['レギュラー', 'ヒドゥン', '❌'], link: 'macd' },
+  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
 ];
