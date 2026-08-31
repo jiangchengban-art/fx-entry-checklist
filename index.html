@@ -856,6 +856,8 @@
   .tp-foot .tp-goto { margin-left: auto; font-size: 12px; padding: 6px 12px; }
   .tp-foot .tp-goto:disabled { opacity: 0.45; cursor: not-allowed; }
   .tp-hint { margin-top: 6px; font-size: 11px; color: var(--warn); text-align: right; }
+  .tp-conf { font-size: 11px; color: var(--good); margin-bottom: 6px; }
+  .tp-conf b { font-size: 12px; }
 
   /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル。 */
   .trend-tf {
@@ -1378,6 +1380,10 @@ const MV_TF_CHECKS = [
   { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
+  /* S38: エントリー再現性向上のため、エントリー足の1波のどのフィボナッチ水準で
+     エントリーしたかを記録する。小数点は省略（23.6%→23% 等）。上位足でも記録は可能
+     （封鎖しない）が、意味を持つのは主にエントリー足での使用時。 */
+  { k: 'entryFibo',    label: 'エントリーFibo',   opts: ['23%', '38%', '50%', '61%', '78%', '❌'], short: 'Fibo' },
 ];
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
 
@@ -3816,7 +3822,20 @@ function setupVerdict(w, setup) {
   if (!g) return { status: 'wait', reason: '波の確認待ち' };
   if (SETUP_GO_WAVES.indexOf(g.v) < 0) return { status: 'wait', reason: g.short + 'は待ち' };
 
-  return { status: 'go', reason: g.short };
+  return { status: 'go', reason: g.short, conf: setupConfidence(w) };
+}
+
+/* S38: GO の確度。MV_TF_CHECKS のうち ❌ を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
+   分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
+function checkConfidence(checks) {
+  const total = MV_TF_CHECKS.length;
+  const cross = MV_TF_CHECKS.reduce((n, c) => n + ((checks && checks[c.k]) === '❌' ? 1 : 0), 0);
+  return Math.round((total - cross) / total * 100);
+}
+function setupConfidence(w) {
+  const higher = checkConfidence(w.checksHigher || {});
+  const entry  = checkConfidence(w.checksEntry  || {});
+  return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
 }
 
 /* ペア単位の総合＝セットアップのうち最も良い方。グループ分けとソートに使う。 */
@@ -3886,9 +3905,13 @@ function trendJudgeBtnsHtml(w) {
 function trendSetupBadgesHtml(w, interactive) {
   return '<span class="setup-badges">' + pairVerdicts(w).map(r => {
     const open = interactive && trendPanel && trendPanel.id === w.id && trendPanel.setupKey === r.setup.k;
-    const body = '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() +
+    const confSuffix = (r.v.status === 'go' && r.v.conf) ? ' ' + r.v.conf.combined + '%' : '';
+    const body = '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() + esc(confSuffix) +
       '<i>' + esc(r.v.reason) + '</i>';
-    const title = esc(r.setup.label + '：' + r.v.reason);
+    const confTitle = (r.v.status === 'go' && r.v.conf)
+      ? '（確度 上位足' + r.v.conf.higher + '% / エントリー足' + r.v.conf.entry + '% / 合算' + r.v.conf.combined + '%）'
+      : '';
+    const title = esc(r.setup.label + '：' + r.v.reason + confTitle);
     /* ボードでは従来どおり表示専用（押しても開く先のパネルが無いため）。 */
     if (!interactive) return '<span class="sbadge ' + r.v.status + '" title="' + title + '">' + body + '</span>';
     return '<button type="button" class="sbadge ' + r.v.status + (open ? ' open' : '') + '"' +
@@ -3944,7 +3967,15 @@ function trendPanelHtml(w) {
   if (!w.tfEntry) missing.push('エントリー足');
   if (!w.judge)   missing.push('判定');
 
+  /* S38: GO の確度（❌の数だけ減点）。パネルを開いた時点の判定を再計算して出す。 */
+  const v = setupVerdict(w, setup);
+  const confHtml = (v.status === 'go' && v.conf)
+    ? '<div class="tp-conf">🎯 確度 上位足 ' + v.conf.higher + '% ／ エントリー足 ' + v.conf.entry +
+      '% ／ 合算 <b>' + v.conf.combined + '%</b></div>'
+    : '';
+
   return '<div class="trend-panel">' +
+    confHtml +
     '<div class="tp-grid">' +
       '<div class="tp-row tp-head">' +
         '<span class="tp-label">時間足</span>' +
