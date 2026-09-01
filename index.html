@@ -778,6 +778,13 @@
     border: 1px solid var(--border); border-radius: 8px;
   }
   .tgoto:hover { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+  .tclear {
+    flex: none; width: 26px; height: 26px; padding: 0;
+    font-size: 13px; font-family: inherit; cursor: pointer;
+    background: transparent; color: var(--ink-muted);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .tclear:hover { background: var(--surface); color: var(--bad); border-color: var(--bad); }
 
   /* 最終更新の鮮度。1日4回の巡回に対し 12h 超で警告色、36h 超で「1日抜けた」扱い。 */
   .fresh {
@@ -1100,6 +1107,7 @@
     <div class="stats-grid" id="statsGrid"></div>
     <div class="basis-rr" id="slotStats"></div>
     <div class="basis-rr" id="slBasisStats"></div>
+    <div class="basis-rr" id="fiboStats"></div>
     <div class="basis-rr" id="basisRr"></div>
     <div class="basis-rr" id="mvAlertStats"></div>
   </section>
@@ -2127,6 +2135,8 @@ function renderStats() {
   const bySlot = {};
   /* bySlBasis = 損切り根拠別。直近高安カバー と フィボ161%カバー の比較 */
   const bySlBasis = {};
+  /* byFibo = エントリーFibo水準別。「38%エントリーが最高勝率」等の傾向を見る軸（未記入/❌は除外） */
+  const byFibo = {};
   trades.forEach(t => {
     const exits = tradeExits(t).filter(x => x.rr != null);
     if (!exits.length) return;
@@ -2134,6 +2144,8 @@ function renderStats() {
     if (n.net != null) {
       netRRs.push(n.net);
       (bySlBasis[t.slBasis || ''] || (bySlBasis[t.slBasis || ''] = [])).push(n.net);
+      const fibo = t.mvChecks && t.mvChecks.entry && t.mvChecks.entry.entryFibo;
+      if (fibo && fibo !== '❌') (byFibo[fibo] || (byFibo[fibo] = [])).push(n.net);
     } else if (n.closed > 0 || isSplitTrade(t)) {
       openCount++;
     }
@@ -2220,6 +2232,26 @@ function renderStats() {
             '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
           '</div>').join('')
       : '<div class="empty-state">決済し終えた記録がまだありません。</div>');
+
+  /* ---- エントリーFibo水準別の成績 ----
+     「38%エントリーが最高勝率」のような傾向を見るための軸。フィボの並び順（23→78%）で表示する。 */
+  const FIBO_ORDER = ['23%', '38%', '50%', '61%', '78%'];
+  const fiboRows = FIBO_ORDER.map(k => {
+    const nets = byFibo[k];
+    if (!nets || !nets.length) return null;
+    return { k, n: nets.length, avg: mean(nets),
+             win: nets.filter(r => r > 0).length / nets.length * 100 };
+  }).filter(Boolean);
+  document.getElementById('fiboStats').innerHTML =
+    '<h3>エントリーFibo水準別の成績</h3>' + (fiboRows.length
+      ? fiboRows.map(r =>
+          '<div class="row">' +
+            '<span class="name">' + esc(r.k) + '</span>' +
+            '<span class="n">' + r.n + '件 / 勝率 ' + r.win.toFixed(0) + '%</span>' +
+            '<span class="rr ' + rrCls(r.avg) + '">RR ' + fmtRR(round2(r.avg)) + '</span>' +
+          '</div>').join('')
+      : '<div class="empty-state">エントリーFiboの記録がまだありません。' +
+        '🔭一覧の根拠パネルでエントリーFiboを記録してください。</div>');
 
   renderMvAlertStats();
 }
@@ -3609,6 +3641,21 @@ function mvSetMode(watchId, value) {
   return w;
 }
 
+/* S39: 🔭一覧カードの巡回記録（方向/EMAゾーン/グランビル/目線）を一括クリアする。
+   ⚠️ ボード側のデータ（checksHigher/checksEntry/tfHigher/tfEntry/judge/alerts）には触れない。
+   別データなので、記録し直す巡回情報だけを消せば十分（誤って建玉系データを壊さないため）。 */
+function mvClearTrend(watchId) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return null;
+  w.trend = {};
+  w.trendAt = '';
+  w.mode = '';
+  w.modeAt = new Date().toISOString();
+  if (!saveMarket(data)) return null;
+  return w;
+}
+
 /* トレンド3項目（方向 / EMAゾーン / グランビル）の唯一の書き込み口（S24）。
    更新時刻を必ず打つので、鮮度表示はこの関数を通す限り自動で正しくなる。
    ⚠️ 判定は mvSetJudge、アラートは mvToggleAlert を通すこと（judgeLog を落とさないため）。
@@ -4032,6 +4079,8 @@ function trendItemHtml(w) {
       trendSetupBadgesHtml(w, true) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
+      '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
+        ' title="このペアの巡回記録（方向/ゾーン/波/目線）をクリア">🗑</button>' +
       '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
         ' title="このペアの環境認識ボードへ">→</button>' +
     '</div>' + tfRows + panel +
@@ -4255,6 +4304,16 @@ trendListEl.addEventListener('click', (e) => {
   const judgeBtn = e.target.closest('[data-mv-judge]');
   if (judgeBtn) {
     mvSetJudge(judgeBtn.dataset.mvJudge, judgeBtn.dataset.value);
+    return;
+  }
+
+  /* S39: 巡回記録のクリア。誤タップ対策に確認ダイアログを挟む。全描画（並べ替え）が必要なので renderTrendList。 */
+  const clearBtn = e.target.closest('[data-trend-clear]');
+  if (clearBtn) {
+    if (window.confirm('このペアの巡回記録（方向・EMAゾーン・グランビル・目線）をクリアしますか？')) {
+      const w = mvClearTrend(clearBtn.dataset.trendClear);
+      if (w) renderTrendList();
+    }
     return;
   }
 
