@@ -8,7 +8,10 @@ let pass = 0, fail = 0;
 const ok  = (n, c) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n); } };
 const eq  = (n, a, b) => ok(n + '  [got ' + JSON.stringify(a) + ']', JSON.stringify(a) === JSON.stringify(b));
 
-const browser = await chromium.launch();
+/* 環境に置かれている Chromium が package.json の playwright と別ビルドのことがあるので、
+   既定の探索に失敗したら実行ファイルを直接指す。 */
+const browser = await chromium.launch().catch(() =>
+  chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
 const errors = [];
 
 async function newPage(seed, viewport) {
@@ -110,10 +113,15 @@ console.log('\n[2] 入力フロー（方向・ゾーン・グランビル）');
   await page.click('#trendGvAll');
   ok('「すべて表示」で8択になる', await page.locator('#trendGvGrid .gv-opt').count() === 8);
   await page.click('#trendGvGrid [data-gv-pick="2"]');
-  ok('選ぶと閉じる', !(await page.locator('#trendGvModal').getAttribute('class')).includes('show'));
+  /* S40: 図をタップして微調整できるようになったため、選んでも閉じない。
+     行の差し替えは閉じたときに1回だけ走る（旧仕様の「選ぶと即閉じ＋即差し替え」を置き換え）。 */
+  ok('選んでも閉じない（S40）', (await page.locator('#trendGvModal').getAttribute('class')).includes('show'));
   eq('買②が保存される',
      await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_market_view_v1')).pairs.find(p => p.id === 'w1').trend.d.granville), '2');
-  eq('チップに買②が出る', await page.locator(row + ' .trend-tf >> nth=0 >> .tgv').textContent(), '買②');
+  await page.click('#trendGvCancel');
+  ok('閉じると閉じる', !(await page.locator('#trendGvModal').getAttribute('class')).includes('show'));
+  eq('チップに買②が出る',
+     (await page.locator(row + ' .trend-tf >> nth=0 >> .tgv').textContent()).trim(), '買②');
 
   /* 方向を反転するとグランビルが落ちる */
   await page.click(row + ' [data-trend-state="w1"][data-tf="d"][data-value="down"]');

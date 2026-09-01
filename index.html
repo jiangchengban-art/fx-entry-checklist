@@ -912,6 +912,8 @@
   .tgv {
     justify-self: start; height: 28px; padding: 0 10px;
     font-size: 11.5px; font-weight: 700;
+    /* S40: ミニ波形を文字の前に置くため（SVGが無いときも見た目は変わらない） */
+    display: inline-flex; align-items: center; gap: 5px;
   }
   .tgv.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .tgv:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -921,11 +923,89 @@
 
   /* グランビル・ピッカー */
   .gv-meta { font-size: 12px; font-weight: 600; color: var(--ink-muted); }
-  .gv-img {
-    display: block; width: 100%; max-height: 42vh; object-fit: contain;
+  /* S40: 図をタップ面にするため、画像と重ね物を同じ座標系に載せる箱。
+     ⚠️ object-fit: contain のままだと「要素の箱」と「実際に絵が描かれる領域」がズレ、
+        レターボックスの余白ぶんだけ重ね物が浮く。箱に画像の実寸比（--gv-ar、JSが load 時に入れる）を
+        張って画像を敷き詰め、% 指定の重ね物が必ず絵の上に乗るようにする。 */
+  .gv-fig {
+    position: relative; width: 100%; margin: 0 auto 10px;
+    aspect-ratio: var(--gv-ar, 1670 / 942);
+    max-width: calc(42vh * var(--gv-ar-num, 1.773));
     border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface-2); margin-bottom: 12px;
+    background: var(--surface-2); overflow: hidden;
   }
+  .gv-fig.tappable { cursor: crosshair; touch-action: manipulation; }
+  .gv-img { display: block; width: 100%; height: 100%; }
+
+  /* 8つの公式ポジションの薄い目印。座標がズレていれば図の丸と重ならないので目視で分かる。 */
+  .gv-anchors, .gv-dots { position: absolute; inset: 0; pointer-events: none; }
+  .gv-anchor {
+    position: absolute; width: 7%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%);
+    border: 1.5px dashed rgba(120, 120, 120, 0.55); border-radius: 50%;
+  }
+  .gv-anchor.cand { border-color: var(--accent); border-style: solid; opacity: 0.5; }
+
+  /* タップ点。リング＋十字で、下の線に埋もれずに位置が読めるようにする。 */
+  .gv-marker {
+    position: absolute; width: 26px; height: 26px; transform: translate(-50%, -50%);
+    border: 2.5px solid var(--accent); border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+  }
+  .gv-marker span {
+    position: absolute; inset: 50% auto auto 50%; width: 3px; height: 3px;
+    transform: translate(-50%, -50%); border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  }
+  .gv-readout {
+    font-size: 12px; color: var(--ink-2); line-height: 1.5;
+    margin: 0 0 12px; min-height: 2.6em;
+  }
+  .gv-readout b { color: var(--accent); font-size: 13px; }
+  .gv-readout i { display: block; font-style: normal; color: var(--ink-muted); font-size: 11px; }
+
+  /* 🗺 波マップ */
+  .gv-tfbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .gv-dot {
+    position: absolute; transform: translate(-50%, -50%);
+    display: flex; align-items: center; gap: 3px; pointer-events: none;
+    font-size: 9.5px; font-weight: 700; white-space: nowrap;
+  }
+  .gv-dot .pt {
+    width: 10px; height: 10px; border-radius: 50%; flex: none;
+    border: 2px solid currentColor; background: currentColor;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+  }
+  /* 中空＝ボタンで選んだだけの概算。実線＝図の上でタップした正確な位置。 */
+  .gv-dot.approx .pt { background: transparent; }
+  /* ⚠️ 図はテーマに関係なく白い画像なので、ラベルの色をテーマ変数に任せない
+     （ダークだと明るい文字が白地に乗って読めなくなる）。 */
+  .gv-dot .nm {
+    padding: 0 3px; border-radius: 4px; color: #22201d;
+    background: rgba(255, 255, 255, 0.88); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  }
+  .gv-dot.go   { color: var(--good); }
+  .gv-dot.wait { color: var(--warn); }
+  .gv-dot.rd   { color: var(--accent); }
+  .gv-dot.no   { color: #8a8a8a; }
+  .gv-legend { margin-bottom: 14px; font-size: 12px; }
+  .gv-legend .grp { display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); }
+  .gv-legend .grp:first-child { border-top: 0; }
+  .gv-legend .gname { flex: none; width: 42px; font-weight: 700; color: var(--ink-2); }
+  .gv-legend .plist { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .gv-legend .empty { color: var(--ink-muted); }
+  .gv-legend button {
+    font-family: inherit; font-size: 11.5px; padding: 2px 6px; cursor: pointer;
+    background: var(--surface-2); color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  .gv-legend button.approx { border-style: dashed; color: var(--ink-muted); }
+  .gv-legend button .st { font-size: 9px; }
+
+  /* 一覧の行に出す極小の波形。記録の質（タップ＝正確／ボタン＝概算）が見た目で分かる。 */
+  .gv-mini { display: block; width: 26px; height: 15px; flex: none; overflow: visible; }
+  .gv-mini path { fill: none; stroke: currentColor; stroke-width: 4; opacity: 0.45; }
+  .gv-mini circle { fill: currentColor; }
   .gv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
   .gv-opt {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -977,6 +1057,19 @@
     #trendGvModal .modal-actions { flex-wrap: wrap; }
     #trendGvAll { flex-basis: 100%; }
     #trendGvModal .modal-actions button { white-space: nowrap; }
+    /* S40: 図はタップ面なので、狭い画面ほど大きく取る（正確に指せることを優先）。 */
+    .gv-fig { max-width: calc(52vh * var(--gv-ar-num, 1.773)); }
+    .gv-marker { width: 30px; height: 30px; }
+    .gv-dot { font-size: 8.5px; }
+    .gv-legend .gname { width: 36px; }
+  }
+
+  /* 375px でもミニ波形は残す（巡回はスマホでするので、ここで消したら意味がない）。
+     入力行は 24 + 3×27 + 3×26 + チップ ≒ 285px でカード内幅に収まることを確認済み。
+     チップだけ少し詰めて余裕を作る。 */
+  @media (max-width: 380px) {
+    .tgv { padding: 0 7px; gap: 4px; }
+    .tgv .gv-mini { width: 22px; height: 13px; }
   }
 </style>
 </head>
@@ -1126,13 +1219,15 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。ペア名の右の3つのボタンで、まず<strong>目線</strong>（📈 トレンドフォロー / 〰 レンジ / 🔄 RD逆張り）を振り分けてください。レンジは自動で ⚪ NO に落ち、RD は最上段にまとまります。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。</div>
+    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。ペア名の右の3つのボタンで、まず<strong>目線</strong>（📈 トレンドフォロー / 〰 レンジ / 🔄 RD逆張り）を振り分けてください。レンジは自動で ⚪ NO に落ち、RD は最上段にまとまります。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。<strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。記録した位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。</div>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🟢 GO のみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
       <select class="trend-category-select" id="trendModeSelect"></select>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendMapOpen"
+              title="記録した波の位置を全通貨まとめて図の上で見る">🗺 波マップ</button>
       <span class="spacer"></span>
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
@@ -1317,18 +1412,45 @@
   </div>
 </div>
 
-<!-- ============ グランビルの波ピッカー（トレンド一覧・S24） ============ -->
-<!-- 巡回中に図と照合して波を選べるようにする。画像は開いたときに初めて読み込む。 -->
+<!-- ============ グランビルの波ピッカー（トレンド一覧・S24、S40でタップ記録化） ============ -->
+<!-- 巡回中に図と照合して波を選べるようにする。画像は開いたときに初めて読み込む。
+     S40: 図そのものがタップ面。今のローソク足の位置を直接指すと、最寄りの公式ポジションが波番号になる。
+     下の8ボタンは残す（タップがズレたときの補正／図を見ずに一発で決めたいとき用）。 -->
 <div class="modal-backdrop" id="trendGvModal">
   <div class="modal wide">
     <h3>グランビルの波 <span class="gv-meta" id="trendGvMeta"></span></h3>
-    <img class="gv-img" id="trendGvImg" alt="グランビルの法則">
+    <div class="gv-fig" id="trendGvFig">
+      <img class="gv-img" id="trendGvImg" alt="グランビルの法則">
+      <div class="gv-anchors" id="trendGvAnchors"></div>
+      <div class="gv-marker" id="trendGvMarker" hidden><span></span></div>
+    </div>
+    <div class="gv-readout" id="trendGvReadout"></div>
     <div class="gv-grid" id="trendGvGrid"></div>
     <div class="modal-actions">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendGvAll">売買8つすべて表示</button>
       <span class="spacer"></span>
+      <button class="btn-ghost" type="button" id="trendGvGuide" title="グランビルの解説を開く">📖</button>
       <button class="btn-secondary" type="button" id="trendGvClear">クリア</button>
       <button class="btn-secondary" type="button" id="trendGvCancel">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 🗺 波マップ（全通貨の波の位置を1枚に重ねる・S40） ============ -->
+<!-- 巡回で記録した位置を通貨横断で見る画面。図の下に同じ内容のテキスト一覧を必ず置く
+     （ドットが重なっても読めるようにするため。ここが実用上の要）。 -->
+<div class="modal-backdrop" id="trendMapModal">
+  <div class="modal wide">
+    <h3>🗺 波マップ <span class="gv-meta" id="trendMapMeta"></span></h3>
+    <div class="gv-tfbar" id="trendMapTfs"></div>
+    <div class="gv-fig" id="trendMapFig">
+      <img class="gv-img" id="trendMapImg" alt="グランビルの法則">
+      <div class="gv-dots" id="trendMapDots"></div>
+    </div>
+    <div class="gv-legend" id="trendMapLegend"></div>
+    <div class="modal-actions">
+      <span class="spacer"></span>
+      <button class="btn-secondary" type="button" id="trendMapClose">閉じる</button>
     </div>
   </div>
 </div>
@@ -1374,6 +1496,52 @@ const MV_GRANVILLE_POSITIONS = [
   { v: '8', side: 'sell', short: '売④', label: '売④ 乖離戻し（上に大きく乖離）' },
 ];
 const MV_GRANVILLE_MAP = Object.fromEntries(MV_GRANVILLE_POSITIONS.map(g => [g.v, g]));
+
+/* ============ S40: 波の位置を図の上のタップで記録する ============ */
+/* グランビル図（IMG_GRANVILLE / 1670×942）上の各ポジションの中心＝ピンクの半透明の丸。
+   値は画像に対する % なので、画像を差し替えない限り表示サイズに依存しない。
+   ⚠️ 図を差し替えたらこの8点も測り直すこと（ピッカーに薄い目印として重ねて出るのでズレは目視で分かる）。 */
+const MV_GRANVILLE_ANCHORS = {
+  '1': [19.4, 85.2], '2': [37.9, 71.8], '3': [45.4, 38.3], '4': [63.5, 46.0],
+  '5': [58.4, 23.2], '6': [74.2, 24.5], '7': [82.8, 50.1], '8': [28.5, 43.0],
+};
+
+/* タップ位置は "x,y"（%・小数1桁）の1フィールドに畳んで持つ。
+   ⚠️ w.trend[tf] の全フィールドが文字列という不変条件（mvEnsureTrend 参照）を壊さないため。
+   x と y は必ず対で意味を持つので、1つにまとめておけば片方だけ欠けた状態が構造的に作れない。 */
+function gvFormatPos(x, y) { return x.toFixed(1) + ',' + y.toFixed(1); }
+function gvParsePos(s) {
+  const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
+  if (!m) return null;
+  const x = parseFloat(m[1]), y = parseFloat(m[2]);
+  return (x >= 0 && x <= 100 && y >= 0 && y <= 100) ? { x, y } : null;
+}
+
+/* タップ点から最も近い公式ポジションを返す。
+   ⚠️ 候補（cands）は必ずピッカーに出ている選択肢と同じ集合を渡すこと。
+      mvWriteTrend() は方向と逆 side のグランビルを自動で消す（＝↗ の記録中に売りの波へ
+      スナップさせると保存した瞬間に消える）ので、候補を絞ることで構造的に起こらなくする。 */
+function gvNearest(x, y, cands) {
+  let best = null, bestD = Infinity;
+  cands.forEach(g => {
+    const a = MV_GRANVILLE_ANCHORS[g.v];
+    if (!a) return;
+    const d = (a[0] - x) * (a[0] - x) + (a[1] - y) * (a[1] - y);
+    if (d < bestD) { bestD = d; best = g; }
+  });
+  return best;
+}
+
+/* 一覧の行に出す極小の波形。アンカーと同じ 0-100 の座標系で、8つのポジションを通るように
+   引いてある（上げ → 天井 → 下げ）ので、記録した % をそのまま点として重ねられる。
+   ⚠️ 縦は GV_MINI_H に潰して描く。横長の図を正方形の viewBox に入れると
+      preserveAspectRatio="none" で点が歪み、肝心の「波のどこにいるか」が読めなくなる。 */
+const GV_MINI_H = 57;   /* 100 : 57 ≒ 図の縦横比 */
+const GV_MINI_POINTS = [[2, 95], [10, 88], [19, 85], [28, 43], [33, 60], [38, 72], [45, 38],
+                        [50, 18], [54, 30], [58, 23], [63, 46], [68, 32], [74, 24], [78, 42],
+                        [83, 50], [90, 72], [97, 88]];
+const GV_MINI_PATH = GV_MINI_POINTS
+  .map((p, i) => (i ? 'L' : 'M') + p[0] + ',' + (p[1] * GV_MINI_H / 100).toFixed(1)).join(' ');
 
 const MV_TF_CHECKS = [
   /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
@@ -3185,8 +3353,10 @@ function mvEnsureTrend(w) {
        既存記録もここで zone が埋まり、週足・月足の枠も同時に生える。
        S28: at（この足の最終更新時刻）を追加。端末間のマージをペア単位ではなく
        時間足単位で行うために要る ── ペア単位だと「PCで日足、iPhoneで4時間足」と
-       別々に記録したとき、後から同期した側の1足のために他方の足が丸ごと消える。 */
-    ['state', 'zone', 'granville', 'at'].forEach(f => {
+       別々に記録したとき、後から同期した側の1足のために他方の足が丸ごと消える。
+       S40: wpos（図の上でタップした位置 "x,y"）を追加。空文字＝ボタンで選んだだけの概算。
+       同じ「全フィールドは文字列」の規約に乗るので、この配列に1語足すだけで移行が済む。 */
+    ['state', 'zone', 'granville', 'wpos', 'at'].forEach(f => {
       if (typeof cur[f] !== 'string') { cur[f] = ''; filled = true; }
     });
   });
@@ -3673,6 +3843,9 @@ function mvWriteTrend(watchId, tfKey, patch) {
   const g = MV_GRANVILLE_MAP[cur.granville];
   const side = cur.state === 'down' ? 'sell' : 'buy';
   if (!isTrendingState(cur.state) || (g && g.side !== side)) cur.granville = '';
+  /* S40: 波の位置（図の上のタップ点）は波番号と1つの記録なので、片方だけ残さない。
+     ⚠️ granville が消える経路はここ1箇所なので、wpos の後始末もここに置けば漏れない。 */
+  if (!cur.granville) cur.wpos = '';
   /* S28: この足の更新時刻。ペア単位の trendAt は鮮度表示用に残すが、
      端末間のマージが見るのはこちら（時間足ごとに独立して新旧を判定するため）。 */
   cur.at = new Date().toISOString();
@@ -3909,6 +4082,16 @@ function trendFreshChip(w) {
   return '<span class="fresh' + cls + '" title="最終更新 ' + esc(fmtDatetime(w.trendAt)) + '">' +
     esc(text) + '</span>';
 }
+/* S40: 記録した波の位置を行の中で示す極小の波形。タップ記録が無いときは何も出さない
+   （文字ラベルだけの従来の見た目に戻る＝「概算」と「正確」が並んでも区別が付く）。 */
+function gvMiniSvg(pos) {
+  if (!pos) return '';
+  return '<svg class="gv-mini" viewBox="0 0 100 ' + GV_MINI_H + '" aria-hidden="true">' +
+    '<path d="' + GV_MINI_PATH + '"/>' +
+    '<circle cx="' + pos.x.toFixed(1) + '" cy="' + (pos.y * GV_MINI_H / 100).toFixed(1) +
+      '" r="8"/></svg>';
+}
+
 const TREND_GROUPS = [
   { status: 'rd',   head: '🔄 RD ── 逆張り検討' },
   { status: 'go',   head: '🟢 GO ── 条件クリア' },
@@ -4059,15 +4242,18 @@ function trendItemHtml(w) {
       '<button type="button" class="tzone-btn ' + z.v + (cur.zone === z.v ? ' on' : '') + '"' +
       ' data-trend-zone="' + esc(w.id) + '" data-tf="' + t.k + '" data-value="' + z.v + '"' +
       ' title="' + esc(t.label) + ' EMAゾーン ' + esc(z.label) + '"><span class="dot"></span></button>').join('');
-    /* グランビルは方向が決まっている足でだけ意味を持つ。レンジ・未記録では押せない。 */
+    /* グランビルは方向が決まっている足でだけ意味を持つ。レンジ・未記録では押せない。
+       S40: 図の上でタップして記録した足だけミニ波形を前置する（＝記録の質が見た目で分かる）。 */
+    const tapped = trending ? gvParsePos(cur.wpos) : null;
     return '<div class="trend-tf">' +
       '<span class="tf">' + esc(t.short) + '</span>' +
       '<span class="tgroup">' + states + '</span>' +
       '<span class="tgroup zones">' + zones + '</span>' +
       '<button type="button" class="tgv' + (g ? ' on' : '') + '"' + (trending ? '' : ' disabled') +
         ' data-trend-granville-open="' + esc(w.id) + '" data-tf="' + t.k + '"' +
-        ' title="' + esc(g ? g.label : 'グランビルの波を選ぶ') + '">' +
-        (g ? esc(g.short) : '波?') + '</button>' +
+        ' title="' + esc(g ? g.label + (tapped ? '（図の上で記録）' : '（ボタン選択・位置は概算）')
+                            : 'グランビルの波を選ぶ') + '">' +
+        gvMiniSvg(tapped) + (g ? esc(g.short) : '波?') + '</button>' +
     '</div>';
   }).join('');
   const panel = (trendPanel && trendPanel.id === w.id) ? trendPanelHtml(w) : '';
@@ -4147,6 +4333,18 @@ function renderTrendModeOptions() {
   trendModeSelect.innerHTML = html;
 }
 
+/* ツールバーの4つの絞り込みを AND で当てる。
+   S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。 */
+function trendApplyFilters(pairs) {
+  let shown = pairs;
+  /* S35: RD（逆張り検討）も「すぐチャンス」側なので GO のみ絞り込みでは残す。 */
+  if (trendGoOnly)     shown = shown.filter(w => ['go', 'rd'].indexOf(pairStatus(w)) >= 0);
+  if (trendStaleOnly)  shown = shown.filter(isTrendStale);
+  if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
+  if (trendModeFilter) shown = shown.filter(w => (w.mode || 'trend') === trendModeFilter);
+  return shown;
+}
+
 function renderTrendList() {
   const data = loadMarket();
   const pairs = data.pairs.slice().sort((a, b) =>
@@ -4165,12 +4363,7 @@ function renderTrendList() {
     return;
   }
 
-  let shown = pairs;
-  /* S35: RD（逆張り検討）も「すぐチャンス」側なので GO のみ絞り込みでは残す。 */
-  if (trendGoOnly) shown = shown.filter(w => ['go', 'rd'].indexOf(pairStatus(w)) >= 0);
-  if (trendStaleOnly)   shown = shown.filter(isTrendStale);
-  if (trendCategory)    shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
-  if (trendModeFilter)  shown = shown.filter(w => (w.mode || 'trend') === trendModeFilter);
+  const shown = trendApplyFilters(pairs);
   if (!shown.length) {
     trendListEl.innerHTML = '<div class="empty-state">条件に当てはまるペアはありません。</div>';
     return;
@@ -4375,17 +4568,46 @@ trendListEl.addEventListener('change', (e) => {
   }
 });
 
-/* ---- グランビル・ピッカー（S24） ---- */
+/* ---- グランビル・ピッカー（S24、S40でタップ記録化） ---- */
 /* 巡回中に「この波は狙い目か」を図と照合して決めたいので、選択肢だけでなく図も出す。
    方向は直前のコントロールで既に決めているため、既定では該当する4択に絞る
-   （買いか売りかの判断を二度させない・375pxでも4つを大きく置ける）。 */
-const trendGvModal = document.getElementById('trendGvModal');
-const trendGvGrid  = document.getElementById('trendGvGrid');
-const trendGvMeta  = document.getElementById('trendGvMeta');
-const trendGvImg   = document.getElementById('trendGvImg');
-const trendGvAll   = document.getElementById('trendGvAll');
+   （買いか売りかの判断を二度させない・375pxでも4つを大きく置ける）。
+   S40: 図そのものがタップ面になった。今のローソク足の位置を指すと wpos に % で残り、
+   最寄りの公式ポジションが granville として確定する。 */
+const trendGvModal   = document.getElementById('trendGvModal');
+const trendGvGrid    = document.getElementById('trendGvGrid');
+const trendGvMeta    = document.getElementById('trendGvMeta');
+const trendGvImg     = document.getElementById('trendGvImg');
+const trendGvAll     = document.getElementById('trendGvAll');
+const trendGvFig     = document.getElementById('trendGvFig');
+const trendGvAnchors = document.getElementById('trendGvAnchors');
+const trendGvMarker  = document.getElementById('trendGvMarker');
+const trendGvReadout = document.getElementById('trendGvReadout');
 let trendGvTarget = null;   // { id, tf }
 let trendGvShowAll = false;
+let trendGvDirty = false;   // タップ／ボタンで動かしたか（閉じるときに行を差し替えるため）
+
+/* 画像の実寸から縦横比を CSS 変数に流す。ハードコードしないので図を差し替えても崩れない。
+   ⚠️ これを入れないと .gv-fig の比率が既定値のままで、重ね物と絵が数 px ずれる。 */
+function gvApplyAspect(img) {
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const ar = img.naturalWidth / img.naturalHeight;
+  document.documentElement.style.setProperty('--gv-ar', img.naturalWidth + ' / ' + img.naturalHeight);
+  document.documentElement.style.setProperty('--gv-ar-num', String(ar));
+}
+
+/* 巨大な base64 は初回描画に載せず、モーダルを開いたときに初めて代入する（S24からの方針）。 */
+function gvLoadImg(img) {
+  if (img.src) { gvApplyAspect(img); return; }
+  img.addEventListener('load', () => gvApplyAspect(img), { once: true });
+  img.src = IMG_GRANVILLE;
+}
+
+/* いま選べる波＝ピッカーのグリッドに出ている集合。スナップ候補もこれと必ず同じにする。 */
+function gvCandidates(cur) {
+  const side = cur.state === 'down' ? 'sell' : 'buy';
+  return MV_GRANVILLE_POSITIONS.filter(g => trendGvShowAll || g.side === side);
+}
 
 function openTrendGv(watchId, tfKey) {
   const w = loadMarket().pairs.find(p => p.id === watchId);
@@ -4394,8 +4616,8 @@ function openTrendGv(watchId, tfKey) {
   if (!isTrendingState(cur.state)) return;   // 方向未記録では開かない
   trendGvTarget = { id: watchId, tf: tfKey };
   trendGvShowAll = false;
-  /* 巨大な base64 は初回描画に載せず、ここで初めて代入する。 */
-  if (!trendGvImg.src) trendGvImg.src = IMG_GRANVILLE;
+  trendGvDirty = false;
+  gvLoadImg(trendGvImg);
   renderTrendGv();
   trendGvModal.classList.add('show');
 }
@@ -4406,41 +4628,230 @@ function renderTrendGv() {
   if (!w) return;
   const t = MV_TREND_TFS.find(x => x.k === trendGvTarget.tf);
   const cur = (w.trend && w.trend[trendGvTarget.tf]) || {};
-  const side = cur.state === 'down' ? 'sell' : 'buy';
   trendGvMeta.textContent = w.pair + ' / ' + (t ? t.label : trendGvTarget.tf);
   trendGvAll.classList.toggle('on', trendGvShowAll);
-  const opts = MV_GRANVILLE_POSITIONS.filter(g => trendGvShowAll || g.side === side);
+  const opts = gvCandidates(cur);
   trendGvGrid.innerHTML = opts.map(g =>
     '<button type="button" class="gv-opt' + (cur.granville === g.v ? ' on' : '') + '"' +
     ' data-gv-pick="' + g.v + '">' +
     '<span class="s">' + esc(g.short) + '</span>' +
     '<span class="l">' + esc(g.label.replace(/^[^（]*（/, '').replace(/）$/, '')) + '</span>' +
     '</button>').join('');
+
+  /* 8つの公式ポジションを薄い目印として重ねる。今スナップ先になりうるものだけ強調する。 */
+  const candSet = {};
+  opts.forEach(g => { candSet[g.v] = true; });
+  trendGvAnchors.innerHTML = MV_GRANVILLE_POSITIONS.map(g => {
+    const a = MV_GRANVILLE_ANCHORS[g.v];
+    if (!a) return '';
+    return '<div class="gv-anchor' + (candSet[g.v] ? ' cand' : '') + '"' +
+      ' style="left:' + a[0] + '%;top:' + a[1] + '%"></div>';
+  }).join('');
+
+  /* マーカーはタップ済みならその位置、ボタン選択だけならアンカー位置に置く
+     （＝ボタンで大まかに置いてから指で微調整する動きがそのまま通る）。 */
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  const tapped = gvParsePos(cur.wpos);
+  const at = tapped || (g ? { x: MV_GRANVILLE_ANCHORS[g.v][0], y: MV_GRANVILLE_ANCHORS[g.v][1] } : null);
+  trendGvMarker.hidden = !at;
+  if (at) {
+    trendGvMarker.style.left = at.x + '%';
+    trendGvMarker.style.top  = at.y + '%';
+  }
+  trendGvFig.classList.add('tappable');
+
+  /* スナップ結果は必ず言語化して見せる（どこに丸め込まれたか分からないまま保存させない）。 */
+  const hint = trendGvShowAll
+    ? '売買8つから選んでいます。'
+    : '方向が' + (cur.state === 'down' ? '↘' : '↗') + 'なので'
+      + (cur.state === 'down' ? '売り' : '買い') + 'の波に絞っています（「売買8つすべて表示」で解除）。';
+  trendGvReadout.innerHTML = (g
+      ? '<b>' + esc(g.short) + '</b> ' + esc(g.label.replace(/^\S+\s*/, ''))
+        + (tapped ? '' : '（ボタン選択・位置は概算）')
+      : '図の上で、今のローソク足の位置をタップしてください。')
+    + '<i>' + esc(hint) + '</i>';
 }
 
 function closeTrendGv() {
+  /* タップは押し直す前提なのでモーダル内では行を触らず、閉じるときに1回だけ差し替える。 */
+  if (trendGvDirty && trendGvTarget) {
+    const w = loadMarket().pairs.find(p => p.id === trendGvTarget.id);
+    if (w) trendPatchItem(w);
+  }
+  trendGvDirty = false;
   trendGvModal.classList.remove('show');
   trendGvTarget = null;
 }
 
+/* 図のタップ。要素の箱＝絵の領域になるよう .gv-fig に比率を張ってあるので、
+   getBoundingClientRect() の割合をそのまま % として使える。 */
+trendGvFig.addEventListener('click', (e) => {
+  if (!trendGvTarget) return;
+  const r = trendGvFig.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const x = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100));
+  const y = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100));
+  const w0 = loadMarket().pairs.find(p => p.id === trendGvTarget.id);
+  if (!w0) return;
+  const cur = (w0.trend && w0.trend[trendGvTarget.tf]) || {};
+  const g = gvNearest(x, y, gvCandidates(cur));
+  if (!g) return;
+  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf,
+                         { granville: g.v, wpos: gvFormatPos(x, y) });
+  if (!w) return;
+  trendGvDirty = true;
+  renderTrendGv();
+});
+
 trendGvGrid.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-gv-pick]');
   if (!btn || !trendGvTarget) return;
-  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf, { granville: btn.dataset.gvPick });
-  closeTrendGv();
-  if (w) trendPatchItem(w);
+  /* ボタンは「言葉で選ぶ」経路なので位置の記録は持たせない（wpos を空にして概算に戻す）。 */
+  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf,
+                         { granville: btn.dataset.gvPick, wpos: '' });
+  if (!w) return;
+  trendGvDirty = true;
+  renderTrendGv();
 });
 trendGvAll.addEventListener('click', () => { trendGvShowAll = !trendGvShowAll; renderTrendGv(); });
+document.getElementById('trendGvGuide').addEventListener('click', () => {
+  closeTrendGv();
+  openGuideDrawer('guide-granville');
+});
 document.getElementById('trendGvClear').addEventListener('click', () => {
   if (!trendGvTarget) return;
-  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf, { granville: '' });
+  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf, { granville: '', wpos: '' });
+  if (w) trendGvDirty = true;
   closeTrendGv();
-  if (w) trendPatchItem(w);
 });
 document.getElementById('trendGvCancel').addEventListener('click', closeTrendGv);
 trendGvModal.addEventListener('click', (e) => { if (e.target === trendGvModal) closeTrendGv(); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && trendGvModal.classList.contains('show')) closeTrendGv();
+});
+
+/* ---- 🗺 波マップ（S40） ---- */
+/* 巡回で記録した波の位置を通貨横断で1枚に重ねる。「今どの通貨がどの波にいるか」＝
+   狙い目ゾーンに何が溜まっているかを一目で掴むための画面。
+   ⚠️ 図の下のテキスト一覧は飾りではなく本体。ドットは必ず重なるので、
+      重なっても読める形を必ず併置する。 */
+const trendMapModal  = document.getElementById('trendMapModal');
+const trendMapMeta   = document.getElementById('trendMapMeta');
+const trendMapTfs    = document.getElementById('trendMapTfs');
+const trendMapImg    = document.getElementById('trendMapImg');
+const trendMapDots   = document.getElementById('trendMapDots');
+const trendMapLegend = document.getElementById('trendMapLegend');
+let trendMapTf = '';   // 空なら開いたときに表示中の先頭の足を採る
+
+/* 図に載せる1件分。wpos があればその座標、無ければ波番号のアンカー位置（＝概算）。
+   どちらも無いペアは「記録なし」なので載せない。 */
+function trendMapEntry(w, tfKey) {
+  const cur = (w.trend && w.trend[tfKey]) || {};
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  if (!g) return null;
+  const tapped = gvParsePos(cur.wpos);
+  const a = MV_GRANVILLE_ANCHORS[g.v];
+  return {
+    w: w, g: g, approx: !tapped,
+    x: tapped ? tapped.x : a[0],
+    y: tapped ? tapped.y : a[1],
+    status: pairStatus(w),
+  };
+}
+
+function trendMapEntries() {
+  const pairs = trendApplyFilters(loadMarket().pairs);
+  const list = pairs.map(w => trendMapEntry(w, trendMapTf)).filter(Boolean)
+    .sort((a, b) => String(a.w.pair).localeCompare(String(b.w.pair)));
+
+  /* ほぼ同じ位置のものは小さな円周へ散らす。散らさないと重なった数だけラベルが隠れ、
+     「1ペアしか居ない」ように見えてしまう（概算はアンカーの一点に必ず全部重なる）。
+     ずらす量は最大でも数 % なので、どの波にいるかの読み取りは変わらない。 */
+  const cells = {};
+  list.forEach(en => {
+    const key = Math.round(en.x / 2) + ':' + Math.round(en.y / 2);
+    (cells[key] = cells[key] || []).push(en);
+  });
+  Object.keys(cells).forEach(key => {
+    const group = cells[key];
+    if (group.length < 2) return;
+    group.forEach((en, i) => {
+      const a = i / group.length * Math.PI * 2;
+      en.x = +Math.min(99, Math.max(1, en.x + Math.cos(a) * 4.5)).toFixed(1);
+      en.y = +Math.min(97, Math.max(3, en.y + Math.sin(a) * 7.5)).toFixed(1);
+    });
+  });
+  return list;
+}
+
+function openTrendMap() {
+  const vis = trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
+  if (!vis.some(t => t.k === trendMapTf)) trendMapTf = vis[0].k;
+  gvLoadImg(trendMapImg);
+  renderTrendMap();
+  trendMapModal.classList.add('show');
+}
+
+function renderTrendMap() {
+  const vis = trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
+  trendMapTfs.innerHTML = vis.map(t =>
+    '<button type="button" class="btn-ghost trend-filter-btn' + (t.k === trendMapTf ? ' on' : '') +
+    '" data-map-tf="' + t.k + '">' + esc(t.label) + '</button>').join('');
+
+  const entries = trendMapEntries();
+  trendMapMeta.textContent = entries.length + '件';
+  trendMapDots.innerHTML = entries.map(en =>
+    '<div class="gv-dot ' + en.status + (en.approx ? ' approx' : '') +
+    '" style="left:' + en.x + '%;top:' + en.y + '%">' +
+    '<span class="pt"></span><span class="nm">' + esc(en.w.pair) + '</span></div>').join('');
+
+  /* 波番号ごとのテキスト一覧。ドットが重なっても、ここを見れば必ず全件読める。 */
+  trendMapLegend.innerHTML = MV_GRANVILLE_POSITIONS.map(g => {
+    const inWave = entries.filter(en => en.g.v === g.v);
+    return '<div class="grp"><span class="gname">' + esc(g.short) + '</span>' +
+      '<span class="plist">' + (inWave.length
+        ? inWave.map(en =>
+            '<button type="button" class="' + en.status + (en.approx ? ' approx' : '') +
+            '" data-map-goto="' + esc(en.w.id) + '"' +
+            ' title="' + esc(en.w.pair + ' / ' + g.label +
+                             (en.approx ? '（ボタン選択・位置は概算）' : '（図の上で記録）')) + '">' +
+            esc(en.w.pair) + (en.approx ? ' <span class="st">◦</span>' : '') + '</button>').join('')
+        : '<span class="empty">—</span>') +
+      '</span></div>';
+  }).join('') +
+    '<div class="grp"><span class="gname"></span><span class="plist empty">' +
+    '実線＝図の上でタップした位置／◦ 破線＝ボタン選択の概算</span></div>';
+}
+
+function closeTrendMap() { trendMapModal.classList.remove('show'); }
+
+trendMapTfs.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-map-tf]');
+  if (!btn) return;
+  trendMapTf = btn.dataset.mapTf;
+  renderTrendMap();
+});
+
+/* ペア名から一覧の該当行へ戻す。ハイライトの出し方はボード→一覧の導線と揃える。 */
+trendMapLegend.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-map-goto]');
+  if (!btn) return;
+  const id = btn.dataset.mapGoto;
+  closeTrendMap();
+  requestAnimationFrame(() => {
+    const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(id) + '"]');
+    if (!item) return;
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    item.classList.add('trend-highlight');
+    setTimeout(() => item.classList.remove('trend-highlight'), 1600);
+  });
+});
+
+document.getElementById('trendMapOpen').addEventListener('click', openTrendMap);
+document.getElementById('trendMapClose').addEventListener('click', closeTrendMap);
+trendMapModal.addEventListener('click', (e) => { if (e.target === trendMapModal) closeTrendMap(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && trendMapModal.classList.contains('show')) closeTrendMap();
 });
 
 /* ============ タブ切替 ============ */

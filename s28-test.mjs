@@ -12,7 +12,10 @@ const ok = (name, cond, extra) => {
   else { fail++; console.log('  ❌ ' + name + (extra ? '  → ' + JSON.stringify(extra) : '')); }
 };
 
-const browser = await chromium.launch();
+/* 環境に置かれている Chromium が package.json の playwright と別ビルドのことがあるので、
+   既定の探索に失敗したら実行ファイルを直接指す。 */
+const browser = await chromium.launch().catch(() =>
+  chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
 
 async function newPage() {
   const ctx = await browser.newContext();

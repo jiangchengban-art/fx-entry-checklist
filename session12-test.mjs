@@ -8,7 +8,10 @@ const check = (name, cond, extra = '') => {
   console.log((cond ? 'PASS' : 'FAIL') + ' - ' + name + (extra ? ' :: ' + extra : ''));
 };
 
-const browser = await chromium.launch();
+/* 環境に置かれている Chromium が package.json の playwright と別ビルドのことがあるので、
+   既定の探索に失敗したら実行ファイルを直接指す。 */
+const browser = await chromium.launch().catch(() =>
+  chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
 const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
