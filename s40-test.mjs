@@ -119,13 +119,21 @@ console.log('\n[3] 逆側タップ（mvWriteTrend の自動クリア回避）');
   ok('買いの波にスナップする  [' + d.granville + ']', ['1', '2', '3', '4'].includes(d.granville));
   ok('保存直後に消えない', d.granville !== '' && d.wpos !== '');
 
-  /* 「売買8つすべて表示」で候補が広がると、売りの波にも落とせる */
+  /* S42: 「売買8つすべて表示」はグリッドの見た目だけ。書き込み経路は方向側に絞ったまま */
   await page.click('#trendGvAll');
   eq('8択になる', await page.locator('#trendGvGrid .gv-opt').count(), 8);
+  eq('逆側の4つは参考表示（.opp）', await page.locator('#trendGvGrid .gv-opt.opp').count(), 4);
   await tapFig(page, '#trendGvFig', 74, 24);
   const d2 = await trendOf(page, 'w1', 'd');
-  ok('↗のまま売りの波を選ぶと自動クリアされる（既存仕様どおり）', d2.granville === '');
-  eq('そのとき wpos も一緒に落ちる', d2.wpos, '');
+  ok('8択表示でもタップは買いの波にスナップする  [' + d2.granville + ']',
+     ['1', '2', '3', '4'].includes(d2.granville));
+  ok('保存直後に消えない（無反応領域がゼロ）', d2.granville !== '' && d2.wpos !== '');
+
+  /* 逆側のボタンは書き込まずに理由を出す（押しても点かないボタンを残さない） */
+  await page.click('#trendGvGrid .gv-opt.opp');
+  const d3 = await trendOf(page, 'w1', 'd');
+  eq('逆側ボタンを押しても波は変わらない', d3.granville, d2.granville);
+  ok('代わりに理由が出る', await page.locator('#toast.show').count() === 1);
   await page.context().close();
 }
 
@@ -222,7 +230,10 @@ console.log('\n[7] 🗺 波マップ');
   eq('ボタン選択は中空', await page.locator('#trendMapDots .gv-dot.approx').count(), 1);
 
   const approx = await page.locator('#trendMapDots .gv-dot.approx').getAttribute('style');
-  ok('概算はアンカー座標に置かれる  [' + approx + ']', approx.includes('45.4%'));
+  /* アンカー座標は図を差し替えるたびに測り直すので、値を直書きせずアプリ側から引く */
+  const anchor3 = await page.evaluate(() => MV_GRANVILLE_ANCHORS['3'][0]);
+  ok('概算はアンカー座標に置かれる  [' + approx + ' / anchor ' + anchor3 + ']',
+     approx.includes('left:' + anchor3 + '%'));
 
   eq('凡例に2件出る', await page.locator('#trendMapLegend [data-map-goto]').count(), 2);
   ok('未記録のペアは凡例にも出ない',

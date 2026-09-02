@@ -988,6 +988,38 @@
   .gv-dot.wait { color: var(--warn); }
   .gv-dot.rd   { color: var(--accent); }
   .gv-dot.no   { color: #8a8a8a; }
+  /* S42: 単一銘柄モードは足ごとに色を変える。
+     ⚠️ pairStatus() はペア単位なので、1銘柄では全足が同じ status 色になって用を成さない。
+        status は .pt の中空/実線（＝記録の質）だけに残し、色は足の識別に振り直す。 */
+  .gv-dot.tf-d  { color: #d1620b; }
+  .gv-dot.tf-h4 { color: #2a78d6; }
+  .gv-dot.tf-w  { color: #7a3fbf; }
+  .gv-dot.tf-mn { color: #0a8f6a; }
+  /* S42: 前日レイヤー。当日より薄く、ラベルを出さずに位置だけ示す。 */
+  .gv-dot.prev { opacity: 0.42; }
+  .gv-dot.prev .nm { display: none; }
+
+  /* S42: 軌跡線。⚠️ viewBox を潰して使うので non-scaling-stroke が無いと線幅が縦横で歪む。 */
+  .gv-trail { position: absolute; inset: 0; pointer-events: none; }
+  .gv-trail line {
+    stroke: currentColor; stroke-width: 1.5; stroke-linecap: round;
+    opacity: 0.55; vector-effect: non-scaling-stroke;
+  }
+  .gv-trail line.go   { color: var(--good); }
+  .gv-trail line.wait { color: var(--warn); }
+  .gv-trail line.rd   { color: var(--accent); }
+  .gv-trail line.no   { color: #8a8a8a; }
+
+  /* S42: 波マップのツールバー（銘柄・日付・記録） */
+  /* 375px でも2段に収める（銘柄／日付＋記録）。巡回中に縦を食わせない。 */
+  .gv-mapbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .gv-mapbar select { flex: 1 1 100%; min-width: 0; }
+  .gv-daynav { display: flex; align-items: center; gap: 3px; }
+  .gv-daynav b { min-width: 84px; text-align: center; font-size: 11.5px; color: var(--ink-2); }
+  .gv-daynav button { padding: 4px 8px; }
+  #trendMapShot { margin-left: auto; padding: 5px 10px; font-size: 11.5px; }
+  .gv-mapnote { margin-bottom: 10px; font-size: 11px; color: var(--ink-muted); line-height: 1.5; }
+
   .gv-legend { margin-bottom: 14px; font-size: 12px; }
   .gv-legend .grp { display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); }
   .gv-legend .grp:first-child { border-top: 0; }
@@ -1019,6 +1051,8 @@
   .gv-opt .l { font-size: 10px; color: var(--ink-muted); line-height: 1.35; text-align: center; }
   .gv-opt.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .gv-opt.on .l { color: var(--accent); }
+  /* S42: 「売買8つすべて表示」で出る逆側＝参考表示。押すと理由を出して弾く（書き込まない）。 */
+  .gv-opt.opp { opacity: 0.42; border-style: dashed; }
 
   @media (max-width: 520px) {
     body { padding: 16px 10px 96px; }
@@ -1442,11 +1476,26 @@
 <div class="modal-backdrop" id="trendMapModal">
   <div class="modal wide">
     <h3>🗺 波マップ <span class="gv-meta" id="trendMapMeta"></span></h3>
+    <!-- S42: 銘柄を1つ選ぶと全時間足を重ねる／日付を戻すと過去日＋軌跡を出す -->
+    <div class="gv-mapbar">
+      <select id="trendMapPairSelect" aria-label="銘柄を絞り込む"></select>
+      <span class="gv-daynav">
+        <button type="button" class="btn-ghost" id="trendMapPrev" title="前の日">◀</button>
+        <b id="trendMapDayLabel">今</b>
+        <button type="button" class="btn-ghost" id="trendMapNext" title="次の日">▶</button>
+      </span>
+      <button type="button" class="btn-ghost" id="trendMapShot"
+              title="今日の波マップを今の状態で上書き保存します">📸 記録</button>
+    </div>
     <div class="gv-tfbar" id="trendMapTfs"></div>
     <div class="gv-fig" id="trendMapFig">
       <img class="gv-img" id="trendMapImg" alt="グランビルの法則">
+      <!-- 軌跡線。% 座標をそのまま流すため viewBox 0-100 ＋ preserveAspectRatio="none" -->
+      <svg class="gv-trail" id="trendMapTrail" viewBox="0 0 100 100"
+           preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="gv-dots" id="trendMapDots"></div>
     </div>
+    <div class="gv-mapnote" id="trendMapNote"></div>
     <div class="gv-legend" id="trendMapLegend"></div>
     <div class="modal-actions">
       <span class="spacer"></span>
@@ -3506,7 +3555,10 @@ function saveMarket(data) {
     storageBackupIfShrinking(MARKET_KEY, localStorage.getItem(MARKET_KEY), data, [
       o => Array.isArray(o.pairs) ? o.pairs.length : null,
       o => Array.isArray(o.judgeLog) ? o.judgeLog.length : null,
-      o => Array.isArray(o.snapshots) ? o.snapshots.length : null,
+      /* ⚠️ S42: wavemap は 30日で自動プルーンされるので、数に入れると毎回「縮小」判定になり
+         __bak が「1秒前の状態」で焼き潰されて復元ボタンが無力化する。日次記録は数えない。 */
+      o => Array.isArray(o.snapshots)
+        ? o.snapshots.filter(s => s && s.kind !== WM_KIND).length : null,
     ]);
     localStorage.setItem(MARKET_KEY, JSON.stringify(data));
     localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
@@ -4603,10 +4655,18 @@ function gvLoadImg(img) {
   img.src = IMG_GRANVILLE;
 }
 
-/* いま選べる波＝ピッカーのグリッドに出ている集合。スナップ候補もこれと必ず同じにする。 */
+/* 記録できる波＝現在の方向側の4つ。
+   ⚠️ S42: ここに trendGvShowAll を混ぜてはいけない。mvWriteTrend() は方向と逆 side の
+      granville を保存直後に必ず消すので、逆側を候補に入れると「タップしても何も起きない
+      領域」が図の広範囲に生まれる（＝S40 で報告された不反応バグの正体）。
+      「売買8つすべて表示」はグリッドの見た目にだけ効かせ、書き込み経路には効かせない。 */
 function gvCandidates(cur) {
   const side = cur.state === 'down' ? 'sell' : 'buy';
-  return MV_GRANVILLE_POSITIONS.filter(g => trendGvShowAll || g.side === side);
+  return MV_GRANVILLE_POSITIONS.filter(g => g.side === side);
+}
+/* グリッドに並べる集合。showAll のときだけ逆側も薄く出す（押すと理由を出して弾く）。 */
+function gvGridOptions(cur) {
+  return trendGvShowAll ? MV_GRANVILLE_POSITIONS.slice() : gvCandidates(cur);
 }
 
 function openTrendGv(watchId, tfKey) {
@@ -4631,8 +4691,11 @@ function renderTrendGv() {
   trendGvMeta.textContent = w.pair + ' / ' + (t ? t.label : trendGvTarget.tf);
   trendGvAll.classList.toggle('on', trendGvShowAll);
   const opts = gvCandidates(cur);
-  trendGvGrid.innerHTML = opts.map(g =>
-    '<button type="button" class="gv-opt' + (cur.granville === g.v ? ' on' : '') + '"' +
+  const candSetGrid = {};
+  opts.forEach(g => { candSetGrid[g.v] = true; });
+  trendGvGrid.innerHTML = gvGridOptions(cur).map(g =>
+    '<button type="button" class="gv-opt' + (cur.granville === g.v ? ' on' : '') +
+    (candSetGrid[g.v] ? '' : ' opp') + '"' +
     ' data-gv-pick="' + g.v + '">' +
     '<span class="s">' + esc(g.short) + '</span>' +
     '<span class="l">' + esc(g.label.replace(/^[^（]*（/, '').replace(/）$/, '')) + '</span>' +
@@ -4661,10 +4724,11 @@ function renderTrendGv() {
   trendGvFig.classList.add('tappable');
 
   /* スナップ結果は必ず言語化して見せる（どこに丸め込まれたか分からないまま保存させない）。 */
+  const arrow = cur.state === 'down' ? '↘' : '↗';
+  const sideJa = cur.state === 'down' ? '売り' : '買い';
   const hint = trendGvShowAll
-    ? '売買8つから選んでいます。'
-    : '方向が' + (cur.state === 'down' ? '↘' : '↗') + 'なので'
-      + (cur.state === 'down' ? '売り' : '買い') + 'の波に絞っています（「売買8つすべて表示」で解除）。';
+    ? '8つ表示中ですが、方向が' + arrow + 'なので記録できるのは' + sideJa + 'の4つだけです。'
+    : '方向が' + arrow + 'なので' + sideJa + 'の波に絞っています（「売買8つすべて表示」で参考表示）。';
   trendGvReadout.innerHTML = (g
       ? '<b>' + esc(g.short) + '</b> ' + esc(g.label.replace(/^\S+\s*/, ''))
         + (tapped ? '' : '（ボタン選択・位置は概算）')
@@ -4706,6 +4770,15 @@ trendGvFig.addEventListener('click', (e) => {
 trendGvGrid.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-gv-pick]');
   if (!btn || !trendGvTarget) return;
+  /* ⚠️ S42: 逆 side を書くと mvWriteTrend() が即座に消して「押しても点かないボタン」になる。
+     書かずに理由を出す（タップ側と同じく、無反応な経路を1つも残さないため）。 */
+  const w0 = loadMarket().pairs.find(p => p.id === trendGvTarget.id);
+  const cur0 = (w0 && w0.trend && w0.trend[trendGvTarget.tf]) || {};
+  if (!gvCandidates(cur0).some(g => g.v === btn.dataset.gvPick)) {
+    showToast('方向が' + (cur0.state === 'down' ? '↘なので買い' : '↗なので売り') +
+              'の波は記録できません。先に方向を変えてください');
+    return;
+  }
   /* ボタンは「言葉で選ぶ」経路なので位置の記録は持たせない（wpos を空にして概算に戻す）。 */
   const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf,
                          { granville: btn.dataset.gvPick, wpos: '' });
@@ -4730,6 +4803,98 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && trendGvModal.classList.contains('show')) closeTrendGv();
 });
 
+/* ============ S42: 波マップの日次記録 ============
+   巡回で記録した波の位置を1日1枚のスナップショットとして残し、昨日・一昨日と比べられるようにする。
+   ⚠️ PWA はバックグラウンドで動けないので「毎日12時に自動保存」は原理的に不可。代わりに
+      🔭一覧タブを開くたびに今日の分を上書きする（＝最後に見た状態が今日の記録になる）。
+
+   ⚠️ 保存先は market doc の snapshots（S28 のマージ表に「id で集合和・at 昇順」の行が既にある）。
+      純追記ログなので端末間で競合しない ── だから同期コードは wmPrune の1行しか触っていない。 */
+const WM_KIND = 'wavemap';
+const WM_KEEP_DAYS = 30;
+
+/* ⚠️ toISOString().slice(0,10) は UTC なので JST では朝9時に日付が変わる。
+   朝の巡回と夜の巡回が別日になってしまうため、必ずローカル日付で切る。 */
+function wmDayKey(d) {
+  const t = d || new Date();
+  return t.getFullYear() + '-' +
+    String(t.getMonth() + 1).padStart(2, '0') + '-' +
+    String(t.getDate()).padStart(2, '0');
+}
+
+/* 波が記録されている足だけを1行にする。ペアは id ではなく名前で持つ
+   （S28 が pairs をペア名で突き合わせるのと同じ理由 ── id は端末ごとに採番される）。 */
+function wmBuildItems(pairs) {
+  const items = [];
+  (pairs || []).forEach(w => {
+    const st = pairStatus(w);
+    MV_TREND_TFS.forEach(t => {
+      const cur = (w.trend && w.trend[t.k]) || {};
+      if (!cur.granville) return;
+      const p = gvParsePos(cur.wpos);
+      items.push({
+        p: w.pair, t: t.k, g: cur.granville,
+        w: p ? Math.round(p.x) + ',' + Math.round(p.y) : '',
+        s: st,
+      });
+    });
+  });
+  return items;
+}
+
+function wmRecords(snaps) {
+  return (snaps || []).filter(s => s && s.kind === WM_KIND && s.day)
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)));
+}
+/* 同じ day が複数端末から来たら at が最新のものを採る（mergeLog は同一 id で先勝ちなので、
+   id を使い回して内容だけ差し替える方式は端末間で伝播しない）。 */
+function wmByDay(snaps) {
+  const map = {};
+  wmRecords(snaps).forEach(r => {
+    const cur = map[r.day];
+    if (!cur || Date.parse(r.at || 0) >= Date.parse(cur.at || 0)) map[r.day] = r;
+  });
+  return map;
+}
+function wmDays(snaps) { return Object.keys(wmByDay(snaps)).sort().reverse(); }
+
+/* ⚠️ プルーンは保存時とマージ結果の両方に掛ける。マージ側に掛けないと、片方の端末が
+   落とした古いレコードが mergeLog の集合和でそのまま戻り、落とす→戻るを永久に繰り返す。
+   ⚠️ wavemap 以外（既存の想定レコード）は無条件で残すこと。 */
+function wmPrune(snaps) {
+  const limit = wmDayKey(new Date(Date.now() - WM_KEEP_DAYS * 86400000));
+  return (snaps || []).filter(s =>
+    !s || s.kind !== WM_KIND || String(s.day || '') >= limit);
+}
+
+let wmAutoSaveFailed = false;
+
+/* 今日の分を差し替えて保存する。過去日は凍結されるので触らない。 */
+function wmSaveToday(silent) {
+  if (STORAGE_FAILED.market) return false;
+  const data = loadMarket();
+  const items = wmBuildItems(data.pairs);
+  /* 巡回前の空の状態で今日を確定させない（その日の記録が丸ごと残らなくなる）。 */
+  if (!items.length) return false;
+  const day = wmDayKey();
+  data.snapshots = wmPrune((data.snapshots || []).filter(s =>
+    !(s && s.kind === WM_KIND && s.day === day)));
+  data.snapshots.push({ id: mvGenId('wm'), at: new Date().toISOString(), day, kind: WM_KIND, items });
+  if (!saveMarket(data)) return false;
+  if (!silent) showToast('📸 ' + day + ' の波マップを記録しました（' + items.length + '件）');
+  return true;
+}
+
+/* 🔭一覧タブを開いたときの自動記録。
+   ⚠️ 容量超過で saveMarket が alert を出すため、一度失敗したらそのセッションでは二度と試さない
+      （タブを切り替えるたびにモーダルが出るのを防ぐ）。 */
+function wmAutoSaveOnOpen() {
+  if (wmAutoSaveFailed || STORAGE_FAILED.market) return;
+  const data = loadMarket();
+  if (!wmBuildItems(data.pairs).length) return;
+  if (!wmSaveToday(true)) wmAutoSaveFailed = true;
+}
+
 /* ---- 🗺 波マップ（S40） ---- */
 /* 巡回で記録した波の位置を通貨横断で1枚に重ねる。「今どの通貨がどの波にいるか」＝
    狙い目ゾーンに何が溜まっているかを一目で掴むための画面。
@@ -4741,33 +4906,83 @@ const trendMapTfs    = document.getElementById('trendMapTfs');
 const trendMapImg    = document.getElementById('trendMapImg');
 const trendMapDots   = document.getElementById('trendMapDots');
 const trendMapLegend = document.getElementById('trendMapLegend');
-let trendMapTf = '';   // 空なら開いたときに表示中の先頭の足を採る
+const trendMapTrail  = document.getElementById('trendMapTrail');
+const trendMapNote   = document.getElementById('trendMapNote');
+const trendMapPairSelect = document.getElementById('trendMapPairSelect');
+const trendMapDayLabel   = document.getElementById('trendMapDayLabel');
+let trendMapTf   = '';   // 空なら開いたときに表示中の先頭の足を採る
+let trendMapDay  = '';   // S42: '' = 今（ライブ）。それ以外は day キー
+let trendMapPair = '';   // S42: '' = 全銘柄。それ以外は単一銘柄モード（全時間足を重ねる）
 
-/* 図に載せる1件分。wpos があればその座標、無ければ波番号のアンカー位置（＝概算）。
-   どちらも無いペアは「記録なし」なので載せない。 */
-function trendMapEntry(w, tfKey) {
-  const cur = (w.trend && w.trend[tfKey]) || {};
-  const g = MV_GRANVILLE_MAP[cur.granville];
+function trendMapVisibleTfs() {
+  return trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
+}
+
+/* 図に載せる1件分の生成元。ライブ（w.trend）と過去日（スナップショットの items）で
+   入り口が2つあるので、座標の決め方はここ1箇所に集約する。
+   wpos があればその座標、無ければ波番号のアンカー位置（＝概算）。 */
+function trendMapEntryOf(src) {
+  const g = MV_GRANVILLE_MAP[src.granville];
   if (!g) return null;
-  const tapped = gvParsePos(cur.wpos);
+  const tapped = gvParsePos(src.wpos);
   const a = MV_GRANVILLE_ANCHORS[g.v];
+  const t = MV_TREND_TFS.find(x => x.k === src.tfKey);
   return {
-    w: w, g: g, approx: !tapped,
+    pair: src.pair, tfKey: src.tfKey, g: g, approx: !tapped,
     x: tapped ? tapped.x : a[0],
     y: tapped ? tapped.y : a[1],
-    status: pairStatus(w),
+    status: src.status || 'no',
+    /* 単一銘柄モードでは銘柄名ではなく足名を出す（同じ銘柄の日足と4Hを見分けるため）。 */
+    label: trendMapPair ? (t ? t.short : src.tfKey) : src.pair,
+    key: src.pair + '|' + src.tfKey,
   };
 }
 
-function trendMapEntries() {
-  const pairs = trendApplyFilters(loadMarket().pairs);
-  const list = pairs.map(w => trendMapEntry(w, trendMapTf)).filter(Boolean)
-    .sort((a, b) => String(a.w.pair).localeCompare(String(b.w.pair)));
+/* 今の状態から。⚠️ 絞り込みは trendApplyFilters() を共有しているので、単一銘柄の絞りは
+   ここで当てる（あちらに足すと 🔭一覧タブの表示まで変わってしまう）。 */
+function trendMapLiveEntries() {
+  let pairs = trendApplyFilters(loadMarket().pairs);
+  if (trendMapPair) pairs = pairs.filter(w => w.pair === trendMapPair);
+  const tfs = trendMapPair ? trendMapVisibleTfs() : [{ k: trendMapTf }];
+  const out = [];
+  pairs.forEach(w => {
+    const st = pairStatus(w);
+    tfs.forEach(t => {
+      const cur = (w.trend && w.trend[t.k]) || {};
+      const en = trendMapEntryOf({ pair: w.pair, tfKey: t.k, granville: cur.granville,
+                                   wpos: cur.wpos, status: st });
+      if (en) out.push(en);
+    });
+  });
+  return out;
+}
 
-  /* ほぼ同じ位置のものは小さな円周へ散らす。散らさないと重なった数だけラベルが隠れ、
-     「1ペアしか居ない」ように見えてしまう（概算はアンカーの一点に必ず全部重なる）。
-     ずらす量は最大でも数 % なので、どの波にいるかの読み取りは変わらない。 */
-  const cells = {};
+/* 過去日のレコードから。⚠️ items は p/t/g/w/s しか持たないので、鮮度と目線の絞り込みは
+   そもそも導出できない（renderTrendMap がその旨を注記に出す）。 */
+function trendMapDayEntries(rec) {
+  if (!rec) return [];
+  const tfOk = {};
+  (trendMapPair ? trendMapVisibleTfs() : [{ k: trendMapTf }]).forEach(t => { tfOk[t.k] = true; });
+  const out = [];
+  (rec.items || []).forEach(it => {
+    if (!tfOk[it.t]) return;
+    if (trendMapPair && it.p !== trendMapPair) return;
+    if (trendGoOnly && ['go', 'rd'].indexOf(it.s) < 0) return;
+    if (trendCategory && trendCategoryOf(it.p) !== trendCategory) return;
+    const en = trendMapEntryOf({ pair: it.p, tfKey: it.t, granville: it.g,
+                                 wpos: it.w, status: it.s });
+    if (en) out.push(en);
+  });
+  return out;
+}
+
+/* ほぼ同じ位置のものは小さな円周へ散らす。散らさないと重なった数だけラベルが隠れ、
+   「1ペアしか居ない」ように見えてしまう（概算はアンカーの一点に必ず全部重なる）。
+   ずらす量は最大でも数 % なので、どの波にいるかの読み取りは変わらない。
+   ⚠️ S42: ずらした量を key ごとに返すこと。前日レイヤーに同じ量を転写しないと、
+      当日と件数が1件違うだけで動いていないペアの点までズレ、実在しない軌跡線が引かれる。 */
+function wmScatter(list) {
+  const cells = {}, offsets = {};
   list.forEach(en => {
     const key = Math.round(en.x / 2) + ':' + Math.round(en.y / 2);
     (cells[key] = cells[key] || []).push(en);
@@ -4777,45 +4992,123 @@ function trendMapEntries() {
     if (group.length < 2) return;
     group.forEach((en, i) => {
       const a = i / group.length * Math.PI * 2;
-      en.x = +Math.min(99, Math.max(1, en.x + Math.cos(a) * 4.5)).toFixed(1);
-      en.y = +Math.min(97, Math.max(3, en.y + Math.sin(a) * 7.5)).toFixed(1);
+      const dx = Math.cos(a) * 4.5, dy = Math.sin(a) * 7.5;
+      offsets[en.key] = { dx, dy };
+      en.x = +Math.min(99, Math.max(1, en.x + dx)).toFixed(1);
+      en.y = +Math.min(97, Math.max(3, en.y + dy)).toFixed(1);
     });
   });
-  return list;
+  return offsets;
+}
+function wmApplyOffsets(list, offsets) {
+  list.forEach(en => {
+    const o = offsets[en.key];
+    if (!o) return;
+    en.x = +Math.min(99, Math.max(1, en.x + o.dx)).toFixed(1);
+    en.y = +Math.min(97, Math.max(3, en.y + o.dy)).toFixed(1);
+  });
+}
+
+function trendMapDotHtml(en, extra) {
+  const color = trendMapPair ? 'tf-' + en.tfKey : en.status;
+  return '<div class="gv-dot ' + color + (en.approx ? ' approx' : '') + (extra || '') +
+    '" style="left:' + en.x + '%;top:' + en.y + '%">' +
+    '<span class="pt"></span><span class="nm">' + esc(en.label) + '</span></div>';
 }
 
 function openTrendMap() {
-  const vis = trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
+  const vis = trendMapVisibleTfs();
   if (!vis.some(t => t.k === trendMapTf)) trendMapTf = vis[0].k;
+  /* 閉じて開いたら「今の全銘柄」に戻す（前回の絞り込みが残っていると迷子になる）。 */
+  trendMapDay = '';
+  trendMapPair = '';
   gvLoadImg(trendMapImg);
   renderTrendMap();
   trendMapModal.classList.add('show');
 }
 
 function renderTrendMap() {
-  const vis = trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
-  trendMapTfs.innerHTML = vis.map(t =>
-    '<button type="button" class="btn-ghost trend-filter-btn' + (t.k === trendMapTf ? ' on' : '') +
-    '" data-map-tf="' + t.k + '">' + esc(t.label) + '</button>').join('');
+  const data = loadMarket();
+  const vis = trendMapVisibleTfs();
+  if (!vis.some(t => t.k === trendMapTf)) trendMapTf = vis[0].k;
 
-  const entries = trendMapEntries();
-  trendMapMeta.textContent = entries.length + '件';
-  trendMapDots.innerHTML = entries.map(en =>
-    '<div class="gv-dot ' + en.status + (en.approx ? ' approx' : '') +
-    '" style="left:' + en.x + '%;top:' + en.y + '%">' +
-    '<span class="pt"></span><span class="nm">' + esc(en.w.pair) + '</span></div>').join('');
+  /* 銘柄プルダウン（記録の有無に関わらず全ペアを出す＝巡回対象がそのまま候補）。 */
+  const names = data.pairs.map(w => w.pair).sort((a, b) => String(a).localeCompare(String(b)));
+  trendMapPairSelect.innerHTML = '<option value="">全銘柄</option>' +
+    names.map(n => '<option value="' + esc(n) + '"' +
+      (n === trendMapPair ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
+
+  /* 単一銘柄モードでは全時間足を重ねるので、足タブは選択ではなく凡例になる。 */
+  trendMapTfs.innerHTML = vis.map(t =>
+    '<button type="button" class="btn-ghost trend-filter-btn' +
+    ((trendMapPair || t.k === trendMapTf) ? ' on' : '') +
+    '" data-map-tf="' + t.k + '"' + (trendMapPair ? ' disabled' : '') + '>' +
+    esc(t.label) + '</button>').join('');
+
+  const byDay = wmByDay(data.snapshots);
+  const days  = wmDays(data.snapshots);
+  const rec   = trendMapDay ? byDay[trendMapDay] : null;
+  trendMapDayLabel.textContent = trendMapDay || '今';
+
+  /* 当日レイヤー → 散らし → 前日レイヤーへ同じオフセットを転写して軌跡を引く。 */
+  const entries = trendMapDay ? trendMapDayEntries(rec) : trendMapLiveEntries();
+  entries.sort((a, b) => String(a.pair).localeCompare(String(b.pair)));
+  const offsets = wmScatter(entries);
+
+  /* ⚠️ ライブ表示のときは今日の分を比較対象から外す。一覧タブを開くたびに今日が保存される
+     ので、外さないと「今の状態」に対して今日のスナップショット＝自分自身が重なる。 */
+  const prevDay = trendMapDay
+    ? days.filter(d => d < trendMapDay)[0]
+    : days.filter(d => d < wmDayKey())[0];
+  const prev = prevDay ? trendMapDayEntries(byDay[prevDay]) : [];
+  wmApplyOffsets(prev, offsets);
+
+  trendMapMeta.textContent = entries.length + '件' +
+    (trendMapDay ? '（' + trendMapDay + ' 時点）' : '');
+
+  const prevAt = {};
+  prev.forEach(en => { prevAt[en.key] = en; });
+  trendMapTrail.innerHTML = entries.map(en => {
+    const p = prevAt[en.key];
+    /* 動いていないものに線は引かない（読み取りの邪魔にしかならない）。 */
+    if (!p || (Math.abs(p.x - en.x) < 0.6 && Math.abs(p.y - en.y) < 0.6)) return '';
+    return '<line class="' + (trendMapPair ? 'no' : en.status) + '" x1="' + p.x + '" y1="' + p.y +
+      '" x2="' + en.x + '" y2="' + en.y + '"></line>';
+  }).join('');
+
+  trendMapDots.innerHTML =
+    prev.filter(en => prevAt[en.key] && entries.some(e => e.key === en.key))
+        .map(en => trendMapDotHtml(en, ' prev')).join('') +
+    entries.map(en => trendMapDotHtml(en)).join('');
+
+  /* 何を見ているか・何が効いていないかを必ず書く（黙って無視するとフィルタが壊れて見える）。 */
+  const note = [];
+  note.push(prevDay
+    ? '薄いドットと線は ' + prevDay + ' からの動きです。'
+    : '比較できる過去の記録がまだありません（🔭一覧を開くたびに今日の分が記録されます）。');
+  if (trendMapDay) note.push('⚠ 過去日では「未更新のみ」「目線」の絞り込みは効きません（記録に含まれないため）。');
+  if (trendMapPair) note.push('単一銘柄モード：色は時間足を表します。');
+  trendMapNote.textContent = note.join(' ');
 
   /* 波番号ごとのテキスト一覧。ドットが重なっても、ここを見れば必ず全件読める。 */
+  const idOf = {};
+  data.pairs.forEach(w => { idOf[w.pair] = w.id; });
   trendMapLegend.innerHTML = MV_GRANVILLE_POSITIONS.map(g => {
     const inWave = entries.filter(en => en.g.v === g.v);
     return '<div class="grp"><span class="gname">' + esc(g.short) + '</span>' +
       '<span class="plist">' + (inWave.length
-        ? inWave.map(en =>
-            '<button type="button" class="' + en.status + (en.approx ? ' approx' : '') +
-            '" data-map-goto="' + esc(en.w.id) + '"' +
-            ' title="' + esc(en.w.pair + ' / ' + g.label +
-                             (en.approx ? '（ボタン選択・位置は概算）' : '（図の上で記録）')) + '">' +
-            esc(en.w.pair) + (en.approx ? ' <span class="st">◦</span>' : '') + '</button>').join('')
+        ? inWave.map(en => {
+            const title = en.pair + ' / ' + g.label +
+              (en.approx ? '（ボタン選択・位置は概算）' : '（図の上で記録）');
+            const text = esc(en.pair) + (trendMapPair ? ' ' + esc(en.label) : '') +
+              (en.approx ? ' <span class="st">◦</span>' : '');
+            /* 削除済みペアは一覧に飛べない。押しても何も起きないボタンは出さない。 */
+            const id = idOf[en.pair];
+            return id
+              ? '<button type="button" class="' + en.status + (en.approx ? ' approx' : '') +
+                '" data-map-goto="' + esc(id) + '" title="' + esc(title) + '">' + text + '</button>'
+              : '<span class="empty" title="' + esc(title) + '">' + text + '</span>';
+          }).join('')
         : '<span class="empty">—</span>') +
       '</span></div>';
   }).join('') +
@@ -4825,10 +5118,45 @@ function renderTrendMap() {
 
 function closeTrendMap() { trendMapModal.classList.remove('show'); }
 
+/* 日付で戻れる先＝今日より前の記録だけ（新しい順）。
+   ⚠️ 今日のスナップショットは一覧タブを開くたびに上書きされる＝「今」とほぼ同じ内容なので、
+      ナビの目盛から外す。外さないと ◀ ▶ が「今」と「今日」の間で無意味に1段寄り道する。 */
+function trendMapNavDays() {
+  const today = wmDayKey();
+  return wmDays(loadMarket().snapshots).filter(d => d < today);
+}
+
+/* 日付を1つ動かす。dir -1 = 過去へ / +1 = 未来へ（最後まで来たら「今」に戻る）。 */
+function trendMapStepDay(dir) {
+  const days = trendMapNavDays();   // 新しい順
+  if (!days.length) { showToast('比較できる過去の記録がまだありません'); return; }
+  if (dir < 0) {
+    const next = trendMapDay ? days.filter(d => d < trendMapDay)[0] : days[0];
+    if (!next) { showToast('これより古い記録はありません'); return; }
+    trendMapDay = next;
+  } else {
+    if (!trendMapDay) { showToast('すでに最新（今の状態）です'); return; }
+    const newer = days.filter(d => d > trendMapDay);
+    trendMapDay = newer.length ? newer[newer.length - 1] : '';
+  }
+  renderTrendMap();
+}
+
 trendMapTfs.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-map-tf]');
-  if (!btn) return;
+  if (!btn || trendMapPair) return;
   trendMapTf = btn.dataset.mapTf;
+  renderTrendMap();
+});
+trendMapPairSelect.addEventListener('change', () => {
+  trendMapPair = trendMapPairSelect.value;
+  renderTrendMap();
+});
+document.getElementById('trendMapPrev').addEventListener('click', () => trendMapStepDay(-1));
+document.getElementById('trendMapNext').addEventListener('click', () => trendMapStepDay(1));
+document.getElementById('trendMapShot').addEventListener('click', () => {
+  if (!wmSaveToday()) { showToast('記録できる波がまだありません'); return; }
+  trendMapDay = '';
   renderTrendMap();
 });
 
@@ -4873,7 +5201,8 @@ function setActiveTab(name, opts) {
   localStorage.setItem(TAB_KEY, name);
   /* 一覧タブは巡回中の記録では行単位でしか差し替えず、並べ替えを意図的に保留している。
      タブに戻ってきたこのタイミングが、グループ分けを最新にする自然な区切りになる。 */
-  if (name === 'trend') renderTrendList();
+  /* S42: 一覧を開くたびに今日の波マップを上書きする。過去日は凍結済みなので触らない。 */
+  if (name === 'trend') { wmAutoSaveOnOpen(); renderTrendList(); }
   if (name === 'settings') { renderStorageInfo(); renderStorageDiagnostics(); renderPwaStatus(); }
   if (!opts || !opts.keepScroll) {
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
@@ -5083,7 +5412,9 @@ function mergeDoc(localDoc, remoteDoc, tomb) {
     trades: mergeTrades(localDoc.trades, r.trades, tomb),
     market: {
       pairs:     mergePairs(lm.pairs, rm.pairs, tomb),
-      snapshots: mergeLog(lm.snapshots, rm.snapshots),
+      /* ⚠️ S42: マージ結果にもプルーンを掛ける。掛けないと片方が落とした古い日次記録が
+         集合和でそのまま戻り、落とす→戻るを永久に繰り返す。日付は決定的なので両端末が収束する。 */
+      snapshots: wmPrune(mergeLog(lm.snapshots, rm.snapshots)),
       judgeLog:  mergeLog(lm.judgeLog, rm.judgeLog),
     },
     tombstones: {
@@ -5095,6 +5426,7 @@ function mergeDoc(localDoc, remoteDoc, tomb) {
     trades:   merged.trades.length - (localDoc.trades || []).length,
     pairs:    merged.market.pairs.length - (lm.pairs || []).length,
     judgeLog: merged.market.judgeLog.length - (lm.judgeLog || []).length,
+    snapshots: merged.market.snapshots.length - (lm.snapshots || []).length,
   };
   return { merged, stats };
 }
