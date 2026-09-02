@@ -235,7 +235,8 @@ console.log('\n[7] 🗺 波マップ');
   ok('概算はアンカー座標に置かれる  [' + approx + ' / anchor ' + anchor3 + ']',
      approx.includes('left:' + anchor3 + '%'));
 
-  eq('凡例に2件出る', await page.locator('#trendMapLegend [data-map-goto]').count(), 2);
+  eq('凡例に2件出る', /* S43: 先頭の 🎯 圏内グループは同じペアを再掲するので、波番号別のグループだけ数える */
+     await page.locator('#trendMapLegend .grp:not(.entry) [data-map-goto]').count(), 2);
   ok('未記録のペアは凡例にも出ない',
      await page.locator('#trendMapLegend [data-map-goto="w3"]').count() === 0);
   /* 時間足タブ：4時間足には記録が無いので0件になる */
@@ -299,7 +300,8 @@ console.log('\n[8b] 重なりの解消');
     els => els.map(el => el.getAttribute('style')));
   eq('3件とも描かれる', styles.length, 3);
   eq('座標が重ならない  ' + JSON.stringify(styles), new Set(styles).size, 3);
-  eq('凡例には3件とも出る', await page.locator('#trendMapLegend [data-map-goto]').count(), 3);
+  eq('凡例には3件とも出る', /* S43: 先頭の 🎯 圏内グループは同じペアを再掲するので、波番号別のグループだけ数える */
+     await page.locator('#trendMapLegend .grp:not(.entry) [data-map-goto]').count(), 3);
   await page.context().close();
 }
 

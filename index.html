@@ -999,6 +999,23 @@
   .gv-dot.prev { opacity: 0.42; }
   .gv-dot.prev .nm { display: none; }
 
+  /* S43: エントリー圏（買②③ / 売②③のアンカー ± GV_ENTRY_RADIUS）。
+     ⚠️ width と height を同じ「%」で指定する＝画面上は横長の楕円になるのが正しい。
+        .gv-anchor の aspect-ratio:1/1（画面上の正円）と違い、gvEntryDistance() が測るのは
+        % 空間の距離なので、画面上の正円にすると圏の見た目と圏内判定がズレる。
+     ⚠️ 色はテーマ変数に任せない（図はテーマに関係なく白い画像。.gv-dot .nm と同じ理由）。 */
+  .gv-ezone {
+    position: absolute; transform: translate(-50%, -50%); border-radius: 50%;
+    border: 1.5px solid rgba(12, 163, 12, 0.55);
+    background: rgba(12, 163, 12, 0.10);
+  }
+  /* 圏内のドット。⚠️ 前日レイヤーには付けない（過去の位置が光ると「今どこが圏内か」が読めない）。 */
+  .gv-dot.hot .pt {
+    width: 13px; height: 13px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 4.5px rgba(12, 163, 12, 0.55);
+  }
+  .gv-dot.hot .nm { color: #0a5c0a; box-shadow: 0 0 0 1.5px rgba(12, 163, 12, 0.7); }
+
   /* S42: 軌跡線。⚠️ viewBox を潰して使うので non-scaling-stroke が無いと線幅が縦横で歪む。 */
   .gv-trail { position: absolute; inset: 0; pointer-events: none; }
   .gv-trail line {
@@ -1017,7 +1034,8 @@
   .gv-daynav { display: flex; align-items: center; gap: 3px; }
   .gv-daynav b { min-width: 84px; text-align: center; font-size: 11.5px; color: var(--ink-2); }
   .gv-daynav button { padding: 4px 8px; }
-  #trendMapShot { margin-left: auto; padding: 5px 10px; font-size: 11.5px; }
+  #trendMapEntryOnly, #trendMapShot { padding: 5px 10px; font-size: 11.5px; }
+  #trendMapEntryOnly { margin-left: auto; }
   .gv-mapnote { margin-bottom: 10px; font-size: 11px; color: var(--ink-muted); line-height: 1.5; }
 
   .gv-legend { margin-bottom: 14px; font-size: 12px; }
@@ -1484,6 +1502,8 @@
         <b id="trendMapDayLabel">今</b>
         <button type="button" class="btn-ghost" id="trendMapNext" title="次の日">▶</button>
       </span>
+      <button type="button" class="btn-ghost" id="trendMapEntryOnly"
+              title="エントリー水準（買②③/売②③）に近い位置で記録したものだけを表示します">🎯 エントリー圏のみ</button>
       <button type="button" class="btn-ghost" id="trendMapShot"
               title="今日の波マップを今の状態で上書き保存します">📸 記録</button>
     </div>
@@ -1493,6 +1513,8 @@
       <!-- 軌跡線。% 座標をそのまま流すため viewBox 0-100 ＋ preserveAspectRatio="none" -->
       <svg class="gv-trail" id="trendMapTrail" viewBox="0 0 100 100"
            preserveAspectRatio="none" aria-hidden="true"></svg>
+      <!-- S43: エントリー圏。軌跡線より上・ドットより下に敷く -->
+      <div class="gv-dots" id="trendMapZones"></div>
       <div class="gv-dots" id="trendMapDots"></div>
     </div>
     <div class="gv-mapnote" id="trendMapNote"></div>
@@ -1577,6 +1599,26 @@ function gvNearest(x, y, cands) {
     if (!a) return;
     const d = (a[0] - x) * (a[0] - x) + (a[1] - y) * (a[1] - y);
     if (d < bestD) { bestD = d; best = g; }
+  });
+  return best;
+}
+
+/* S43: エントリー水準（買②③ / 売②③）のアンカーからの近さ。
+   ⚠️ 圏の波は別配列を作らず SETUP_GO_WAVES をそのまま参照する。GO の波を増減したときに
+      波マップの圏だけ取り残されると、判定と見た目が食い違う。
+      （SETUP_GO_WAVES の定義はこの下だが、関数の中なので呼ばれる時点では解決している。）
+   ⚠️ 距離の測り方は gvNearest() と必ず同じ（% 座標の素の二乗距離）にすること。
+      画像は横長なので幾何学的には x と y で縮尺が違うが、ここで補正すると
+      「買②と表示されているのに買③の圏内」という食い違いが起きる。
+      スナップ結果との一致 > 幾何学的な正しさ。 */
+const GV_ENTRY_RADIUS = 10;   /* % 座標での半径。8アンカーの最近接距離（約19.5）の半分が上限 */
+function gvEntryDistance(x, y) {
+  let best = null;
+  SETUP_GO_WAVES.forEach(v => {
+    const a = MV_GRANVILLE_ANCHORS[v];
+    if (!a) return;
+    const d = Math.sqrt((a[0] - x) * (a[0] - x) + (a[1] - y) * (a[1] - y));
+    if (best === null || d < best) best = d;
   });
   return best;
 }
@@ -4910,9 +4952,12 @@ const trendMapTrail  = document.getElementById('trendMapTrail');
 const trendMapNote   = document.getElementById('trendMapNote');
 const trendMapPairSelect = document.getElementById('trendMapPairSelect');
 const trendMapDayLabel   = document.getElementById('trendMapDayLabel');
+const trendMapZones      = document.getElementById('trendMapZones');
+const trendMapEntryBtn   = document.getElementById('trendMapEntryOnly');
 let trendMapTf   = '';   // 空なら開いたときに表示中の先頭の足を採る
 let trendMapDay  = '';   // S42: '' = 今（ライブ）。それ以外は day キー
 let trendMapPair = '';   // S42: '' = 全銘柄。それ以外は単一銘柄モード（全時間足を重ねる）
+let trendMapEntryOnly = false;  // S43: エントリー圏内の記録だけに絞る
 
 function trendMapVisibleTfs() {
   return trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
@@ -4927,8 +4972,15 @@ function trendMapEntryOf(src) {
   const tapped = gvParsePos(src.wpos);
   const a = MV_GRANVILLE_ANCHORS[g.v];
   const t = MV_TREND_TFS.find(x => x.k === src.tfKey);
+  /* S43: エントリー水準への近さ。
+     ⚠️ 概算（ボタンで選んだだけ＝tapped なし）は座標がアンカーそのものなので距離 0 になり、
+        買②③・売②③を選んだ全件が無条件で「圏内」になってしまう。位置を測っていない記録は
+        圏外扱いにする（その旨は #trendMapNote に出す）。 */
+  const dist = tapped ? gvEntryDistance(tapped.x, tapped.y) : null;
   return {
     pair: src.pair, tfKey: src.tfKey, g: g, approx: !tapped,
+    dist: dist,
+    hot: dist !== null && dist <= GV_ENTRY_RADIUS,
     x: tapped ? tapped.x : a[0],
     y: tapped ? tapped.y : a[1],
     status: src.status || 'no',
@@ -5011,7 +5063,9 @@ function wmApplyOffsets(list, offsets) {
 
 function trendMapDotHtml(en, extra) {
   const color = trendMapPair ? 'tf-' + en.tfKey : en.status;
-  return '<div class="gv-dot ' + color + (en.approx ? ' approx' : '') + (extra || '') +
+  /* ⚠️ hot は当日レイヤーだけ。前日（extra に ' prev'）まで光ると今どこが圏内か読めない。 */
+  const hot = (en.hot && !(extra || '').includes('prev')) ? ' hot' : '';
+  return '<div class="gv-dot ' + color + (en.approx ? ' approx' : '') + hot + (extra || '') +
     '" style="left:' + en.x + '%;top:' + en.y + '%">' +
     '<span class="pt"></span><span class="nm">' + esc(en.label) + '</span></div>';
 }
@@ -5022,6 +5076,7 @@ function openTrendMap() {
   /* 閉じて開いたら「今の全銘柄」に戻す（前回の絞り込みが残っていると迷子になる）。 */
   trendMapDay = '';
   trendMapPair = '';
+  trendMapEntryOnly = false;
   gvLoadImg(trendMapImg);
   renderTrendMap();
   trendMapModal.classList.add('show');
@@ -5051,9 +5106,22 @@ function renderTrendMap() {
   trendMapDayLabel.textContent = trendMapDay || '今';
 
   /* 当日レイヤー → 散らし → 前日レイヤーへ同じオフセットを転写して軌跡を引く。 */
-  const entries = trendMapDay ? trendMapDayEntries(rec) : trendMapLiveEntries();
+  let entries = trendMapDay ? trendMapDayEntries(rec) : trendMapLiveEntries();
+  const hotAll = entries.filter(en => en.hot).length;
+  /* ⚠️ 絞り込みは wmScatter() より前。散らしは同一セル内の件数と並び順で角度が決まるので、
+        絞った後の集合で計算しないと前日レイヤーへ転写するオフセットが噛み合わない。 */
+  if (trendMapEntryOnly) entries = entries.filter(en => en.hot);
   entries.sort((a, b) => String(a.pair).localeCompare(String(b.pair)));
   const offsets = wmScatter(entries);
+  trendMapEntryBtn.classList.toggle('on', trendMapEntryOnly);
+
+  /* エントリー水準の圏。⚠️ 幅と高さを同じ % にする（CSS の .gv-ezone 参照）。 */
+  trendMapZones.innerHTML = SETUP_GO_WAVES.map(v => {
+    const a = MV_GRANVILLE_ANCHORS[v], g = MV_GRANVILLE_MAP[v];
+    if (!a || !g) return '';
+    return '<div class="gv-ezone" title="' + esc(g.label) + '" style="left:' + a[0] + '%;top:' + a[1] +
+      '%;width:' + (GV_ENTRY_RADIUS * 2) + '%;height:' + (GV_ENTRY_RADIUS * 2) + '%"></div>';
+  }).join('');
 
   /* ⚠️ ライブ表示のときは今日の分を比較対象から外す。一覧タブを開くたびに今日が保存される
      ので、外さないと「今の状態」に対して今日のスナップショット＝自分自身が重なる。 */
@@ -5064,6 +5132,7 @@ function renderTrendMap() {
   wmApplyOffsets(prev, offsets);
 
   trendMapMeta.textContent = entries.length + '件' +
+    (trendMapEntryOnly ? '' : '（うち 🎯 ' + hotAll + '件）') +
     (trendMapDay ? '（' + trendMapDay + ' 時点）' : '');
 
   const prevAt = {};
@@ -5088,32 +5157,45 @@ function renderTrendMap() {
     : '比較できる過去の記録がまだありません（🔭一覧を開くたびに今日の分が記録されます）。');
   if (trendMapDay) note.push('⚠ 過去日では「未更新のみ」「目線」の絞り込みは効きません（記録に含まれないため）。');
   if (trendMapPair) note.push('単一銘柄モード：色は時間足を表します。');
+  note.push('🎯 の緑の圏はエントリー水準（買②③ / 売②③）です。' +
+    '◦ 概算（ボタン選択）は位置を測っていないため圏内に数えません。');
+  if (trendMapEntryOnly) note.push('⚠ いま圏内の記録だけを表示しています。');
   trendMapNote.textContent = note.join(' ');
 
   /* 波番号ごとのテキスト一覧。ドットが重なっても、ここを見れば必ず全件読める。 */
   const idOf = {};
   data.pairs.forEach(w => { idOf[w.pair] = w.id; });
-  trendMapLegend.innerHTML = MV_GRANVILLE_POSITIONS.map(g => {
+  const legendChip = (en, suffix) => {
+    const title = en.pair + ' / ' + en.g.label +
+      (en.approx ? '（ボタン選択・位置は概算）' : '（図の上で記録）') +
+      (en.dist !== null ? ' / エントリー水準まで ' + en.dist.toFixed(1) + '%' : '');
+    const text = esc(en.pair) + (trendMapPair ? ' ' + esc(en.label) : '') + (suffix || '') +
+      (en.approx ? ' <span class="st">◦</span>' : '');
+    /* 削除済みペアは一覧に飛べない。押しても何も起きないボタンは出さない。 */
+    const id = idOf[en.pair];
+    return id
+      ? '<button type="button" class="' + en.status + (en.approx ? ' approx' : '') +
+        '" data-map-goto="' + esc(id) + '" title="' + esc(title) + '">' + text + '</button>'
+      : '<span class="empty" title="' + esc(title) + '">' + text + '</span>';
+  };
+
+  /* S43: エントリー圏に入っているものを先頭にまとめる（近い順）。ここが「今すぐ見る通貨」。 */
+  const hot = entries.filter(en => en.hot).sort((a, b) => a.dist - b.dist);
+  trendMapLegend.innerHTML =
+    '<div class="grp entry"><span class="gname">🎯 圏内（' + hot.length + '）</span>' +
+    '<span class="plist">' + (hot.length
+      ? hot.map(en => legendChip(en, ' ' + esc(en.g.short) + ' ' + en.dist.toFixed(0) + '%')).join('')
+      : '<span class="empty">—</span>') + '</span></div>' +
+  MV_GRANVILLE_POSITIONS.map(g => {
     const inWave = entries.filter(en => en.g.v === g.v);
     return '<div class="grp"><span class="gname">' + esc(g.short) + '</span>' +
       '<span class="plist">' + (inWave.length
-        ? inWave.map(en => {
-            const title = en.pair + ' / ' + g.label +
-              (en.approx ? '（ボタン選択・位置は概算）' : '（図の上で記録）');
-            const text = esc(en.pair) + (trendMapPair ? ' ' + esc(en.label) : '') +
-              (en.approx ? ' <span class="st">◦</span>' : '');
-            /* 削除済みペアは一覧に飛べない。押しても何も起きないボタンは出さない。 */
-            const id = idOf[en.pair];
-            return id
-              ? '<button type="button" class="' + en.status + (en.approx ? ' approx' : '') +
-                '" data-map-goto="' + esc(id) + '" title="' + esc(title) + '">' + text + '</button>'
-              : '<span class="empty" title="' + esc(title) + '">' + text + '</span>';
-          }).join('')
+        ? inWave.map(en => legendChip(en, '')).join('')
         : '<span class="empty">—</span>') +
       '</span></div>';
   }).join('') +
     '<div class="grp"><span class="gname"></span><span class="plist empty">' +
-    '実線＝図の上でタップした位置／◦ 破線＝ボタン選択の概算</span></div>';
+    '実線＝図の上でタップした位置／◦ 破線＝ボタン選択の概算（🎯 圏内には数えません）</span></div>';
 }
 
 function closeTrendMap() { trendMapModal.classList.remove('show'); }
@@ -5150,6 +5232,10 @@ trendMapTfs.addEventListener('click', (e) => {
 });
 trendMapPairSelect.addEventListener('change', () => {
   trendMapPair = trendMapPairSelect.value;
+  renderTrendMap();
+});
+trendMapEntryBtn.addEventListener('click', () => {
+  trendMapEntryOnly = !trendMapEntryOnly;
   renderTrendMap();
 });
 document.getElementById('trendMapPrev').addEventListener('click', () => trendMapStepDay(-1));

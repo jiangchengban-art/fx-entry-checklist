@@ -6,7 +6,7 @@
  * ⚠ index.html を更新したら CACHE の版番号を上げること。
  *   上げ忘れても HTML は network-first なので最新が届くが、assets の差し替えは届かない。
  */
-const CACHE = 'fx-checklist-v16';
+const CACHE = 'fx-checklist-v17';
 
 /* 起動に最低限必要なもの。画像は重いので事前取得せず、使われたときに入れる。 */
 const PRECACHE = ['./', './index.html', './manifest.webmanifest',
