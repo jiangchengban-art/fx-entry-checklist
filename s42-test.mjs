@@ -68,10 +68,9 @@ console.log('\n[③-1] 図のどこをタップしても必ず記録される');
     },
   }, { width: 375, height: 800 });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-granville-open][data-tf="d"]');
+  await page.click('[data-trend-item="w1"] [data-trend-granville-open][data-tf="d"]');
 
-  /* 「売買8つすべて表示」ON でも、売りアンカー近傍のタップが消えない */
-  await page.click('#trendGvAll');
+  /* 売りアンカーの直上をタップしても、方向側（買い）へスナップして消えない */
   await tapFig(page, '#trendGvFig', 78, 22);      // 売②のアンカー直上
   const d = await trendOf(page, 'w1', 'd');
   ok('売②の真上でも買いの波にスナップ  [' + d.granville + ']', ['1', '2', '3', '4'].includes(d.granville));
@@ -90,7 +89,9 @@ console.log('\n[③-1] 図のどこをタップしても必ず記録される');
   await page.context().close();
 }
 
-console.log('\n[③-2] 逆側のボタンは書かずに理由を出す');
+/* S44: 8ボタン（と「売買8つすべて表示」）は撤去した。逆側ボタンという概念そのものが消えたので、
+   ここでは「選択UIが残っていないこと」と「図のタップだけで完結すること」を見る。 */
+console.log('\n[③-2] 選択ボタンは撤去され、記録経路は図のタップだけ');
 {
   const page = await newPage({
     [MARKET]: {
@@ -99,14 +100,13 @@ console.log('\n[③-2] 逆側のボタンは書かずに理由を出す');
     },
   });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-granville-open][data-tf="d"]');
-  eq('既定は買い4つだけ', await page.locator('#trendGvGrid .gv-opt').count(), 4);
-  await page.click('#trendGvAll');
-  eq('8つ表示になる', await page.locator('#trendGvGrid .gv-opt').count(), 8);
-  eq('逆側は参考表示（.opp）が4つ', await page.locator('#trendGvGrid .gv-opt.opp').count(), 4);
-  await page.click('#trendGvGrid .gv-opt.opp');
-  eq('押しても波は変わらない', (await trendOf(page, 'w1', 'd')).granville, '2');
-  ok('理由が toast で出る', await page.locator('#toast.show').count() === 1);
+  await page.click('[data-trend-item="w1"] [data-trend-granville-open][data-tf="d"]');
+  eq('8ボタンのグリッドが無い', await page.locator('#trendGvGrid').count(), 0);
+  eq('「売買8つすべて表示」が無い', await page.locator('#trendGvAll').count(), 0);
+  eq('波の選択ボタンが1つも無い', await page.locator('[data-gv-pick]').count(), 0);
+  /* 図のタップは従来どおり効く（方向側へスナップ） */
+  await tapFig(page, '#trendGvFig', 46, 39);
+  eq('図のタップで波が変わる', (await trendOf(page, 'w1', 'd')).granville, '3');
   await page.context().close();
 }
 

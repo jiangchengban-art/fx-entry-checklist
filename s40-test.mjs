@@ -51,6 +51,11 @@ const seedOne = (trend) => ({
   [MARKET]: { pairs: [mkPair('w1', 'USDJPY', trend ? { trend } : {})], snapshots: [], judgeLog: [] },
 });
 
+/* ⚠️ loadMarket() がプリセット28銘柄を自動生成するので、行のセレクタは必ずペアで絞ること。
+   S44 で並び順が「エントリー圏に近い順」になり、seed したペアが先頭とは限らなくなった。 */
+const W1 = '[data-trend-item="w1"] ';
+const GV_D = W1 + '[data-trend-granville-open][data-tf="d"]';
+
 /* ─────────────────────────────────────────────────────────
    1. 移行：wpos を持たない旧データを読んでも壊れない
    ───────────────────────────────────────────────────────── */
@@ -76,7 +81,7 @@ console.log('\n[2] 図のタップ（375px）');
   const page = await newPage(seedOne({ d: { state: 'up', zone: 'green', granville: '' } }),
                              { width: 375, height: 800 });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-granville-open][data-tf="d"]');
+  await page.click(GV_D);
   ok('ピッカーが開く', await page.locator('#trendGvModal.show').isVisible());
   ok('図がタップ面になっている', await page.locator('#trendGvFig.tappable').isVisible());
   eq('アンカーの目印が8つ出る', await page.locator('#trendGvAnchors .gv-anchor').count(), 8);
@@ -91,7 +96,8 @@ console.log('\n[2] 図のタップ（375px）');
   ok('タップ位置が wpos に残る  [' + d.wpos + ']',
      Math.abs(p[0] - 36) < 1 && Math.abs(p[1] - 70) < 1);
   ok('マーカーが出る', await page.locator('#trendGvMarker').isVisible());
-  ok('スナップ結果が言語化される', (await page.textContent('#trendGvReadout')).includes('買②'));
+  /* S44: 読み取り表示は波番号ではなくエントリー圏との距離（買②のアンカーの手前＝圏内）。 */
+  ok('圏との距離が言語化される', (await page.textContent('#trendGvReadout')).includes('エントリー圏内'));
   ok('タップしてもモーダルは閉じない（押し直せる）',
      await page.locator('#trendGvModal.show').isVisible());
 
@@ -111,49 +117,38 @@ console.log('\n[3] 逆側タップ（mvWriteTrend の自動クリア回避）');
   const page = await newPage(seedOne({ d: { state: 'up', zone: 'green', granville: '' } }),
                              { width: 375, height: 800 });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-granville-open][data-tf="d"]');
-  eq('既定の候補は買い4つだけ', await page.locator('#trendGvGrid .gv-opt').count(), 4);
+  await page.click(GV_D);
+  /* S44: 8ボタンは撤去。図のタップだけが記録経路になった。 */
+  eq('選択ボタンは撤去されている', await page.locator('#trendGvGrid, #trendGvAll').count(), 0);
   /* 売②のアンカー（74.2, 24.5）の上をタップする＝買いの候補しかないので買③あたりへ落ちる */
   await tapFig(page, '#trendGvFig', 74, 24);
   const d = await trendOf(page, 'w1', 'd');
   ok('買いの波にスナップする  [' + d.granville + ']', ['1', '2', '3', '4'].includes(d.granville));
-  ok('保存直後に消えない', d.granville !== '' && d.wpos !== '');
-
-  /* S42: 「売買8つすべて表示」はグリッドの見た目だけ。書き込み経路は方向側に絞ったまま */
-  await page.click('#trendGvAll');
-  eq('8択になる', await page.locator('#trendGvGrid .gv-opt').count(), 8);
-  eq('逆側の4つは参考表示（.opp）', await page.locator('#trendGvGrid .gv-opt.opp').count(), 4);
-  await tapFig(page, '#trendGvFig', 74, 24);
-  const d2 = await trendOf(page, 'w1', 'd');
-  ok('8択表示でもタップは買いの波にスナップする  [' + d2.granville + ']',
-     ['1', '2', '3', '4'].includes(d2.granville));
-  ok('保存直後に消えない（無反応領域がゼロ）', d2.granville !== '' && d2.wpos !== '');
-
-  /* 逆側のボタンは書き込まずに理由を出す（押しても点かないボタンを残さない） */
-  await page.click('#trendGvGrid .gv-opt.opp');
-  const d3 = await trendOf(page, 'w1', 'd');
-  eq('逆側ボタンを押しても波は変わらない', d3.granville, d2.granville);
-  ok('代わりに理由が出る', await page.locator('#toast.show').count() === 1);
+  ok('保存直後に消えない（無反応領域がゼロ）', d.granville !== '' && d.wpos !== '');
   await page.context().close();
 }
 
 /* ─────────────────────────────────────────────────────────
-   4. 8ボタンは概算（wpos を空にする）
+   4. 読み取り表示（S44：波番号ではなくエントリー圏との距離）とクリア
    ───────────────────────────────────────────────────────── */
-console.log('\n[4] 8ボタンとの併用');
+console.log('\n[4] 読み取り表示とクリア');
 {
   const page = await newPage(seedOne({ d: { state: 'up', zone: 'green', granville: '' } }),
                              { width: 375, height: 800 });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-granville-open][data-tf="d"]');
+  await page.click(GV_D);
+  ok('未タップでは案内が出る', (await page.textContent('#trendGvReadout')).includes('タップ'));
   await tapFig(page, '#trendGvFig', 36, 70);
   ok('タップで wpos が入る', (await trendOf(page, 'w1', 'd')).wpos !== '');
-  await page.click('[data-gv-pick="3"]');
-  const d = await trendOf(page, 'w1', 'd');
-  eq('ボタンで波が変わる', d.granville, '3');
-  eq('ボタン選択は概算なので wpos が消える', d.wpos, '');
-  ok('ボタンでもモーダルは閉じない', await page.locator('#trendGvModal.show').isVisible());
-  ok('マーカーはアンカー位置へ移る', await page.locator('#trendGvMarker').isVisible());
+  ok('圏内なら圏内と出る', (await page.textContent('#trendGvReadout')).includes('エントリー圏内'));
+
+  /* 圏から離れた位置（買①のあたり）をタップすると圏外表示になる */
+  await tapFig(page, '#trendGvFig', 15, 73);
+  const far = await page.textContent('#trendGvReadout');
+  ok('圏外なら距離が出る  [' + far.slice(0, 30) + ']',
+     far.includes('圏外') && far.includes('エントリー水準まで'));
+  ok('タップしてもモーダルは閉じない', await page.locator('#trendGvModal.show').isVisible());
+  ok('マーカーが出ている', await page.locator('#trendGvMarker').isVisible());
 
   /* クリアは両方落として閉じる */
   await page.click('#trendGvClear');
@@ -172,7 +167,7 @@ console.log('\n[5] 一覧行への反映');
   const page = await newPage(seedOne({ d: { state: 'up', zone: 'green', granville: '' } }),
                              { width: 900, height: 900 });
   await page.click('[data-tab="trend"]');
-  const chip = '[data-trend-granville-open][data-tf="d"]';
+  const chip = GV_D;
   eq('記録前は「波?」', (await page.textContent(chip)).trim(), '波?');
   await page.click(chip);
   await tapFig(page, '#trendGvFig', 36, 70);
@@ -180,12 +175,23 @@ console.log('\n[5] 一覧行への反映');
   ok('閉じると行のチップが更新される', (await page.textContent(chip)).includes('買②'));
   eq('タップ記録の行にはミニ波形が出る', await page.locator(chip + ' .gv-mini').count(), 1);
 
-  /* ボタン選択に切り替えるとミニ波形が消える */
-  await page.click(chip);
-  await page.click('[data-gv-pick="3"]');
-  await page.click('#trendGvCancel');
+  /* S44: 圏内なので 🎯 チップと「根拠」ボタンが同じ行に出る */
+  eq('圏内の行に 🎯 が出る', await page.locator(W1 + '.trend-tf .tent').count(), 1);
+  eq('根拠パネルを開くボタンが出る',
+     await page.locator(W1 + '[data-trend-panel-open][data-tf="d"]').count(), 1);
+
+  /* 概算（wpos なし）の記録にはミニ波形も 🎯 も出ない */
+  await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('mochipoyo_market_view_v1'));
+    const w = d.pairs.find(p => p.id === 'w1');
+    w.trend.d.granville = '3'; w.trend.d.wpos = '';
+    localStorage.setItem('mochipoyo_market_view_v1', JSON.stringify(d));
+  });
+  await page.reload();
+  await page.click('[data-tab="trend"]');
   eq('概算の行にはミニ波形を出さない', await page.locator(chip + ' .gv-mini').count(), 0);
   ok('文字ラベルは残る', (await page.textContent(chip)).includes('買③'));
+  eq('概算は圏内に数えないので 🎯 も出ない', await page.locator(W1 + '.trend-tf .tent').count(), 0);
   await page.context().close();
 }
 
@@ -261,9 +267,9 @@ console.log('\n[8] マップと絞り込みの連動');
   const page = await newPage({
     [MARKET]: {
       pairs: [
-        /* 買② + 緑 + ↗ = GO */
+        /* 買②のアンカー付近をタップ＝エントリー圏内 */
         mkPair('w1', 'USDJPY', { trend: { d: { state: 'up', zone: 'green', granville: '2', wpos: '36.0,70.0' } } }),
-        /* 買① は SETUP_GO_WAVES 外なので WAIT */
+        /* 買① は SETUP_GO_WAVES 外なので圏外 */
         mkPair('w2', 'EURUSD', { trend: { d: { state: 'up', zone: 'green', granville: '1', wpos: '20.0,85.0' } } }),
       ],
       snapshots: [], judgeLog: [],
@@ -273,10 +279,10 @@ console.log('\n[8] マップと絞り込みの連動');
   await page.click('#trendMapOpen');
   eq('絞り込みなしでは2件', await page.locator('#trendMapDots .gv-dot').count(), 2);
   await page.click('#trendMapClose');
-  await page.click('#trendFilterAligned');            /* 🟢 GO のみ */
+  await page.click('#trendFilterAligned');            /* S44: 🎯 エントリー圏のみ */
   await page.click('#trendMapOpen');
-  eq('GO のみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
-  ok('残るのは GO のペア', await page.locator('#trendMapDots .gv-dot.go').count() === 1);
+  eq('エントリー圏のみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
+  ok('残るのは圏内のペア', await page.locator('#trendMapDots .gv-dot.hot').count() === 1);
   await page.context().close();
 }
 
@@ -336,7 +342,7 @@ console.log('\n[9] 375px のレイアウト');
   ok('行がはみ出さない  ' + JSON.stringify(row), row.need <= row.has + 1);
   await page.screenshot({ path: 's40-01-trend-375.png', fullPage: true });
 
-  await page.click('[data-trend-granville-open][data-tf="d"]');
+  await page.click(GV_D);
   await page.screenshot({ path: 's40-02-picker-375.png' });
   await page.click('#trendGvCancel');
   await page.click('#trendMapOpen');

@@ -796,26 +796,6 @@
   .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
 
-  /* S32: セットアップ自動判定のバッジ。「日 GO 買②」「4H WAIT ゾーン待ち」の形で、
-     どちらの上位足で狙えるか＋あと何を見れば GO になるかを行内で示す。 */
-  .setup-badges { display: inline-flex; gap: 5px; flex: none; }
-  .sbadge {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
-    padding: 2px 7px; border-radius: 999px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
-  }
-  .sbadge b { font-weight: 700; opacity: 0.72; }
-  .sbadge i { font-style: normal; font-weight: 600; font-size: 10px; opacity: 0.85; }
-  .sbadge.rd   { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
-  .sbadge.go   { color: var(--good); border-color: var(--good); background: var(--good-soft); }
-  .sbadge.wait { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
-  .sbadge.no   { opacity: 0.6; }
-  /* S33: バッジは根拠パネルの開閉ボタンを兼ねる（ボードでは span のまま＝押せない）。 */
-  button.sbadge { cursor: pointer; font-family: inherit; }
-  button.sbadge:active { transform: scale(0.96); }
-  .sbadge.open { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
-
   /* S33: 根拠パネル。上位足とエントリー足を横並び2列にして、375pxでも縦に伸ばさない。 */
   .trend-panel {
     border-top: 1px solid var(--border);
@@ -866,13 +846,16 @@
   .tp-conf { font-size: 11px; color: var(--good); margin-bottom: 6px; }
   .tp-conf b { font-size: 12px; }
 
-  /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル。 */
+  /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル／🎯圏内＋根拠。
+     ⚠️ S44 で grid から flex にした。末尾の 🎯 と「根拠」は圏内のときだけ出る＝子要素の数が
+        行ごとに変わるので、固定の列定義では足の数だけ空列がズレる。 */
   .trend-tf {
-    display: grid; grid-template-columns: 30px auto auto 1fr;
+    display: flex; flex-wrap: wrap;
     gap: 6px; align-items: center; padding: 4px 11px 4px 9px;
   }
   .trend-tf:last-child { padding-bottom: 9px; }
   .trend-tf .tf {
+    flex: 0 0 30px;
     font-size: 10.5px; font-weight: 700; color: var(--ink-muted); text-align: right;
   }
   .trend-tf .tgroup { display: inline-flex; gap: 4px; }
@@ -984,13 +967,11 @@
     padding: 0 3px; border-radius: 4px; color: #22201d;
     background: rgba(255, 255, 255, 0.88); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
   }
-  .gv-dot.go   { color: var(--good); }
-  .gv-dot.wait { color: var(--warn); }
-  .gv-dot.rd   { color: var(--accent); }
-  .gv-dot.no   { color: #8a8a8a; }
-  /* S42: 単一銘柄モードは足ごとに色を変える。
-     ⚠️ pairStatus() はペア単位なので、1銘柄では全足が同じ status 色になって用を成さない。
-        status は .pt の中空/実線（＝記録の質）だけに残し、色は足の識別に振り直す。 */
+  /* S44: GO/WAIT/NO の色分けは廃止。全ペアモードは中立色1色にし、注目させるのは
+     エントリー圏内（.hot）だけにする（色が4つあると圏内の緑が埋もれる）。 */
+  .gv-dot.plain { color: #8a8a8a; }
+  /* S42: 単一銘柄モードは足ごとに色を変える。1銘柄では全足が同じ色になって用を成さないため、
+     記録の質（タップ＝実線／ボタン＝中空）は .pt に残し、色は足の識別に振り直す。 */
   .gv-dot.tf-d  { color: #d1620b; }
   .gv-dot.tf-h4 { color: #2a78d6; }
   .gv-dot.tf-w  { color: #7a3fbf; }
@@ -1022,10 +1003,7 @@
     stroke: currentColor; stroke-width: 1.5; stroke-linecap: round;
     opacity: 0.55; vector-effect: non-scaling-stroke;
   }
-  .gv-trail line.go   { color: var(--good); }
-  .gv-trail line.wait { color: var(--warn); }
-  .gv-trail line.rd   { color: var(--accent); }
-  .gv-trail line.no   { color: #8a8a8a; }
+  .gv-trail line.plain { color: #8a8a8a; }
 
   /* S42: 波マップのツールバー（銘柄・日付・記録） */
   /* 375px でも2段に収める（銘柄／日付＋記録）。巡回中に縦を食わせない。 */
@@ -1056,21 +1034,18 @@
   .gv-mini { display: block; width: 26px; height: 15px; flex: none; overflow: visible; }
   .gv-mini path { fill: none; stroke: currentColor; stroke-width: 4; opacity: 0.45; }
   .gv-mini circle { fill: currentColor; }
-  .gv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-  .gv-opt {
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    padding: 10px 6px; font-family: inherit; cursor: pointer;
-    background: var(--surface-2); color: var(--ink-2);
-    border: 1px solid var(--border); border-radius: 10px;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  /* S44: 行末のエントリー圏チップ兼「根拠パネルを開く」ボタン（圏内の足にだけ出る）。 */
+  .tent {
+    display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
+    font-family: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 3px 7px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid var(--good); background: var(--good-soft); color: var(--good);
   }
-  .gv-opt:hover { background: var(--surface); }
-  .gv-opt .s { font-size: 15px; font-weight: 700; }
-  .gv-opt .l { font-size: 10px; color: var(--ink-muted); line-height: 1.35; text-align: center; }
-  .gv-opt.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-  .gv-opt.on .l { color: var(--accent); }
-  /* S42: 「売買8つすべて表示」で出る逆側＝参考表示。押すと理由を出して弾く（書き込まない）。 */
-  .gv-opt.opp { opacity: 0.42; border-style: dashed; }
+  .tent-btn { cursor: pointer; }
+  .tent-btn:active { transform: scale(0.96); }
+  .tent-btn.open { background: var(--good); color: var(--surface); }
+  .trend-group-head.sub { color: var(--ink-muted); font-weight: 600; }
+  .gv-readout b.hot { color: var(--good); }
 
   @media (max-width: 520px) {
     body { padding: 16px 10px 96px; }
@@ -1085,30 +1060,29 @@
     .trend-head { gap: 6px 8px; padding: 8px 9px 6px; }
     .trend-head .pair { min-width: 66px; font-size: 13px; }
     .trend-head .spacer { flex-basis: 100%; height: 0; }
-    /* 判定バッジは1段目に鮮度と並ぶ。理由まで出すと 375px で折り返して
-       2段目のタップ位置がズレるため、理由は隠して「足＋GO/WAIT/NO」だけ残す（title で読める）。 */
-    .sbadge i { display: none; }
-    .setup-badges { gap: 4px; }
-    /* 入力行は1段のまま保つ（22ペア分の縦スクロールを増やさない）。
-       375pxで 24 + 3×27 + 3×26 + グランビル ≒ 280px となり、カード内幅に収まる。 */
-    .trend-tf { grid-template-columns: 24px auto auto 1fr; gap: 5px; padding-left: 7px; padding-right: 7px; }
+    /* 入力行は 375px でも1段に収める（22ペア分の縦スクロールを増やさない）。
+       24 + 3×27 + 3×26 + グランビル ≒ 280px。圏内の行だけ 🎯＋根拠 が付いて2段目に折り返す。 */
+    /* ⚠️ 実測で内容幅 305px に対し 24+87+84+58+29 + gap4×4 = 298px。🎯 を足しても1段に収まる。
+       ここを緩めると圏内の行だけ2段になり、巡回の縦スクロールが増える。 */
+    .trend-tf { gap: 4px; padding-left: 7px; padding-right: 7px; }
+    .trend-tf .tf { flex-basis: 24px; }
     .trend-tf .tgroup { gap: 3px; }
     .tmode { gap: 2px; }
     .tmode-btn { width: 24px; height: 23px; font-size: 11px; }
     .tstate-btn { width: 27px; height: 27px; }
     .tzone-btn  { width: 26px; height: 27px; }
-    .tgv { height: 27px; padding: 0 8px; font-size: 11px; }
+    .tgv { height: 27px; padding: 0 6px; font-size: 11px; }
     /* S33: 根拠パネルは 375px でも2列を維持する（縦積みにすると14行になり巡回が重くなる）。
        ラベル列を詰め、MV_TF_CHECKS の short で文言を短くして収める。 */
     .trend-panel { padding: 8px 8px 9px; }
     .tp-row { grid-template-columns: 62px minmax(0, 1fr) minmax(0, 1fr); gap: 5px; }
     .tp-label, .tp-label.link { font-size: 10.5px; }
     select.tp-cell, .tp-fixed, .tp-synced { font-size: 11.5px; padding: 4px 4px; }
-    .gv-grid { grid-template-columns: repeat(2, 1fr); }
-    /* 狭い画面では「すべて表示」を1行取らせ、クリア／閉じるが2行に割れないようにする */
     #trendGvModal .modal-actions { flex-wrap: wrap; }
-    #trendGvAll { flex-basis: 100%; }
     #trendGvModal .modal-actions button { white-space: nowrap; }
+    /* 375px では 🎯 だけ残す（距離と「根拠」は title で読める）。入力行を1段に保つため。 */
+    .tent { padding: 3px 6px; }
+    .tent .d { display: none; }
     /* S40: 図はタップ面なので、狭い画面ほど大きく取る（正確に指せることを優先）。 */
     .gv-fig { max-width: calc(52vh * var(--gv-ar-num, 1.773)); }
     .gv-marker { width: 30px; height: 30px; }
@@ -1274,7 +1248,7 @@
     <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。ペア名の右の3つのボタンで、まず<strong>目線</strong>（📈 トレンドフォロー / 〰 レンジ / 🔄 RD逆張り）を振り分けてください。レンジは自動で ⚪ NO に落ち、RD は最上段にまとまります。記録した内容から <strong>🟢 GO</strong>（条件クリア）/ <strong>🟡 WAIT</strong>（条件待ち）/ <strong>⚪ NO</strong>（当面なし）を自動判定し、GO が上に来るよう並べ替えます。判定は<strong>日足セットアップ・4Hセットアップで別々</strong>に出るので、行ごとのバッジで「どちらの上位足で狙えるか」と「あと何を見れば GO になるか」が分かります。週足・月足は必要なときだけ表示してください。<strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。記録した位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。</div>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🟢 GO のみ</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🎯 エントリー圏のみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
       <select class="trend-category-select" id="trendModeSelect"></select>
@@ -1467,7 +1441,9 @@
 <!-- ============ グランビルの波ピッカー（トレンド一覧・S24、S40でタップ記録化） ============ -->
 <!-- 巡回中に図と照合して波を選べるようにする。画像は開いたときに初めて読み込む。
      S40: 図そのものがタップ面。今のローソク足の位置を直接指すと、最寄りの公式ポジションが波番号になる。
-     下の8ボタンは残す（タップがズレたときの補正／図を見ずに一発で決めたいとき用）。 -->
+     S44: 「買①〜売④」の8ボタンと「売買8つすべて表示」は撤去した。タップで自動確定するようになった
+          今は二重入力にしかならず、知りたいのは波番号そのものではなく「エントリー圏にどれだけ
+          近いか」だけだから。読み取り表示はその距離に置き換えてある（波番号は内部保存のみ）。 -->
 <div class="modal-backdrop" id="trendGvModal">
   <div class="modal wide">
     <h3>グランビルの波 <span class="gv-meta" id="trendGvMeta"></span></h3>
@@ -1477,9 +1453,7 @@
       <div class="gv-marker" id="trendGvMarker" hidden><span></span></div>
     </div>
     <div class="gv-readout" id="trendGvReadout"></div>
-    <div class="gv-grid" id="trendGvGrid"></div>
     <div class="modal-actions">
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendGvAll">売買8つすべて表示</button>
       <span class="spacer"></span>
       <button class="btn-ghost" type="button" id="trendGvGuide" title="グランビルの解説を開く">📖</button>
       <button class="btn-secondary" type="button" id="trendGvClear">クリア</button>
@@ -1623,6 +1597,32 @@ function gvEntryDistance(x, y) {
   return best;
 }
 
+/* S44: ペアが「チャンスにどれだけ近いか」。小さいほど上に並ぶ（記録が無ければ Infinity）。
+   GO / WAIT / NO の3段階ラベルを置き換える連続量で、S32 と同じく w には一切保存しない導出。
+   ⚠️ 見るのは MV_TREND_DEFAULT_TFS（日足・4時間足）だけ。週足・月足は表示トグルで出入りするので、
+      混ぜると「表示を切り替えただけで並び順が飛ぶ」。
+   ⚠️ 概算（ボタンで選んだだけ＝wpos が空）は数えない。概算の座標はアンカーそのもので距離0になり、
+      買②③/売②③を選んだ全件が無条件で最上位に来てしまう（S43 の圏内判定と同じ理由）。
+   方向と逆 side の波は mvWriteTrend() が自動で消すので、ここで side を見る必要はない。 */
+function pairEntryDistance(w) {
+  let best = Infinity;
+  MV_TREND_DEFAULT_TFS.forEach(t => {
+    const d = tfEntryDistance(w, t.k);
+    if (d !== null && d < best) best = d;
+  });
+  return best;
+}
+/* 足1本分。行に 🎯 と「根拠」ボタンを出すかどうかもこれで決める。 */
+function tfEntryDistance(w, tfKey) {
+  const cur = (w.trend && w.trend[tfKey]) || {};
+  if (!cur.granville) return null;
+  const pos = gvParsePos(cur.wpos);
+  if (!pos) return null;
+  return gvEntryDistance(pos.x, pos.y);
+}
+function pairIsHot(w)        { return pairEntryDistance(w) <= GV_ENTRY_RADIUS; }
+function tfIsHot(w, tfKey)   { const d = tfEntryDistance(w, tfKey); return d !== null && d <= GV_ENTRY_RADIUS; }
+
 /* 一覧の行に出す極小の波形。アンカーと同じ 0-100 の座標系で、8つのポジションを通るように
    引いてある（上げ → 天井 → 下げ）ので、記録した % をそのまま点として重ねられる。
    ⚠️ 縦は GV_MINI_H に潰して描く。横長の図を正方形の viewBox に入れると
@@ -1658,8 +1658,9 @@ const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
    一致するものだけ「🔭一覧と連動」表示になり、一覧のグランビル記録が自動で流れ込む。
    一覧は日足・4時間足（＋週足・月足）しか持たないため、1時間足・5分足・15分足は対象外＝従来どおり手動選択。 */
 const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4' };
-/* S33: 上の逆引き。🔭一覧のセットアップバッジ（MV_SETUPS の tf = 'd' / 'h4'）から
-   ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。 */
+/* S33: 上の逆引き。🔭一覧で根拠パネルを開いた足（S44 以降は行の「根拠」ボタンを押した足）から
+   ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。
+   ⚠️ ここに無い足（月足）では根拠パネルを開けない ── tfHigher に入れる値が無いため。 */
 const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足' };
 /* トレンド一覧の該当足からボードの checksHigher/checksEntry.granville へ書き込む唯一の入り口。
    一覧が入力元・ボードは複製という向きを守るため、ボード側からここへは書き込まない。 */
@@ -1717,8 +1718,8 @@ const MV_TREND_TFS = [
 /* ⚠️ 並び順・サマリーの主軸はこの2足。週足・月足は表示トグルで出入りするため、
    主軸に入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
    また記録済み4足すべてを必須にすると、月足が未記録なだけで全ペアが最上位から落ちる（初日は必ずそうなる）。
-   S32 の判定（MV_SETUPS / setupVerdict）が週足を見るのは「1つ上の足が逆行していないか」の
-   減点材料としてだけで、未記録なら見逃す。表示トグルの状態は判定に影響しない。 */
+   S44: pairEntryDistance()（並び順とサマリーの 🎯 圏内）が見るのもこの2足だけ。行に出る
+   🎯 チップは足ごとなので週足・月足でも出るが、ペアの順位は動かさない。 */
 const MV_TREND_DEFAULT_TFS = MV_TREND_TFS.filter(t => !t.optional);
 
 const MV_TREND_STATES = [
@@ -1739,29 +1740,19 @@ const MV_TREND_ZONES = [
 ];
 const MV_TREND_ZONE_MAP = Object.fromEntries(MV_TREND_ZONES.map(z => [z.v, z]));
 
-/* ============ セットアップ自動判定（S32） ============
-   巡回で記録した trend の内容から「その通貨が今どの状態か」を GO / WAIT / NO に自動分類する。
-   ⚠️ 判定は w に一切保存しない純粋な導出。localStorage のスキーマ・CSV・端末間マージ（S28）を
-      触らずに済ませるための最重要方針で、ここを破ると同期のマージ表に行が増える。
+/* ============ エントリー水準の波（S32 で導入 → S44 で役割を縮小） ============
+   実際にエントリーするのは押し目（買②③）と戻り（売②③）だけ。
+   ①上抜け・④乖離戻しは「方向はあるがトレンドフォローの入り所ではない」ので含めない。
 
-   上位足に日足を使う場合と4時間足を使う場合の2通りでトレードするため、判定はペア単位ではなく
-   セットアップ単位で別々に出す。tf がそのセットアップの主軸、above が「1つ上の足」。
-   MV_TREND_TFS に足を増やしたらここに1行足すだけで判定・バッジ・集計すべてに反映される。 */
-const MV_SETUPS = [
-  { k: 'd',  tf: 'd',  above: 'w', label: '日足セットアップ', short: '日' },
-  { k: 'h4', tf: 'h4', above: 'd', label: '4Hセットアップ',   short: '4H' },
-];
-/* トレンド方向 → 整合するEMAゾーンの色 / グランビルの side。 */
-const SETUP_SIDE = { up: { zone: 'green', side: 'buy' }, down: { zone: 'red', side: 'sell' } };
-/* GO にするグランビルの波＝押し目（買②③）と戻り（売②③）だけ。
-   ①上抜け・④乖離戻しは「方向はあるがトレンドフォローの入り所ではない」ため WAIT に回す。 */
+   ⚠️ S44 で GO / WAIT / NO の自動判定（setupVerdict）は全廃した。波の位置そのものを
+      図のタップで記録できるようになった（S40 の wpos）ので、3段階の離散ラベルは
+      gvEntryDistance() が返す「エントリー圏までの距離」に置き換わっている。
+      この配列はその圏の中心を決める唯一の定義として残っている。 */
 const SETUP_GO_WAVES = ['2', '3', '6', '7'];
-const SETUP_STATUSES = { rd: 0, go: 1, wait: 2, no: 3 };
 
 /* S35: 巡回でカードの最初に押す「目線」。その通貨が今どの土俵にあるかを1タップで振り分ける。
    未選択（''）は trend と同じ扱いなので、既存データの移行処理は要らない。
-   ⚠️ range / rd は setupVerdict() の冒頭で判定そのものを差し替える（表示だけのタグではない）。
-   rd は自動判定しない ── 逆張りの条件は目視で見るため、最上位グループに上げるだけ。 */
+   ⚠️ S44 以降はどこにも自動判定を持たない純粋な絞り込みタグ（#trendModeSelect で使う）。 */
 const MV_TREND_MODES = [
   { v: 'trend', icon: '📈', label: 'トレンドフォロー検討' },
   { v: 'range', icon: '〰',  label: 'レンジ' },
@@ -3746,9 +3737,7 @@ function renderMarketBoard() {
   mvListEl.innerHTML = '<div class="mv-card">' +
     '<div class="mv-card-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
-      /* S32: 🔭一覧の記録から導出したセットアップ判定。上のプルダウンで選んだ上位足と
-         突き合わせて「今このペアは狙える状態か」をボードでも確認できるようにする。 */
-      trendSetupBadgesHtml(w) +
+      /* S44: セットアップ判定バッジは廃止（🔭一覧の各足の行に出る 🎯 エントリー圏に置き換え）。 */
       '<div class="mv-alert-badges">' + alertBadges + '</div>' +
       '<span class="spacer"></span>' +
       '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">このペアのデータを削除</button>' +
@@ -3892,7 +3881,7 @@ function mvSetJudge(watchId, value) {
 
 /* 目線（トレンドフォロー / レンジ / RD逆張り）の唯一の書き込み口（S35）。
    mvSetJudge / mvWriteTrend と同じ「書き込み口を1つにする」規約。同じものを再度押すと未選択に戻る。
-   ⚠️ 判定（setupVerdict）はこの値を読むだけで、判定結果そのものは相変わらず保存しない。
+   ⚠️ S44 以降、目線は自動判定に一切影響しない純粋な絞り込みタグ（#trendModeSelect で使う）。
    ⚠️ ここでは再描画しない。呼び出し側が trendPatchItem() で行だけ差し替える
       （全描画すると行がグループ間を移動して指の下から消えるため。S24 の最重要仕様3）。 */
 function mvSetMode(watchId, value) {
@@ -4075,12 +4064,16 @@ const trendTfBar     = document.getElementById('trendTfToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 const trendModeSelect = document.getElementById('trendModeSelect');
 
-let trendGoOnly = false;      // 「GO のみ」の絞り込み。永続化しない
+/* S44: 「エントリー圏のみ」の絞り込み。永続化しない。
+   ⚠️ DOM の id は #trendFilterAligned のまま据え置く（S32 で GO のみに変えたときと同じ判断）。
+      参照とハンドラの対応を崩さないため、変えるのは文言と条件だけにする。 */
+let trendEntryOnly   = false;
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 let trendModeFilter  = '';    // 目線絞り込み（MV_TREND_MODES の v、空文字=すべて）。永続化しない
-/* S33: 開いている根拠パネル { id, setupKey }。一度に1つだけ。巡回中の一時状態なので永続化しない。
-   ⚠️ trendSetupBadgesHtml / trendItemHtml より前に宣言すること（描画時に参照する）。 */
+/* S33: 開いている根拠パネル。S44 で { id, setupKey } → { id, tfKey }（開いた足がそのまま上位足）。
+   一度に1つだけ。巡回中の一時状態なので永続化しない。
+   ⚠️ trendEntryChipHtml / trendItemHtml より前に宣言すること（描画時に参照する）。 */
 let trendPanel = null;
 
 /* ペア名 → MV_PAIR_GROUPS のラベル。プリセット外（自由入力）のペアは「その他」扱い。 */
@@ -4104,42 +4097,7 @@ function saveTrendTfs() {
 }
 let trendVisibleTfs = loadTrendTfs();
 
-/* 1セットアップ分の判定。w.trend から導出するだけで、何も保存しない。
-   原則は「未記録=WAIT（あと何を見ればいいかが分かる）／逆行=NO（矛盾しているので当面なし）」。
-   ただし主軸の足の方向そのものが未記録・レンジのときは判断の起点が無いので NO に落とす。
-   ⚠️ 見るのは MV_SETUPS が名指しした足だけで、表示トグル（週足・月足の出し入れ）とは無関係。
-      週足を非表示にしても w.trend.w は読めるので、表示を変えただけで判定が動くことはない。 */
-function setupVerdict(w, setup) {
-  /* S35: 目線が先。レンジは方向を記録していても当面なし、RD は逆張り検討として最上位に上げる。
-     ⚠️ ここで短絡してもバッジは日足・4H の2つ出したままにする（trendSetupBadgesHtml を参照）。
-        バッジが根拠パネルの入口＝押した足がそのまま上位足になるため、選択肢を潰せない。 */
-  const mode = w.mode || 'trend';
-  if (mode === 'range') return { status: 'no', reason: 'レンジ' };
-  if (mode === 'rd')    return { status: 'rd', reason: '逆張り' };
-
-  const cur   = (w.trend && w.trend[setup.tf])    || {};
-  const above = (w.trend && w.trend[setup.above]) || {};
-  const S = SETUP_SIDE[cur.state];
-  if (!S) return { status: 'no', reason: cur.state === 'range' ? 'レンジ' : '未記録' };
-
-  /* 1つ上の足が逆向きに記録されていたら、条件が揃っても GO にしない（未記録のときは見逃す）。 */
-  if (above.state && isTrendingState(above.state) && above.state !== cur.state)
-    return { status: 'wait', reason: '上位足が逆行' };
-
-  if (cur.zone && cur.zone !== 'gray' && cur.zone !== S.zone)
-    return { status: 'no', reason: 'ゾーンが逆' };
-  if (!cur.zone || cur.zone === 'gray')
-    return { status: 'wait', reason: 'ゾーン待ち' };
-
-  const g = MV_GRANVILLE_MAP[cur.granville];
-  if (g && g.side !== S.side) return { status: 'no', reason: '波が逆' };
-  if (!g) return { status: 'wait', reason: '波の確認待ち' };
-  if (SETUP_GO_WAVES.indexOf(g.v) < 0) return { status: 'wait', reason: g.short + 'は待ち' };
-
-  return { status: 'go', reason: g.short, conf: setupConfidence(w) };
-}
-
-/* S38: GO の確度。MV_TF_CHECKS のうち ❌ を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
+/* S38: 根拠の確度。MV_TF_CHECKS のうち ❌ を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
    分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
 function checkConfidence(checks) {
   const total = MV_TF_CHECKS.length;
@@ -4150,13 +4108,6 @@ function setupConfidence(w) {
   const higher = checkConfidence(w.checksHigher || {});
   const entry  = checkConfidence(w.checksEntry  || {});
   return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
-}
-
-/* ペア単位の総合＝セットアップのうち最も良い方。グループ分けとソートに使う。 */
-function pairVerdicts(w) { return MV_SETUPS.map(s => ({ setup: s, v: setupVerdict(w, s) })); }
-function pairStatus(w) {
-  return pairVerdicts(w).reduce((best, r) =>
-    SETUP_STATUSES[r.v.status] < SETUP_STATUSES[best] ? r.v.status : best, 'no');
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -4186,13 +4137,6 @@ function gvMiniSvg(pos) {
       '" r="8"/></svg>';
 }
 
-const TREND_GROUPS = [
-  { status: 'rd',   head: '🔄 RD ── 逆張り検討' },
-  { status: 'go',   head: '🟢 GO ── 条件クリア' },
-  { status: 'wait', head: '🟡 WAIT ── 条件待ち' },
-  { status: 'no',   head: '⚪ NO ── 当面なし' },
-];
-
 /* アラートバッジと判定ボタンは環境認識ボードと同じ data 属性を出す。
    ⚠️ 属性を変えると共有ハンドラ（mvToggleAlert / mvSetJudge）から外れ、
    judgeLog が落ちて振り返りタブの時間足別統計が壊れるので触らないこと。 */
@@ -4220,28 +4164,26 @@ function trendJudgeBtnsHtml(w) {
     esc(j.label.slice(0, 1)) + '</button>').join('');
 }
 
-/* セットアップごとの判定バッジ。理由まで出すのは「あと何を見れば GO になるか」が
-   巡回中にその場で分かるようにするため（スマホ幅では CSS で理由だけ隠す）。
-   S33: バッジ自体が根拠パネルの開閉ボタンを兼ねる。押した足がそのまま上位足になるので、
-   ボードで時間足を選び直す手間が消える。WAIT / NO でも開ける（「上位足は逆行だが今回は見たい」）。
-   ⚠️ ボードの mv-card-head でも使うが、あちらの trendListEl 用ハンドラは効かない。
-      ボード側は data-trend-setup-open を拾わないので、押しても何も起きない（無害）。 */
-function trendSetupBadgesHtml(w, interactive) {
-  return '<span class="setup-badges">' + pairVerdicts(w).map(r => {
-    const open = interactive && trendPanel && trendPanel.id === w.id && trendPanel.setupKey === r.setup.k;
-    const confSuffix = (r.v.status === 'go' && r.v.conf) ? ' ' + r.v.conf.combined + '%' : '';
-    const body = '<b>' + esc(r.setup.short) + '</b>' + r.v.status.toUpperCase() + esc(confSuffix) +
-      '<i>' + esc(r.v.reason) + '</i>';
-    const confTitle = (r.v.status === 'go' && r.v.conf)
-      ? '（確度 上位足' + r.v.conf.higher + '% / エントリー足' + r.v.conf.entry + '% / 合算' + r.v.conf.combined + '%）'
-      : '';
-    const title = esc(r.setup.label + '：' + r.v.reason + confTitle);
-    /* ボードでは従来どおり表示専用（押しても開く先のパネルが無いため）。 */
-    if (!interactive) return '<span class="sbadge ' + r.v.status + '" title="' + title + '">' + body + '</span>';
-    return '<button type="button" class="sbadge ' + r.v.status + (open ? ' open' : '') + '"' +
-      ' data-trend-setup-open="' + esc(w.id) + '" data-setup="' + esc(r.setup.k) + '"' +
-      ' title="' + title + '（タップで根拠を記録）">' + body + '</button>';
-  }).join('') + '</span>';
+/* S44: 足1本ぶんのエントリー圏チップと、根拠パネルを開くボタン。
+   図の上でタップして記録した位置が圏内（買②③/売②③ ± GV_ENTRY_RADIUS）のときだけ出す。
+   ⚠️ 圏外・概算（wpos が空）・未記録では何も出さない。押しても意味のないボタンを置かないため
+      （S42-③「押しても反応しない」の再演を避ける）。
+   ⚠️ 月足のように MV_TREND_KEY_TO_TF が引けない足はボタンを出さない。引けないと tfHigher に
+      入れる値が無く、パネルを開いても marketFieldsFromBoard() の要求を満たせない。 */
+function trendEntryChipHtml(w, tfKey) {
+  const d = tfEntryDistance(w, tfKey);
+  if (d === null || d > GV_ENTRY_RADIUS) return '';
+  const open = trendPanel && trendPanel.id === w.id && trendPanel.tfKey === tfKey;
+  /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
+     2要素にすると圏内の行だけが2段に折り返して巡回の縦スクロールが増える。
+     幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
+  const body = '🎯<span class="d">' + Math.round(d) + '%</span><span class="d">根拠</span>';
+  const title = 'エントリー水準まで ' + d.toFixed(1) + '%';
+  if (!MV_TREND_KEY_TO_TF[tfKey])
+    return '<span class="tent" title="' + esc(title) + '">' + body + '</span>';
+  return '<button type="button" class="tent tent-btn' + (open ? ' open' : '') + '"' +
+    ' data-trend-panel-open="' + esc(w.id) + '" data-tf="' + esc(tfKey) + '"' +
+    ' title="' + esc(title + '。この足を上位足にして根拠を記録') + '">' + body + '</button>';
 }
 
 /* 根拠チェック1項目のセル。上位足・エントリー足で同じ形を使う。
@@ -4272,8 +4214,10 @@ function trendCheckCell(w, field, c) {
       差し替えるため。ここで trendPanel から作り直さないと、方向やゾーンを触った瞬間に
       入力途中のパネルが消える。 */
 function trendPanelHtml(w) {
-  const setup = MV_SETUPS.find(s => s.k === trendPanel.setupKey);
-  if (!setup) return '';
+  const tfKey = trendPanel.tfKey;
+  const higherTf = MV_TREND_KEY_TO_TF[tfKey];
+  if (!higherTf) return '';
+  const tfLabel = (MV_TREND_TFS.find(t => t.k === tfKey) || {}).label || higherTf;
   const rows = MV_TF_CHECKS.map(c =>
     '<div class="tp-row">' +
       (c.link
@@ -4291,20 +4235,18 @@ function trendPanelHtml(w) {
   if (!w.tfEntry) missing.push('エントリー足');
   if (!w.judge)   missing.push('判定');
 
-  /* S38: GO の確度（❌の数だけ減点）。パネルを開いた時点の判定を再計算して出す。 */
-  const v = setupVerdict(w, setup);
-  const confHtml = (v.status === 'go' && v.conf)
-    ? '<div class="tp-conf">🎯 確度 上位足 ' + v.conf.higher + '% ／ エントリー足 ' + v.conf.entry +
-      '% ／ 合算 <b>' + v.conf.combined + '%</b></div>'
-    : '';
+  /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。 */
+  const conf = setupConfidence(w);
+  const confHtml = '<div class="tp-conf">🎯 確度 上位足 ' + conf.higher + '% ／ エントリー足 ' +
+    conf.entry + '% ／ 合算 <b>' + conf.combined + '%</b></div>';
 
   return '<div class="trend-panel">' +
     confHtml +
     '<div class="tp-grid">' +
       '<div class="tp-row tp-head">' +
         '<span class="tp-label">時間足</span>' +
-        '<span class="tp-fixed" title="' + esc(setup.label) + 'なので上位足は固定">' +
-          esc(w.tfHigher || MV_TREND_KEY_TO_TF[setup.tf]) + '</span>' +
+        '<span class="tp-fixed" title="' + esc(tfLabel) + 'の行から開いたので上位足は固定">' +
+          esc(w.tfHigher || higherTf) + '</span>' +
         '<select class="tp-cell" data-trend-tfentry="' + esc(w.id) + '">' +
           '<option value="">エントリー足…</option>' +
           MV_TF_ENTRY_OPTIONS.map(o =>
@@ -4321,7 +4263,8 @@ function trendPanelHtml(w) {
   '</div>';
 }
 
-/* 1ペア分の行。ヘッダ（ペア名・鮮度・判定バッジ・アラート・判定）＋可視時間足ごとの入力行。
+/* 1ペア分の行。ヘッダ（ペア名・目線・鮮度・アラート）＋可視時間足ごとの入力行。
+   S44: 判定バッジはヘッダから消え、代わりに各足の行末に 🎯（エントリー圏）と根拠ボタンが出る。
    入力はすべてこの行の中で完結する（展開操作なし）。 */
 function trendItemHtml(w) {
   const tfRows = trendVisibleTfs.map(t => {
@@ -4348,6 +4291,7 @@ function trendItemHtml(w) {
         ' title="' + esc(g ? g.label + (tapped ? '（図の上で記録）' : '（ボタン選択・位置は概算）')
                             : 'グランビルの波を選ぶ') + '">' +
         gvMiniSvg(tapped) + (g ? esc(g.short) : '波?') + '</button>' +
+      trendEntryChipHtml(w, t.k) +
     '</div>';
   }).join('');
   const panel = (trendPanel && trendPanel.id === w.id) ? trendPanelHtml(w) : '';
@@ -4356,7 +4300,6 @@ function trendItemHtml(w) {
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendModeBtnsHtml(w) +
       trendFreshChip(w) +
-      trendSetupBadgesHtml(w, true) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
@@ -4369,9 +4312,9 @@ function trendItemHtml(w) {
 
 /* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。 */
 function renderTrendSummary(pairs) {
-  const counts = { rd: 0, go: 0, wait: 0, no: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
+  const counts = { hot: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
   pairs.forEach(w => {
-    counts[pairStatus(w)]++;
+    if (pairIsHot(w)) counts.hot++;
     if (isTrendStale(w)) counts.stale++;
     MV_TREND_DEFAULT_TFS.forEach(t => {
       const s = (w.trend && w.trend[t.k] || {}).state || '';
@@ -4382,10 +4325,7 @@ function renderTrendSummary(pairs) {
     });
   });
   const summaryItems = [
-    { cls: 'rd',   label: '🔄 RD',   n: counts.rd,   unit: 'ペア' },
-    { cls: 'go',   label: '🟢 GO',   n: counts.go,   unit: 'ペア' },
-    { cls: 'wait', label: '🟡 WAIT', n: counts.wait, unit: 'ペア' },
-    { cls: 'no',   label: '⚪ NO',   n: counts.no,   unit: 'ペア' },
+    { cls: 'hot',  label: '🎯 圏内', n: counts.hot,  unit: 'ペア' },
     { cls: '', label: '↗ 上昇',   n: counts.up,    unit: '' },
     { cls: '', label: '↘ 下降',   n: counts.down,  unit: '' },
     { cls: '', label: '─ レンジ', n: counts.range, unit: '' },
@@ -4417,7 +4357,7 @@ function renderTrendCategoryOptions() {
   trendCategorySelect.innerHTML = html;
 }
 
-/* S36: 目線（📈/〰/🔄）で絞り込むプルダウン。未設定ペアは 'trend' 扱い（setupVerdict と同じ既定値）。 */
+/* S36: 目線（📈/〰/🔄）で絞り込むプルダウン。未設定ペアは 'trend' 扱い。 */
 function renderTrendModeOptions() {
   let html = '<option value="">すべての目線</option>';
   MV_TREND_MODES.forEach(m => {
@@ -4431,8 +4371,8 @@ function renderTrendModeOptions() {
    S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。 */
 function trendApplyFilters(pairs) {
   let shown = pairs;
-  /* S35: RD（逆張り検討）も「すぐチャンス」側なので GO のみ絞り込みでは残す。 */
-  if (trendGoOnly)     shown = shown.filter(w => ['go', 'rd'].indexOf(pairStatus(w)) >= 0);
+  /* S44: 図の上でタップした位置が買②③/売②③の圏内にあるペアだけに絞る。 */
+  if (trendEntryOnly)  shown = shown.filter(pairIsHot);
   if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   if (trendModeFilter) shown = shown.filter(w => (w.mode || 'trend') === trendModeFilter);
@@ -4441,15 +4381,16 @@ function trendApplyFilters(pairs) {
 
 function renderTrendList() {
   const data = loadMarket();
+  /* S44: エントリー圏に近い順。記録が無いペアは Infinity で下に沈み、同値は名前順で安定する。 */
   const pairs = data.pairs.slice().sort((a, b) =>
-    SETUP_STATUSES[pairStatus(a)] - SETUP_STATUSES[pairStatus(b)] ||
+    pairEntryDistance(a) - pairEntryDistance(b) ||
     String(a.pair).localeCompare(String(b.pair)));
 
   renderTrendSummary(pairs);
   renderTrendTfToggles();
   renderTrendCategoryOptions();
   renderTrendModeOptions();
-  trendFilterBtn.classList.toggle('on', trendGoOnly);
+  trendFilterBtn.classList.toggle('on', trendEntryOnly);
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
 
   if (!pairs.length) {
@@ -4463,13 +4404,19 @@ function renderTrendList() {
     return;
   }
 
+  /* S44: グループはエントリー圏の1本だけ。圏外は見出しを付けずにそのまま続ける
+     （距離順に並んでいるので、上から見ていけば「次に近いもの」が自然に読める）。 */
+  const hot = shown.filter(pairIsHot);
   let html = '';
-  TREND_GROUPS.forEach(g => {
-    const inGroup = shown.filter(w => pairStatus(w) === g.status);
-    if (!inGroup.length) return;
-    html += '<div class="trend-group-head">' + esc(g.head) + '（' + inGroup.length + '）</div>';
-    html += inGroup.map(trendItemHtml).join('');
-  });
+  if (hot.length) {
+    html += '<div class="trend-group-head">🎯 エントリー圏（' + hot.length + '）</div>';
+    html += hot.map(trendItemHtml).join('');
+  }
+  const rest = shown.filter(w => !pairIsHot(w));
+  if (rest.length) {
+    if (hot.length) html += '<div class="trend-group-head sub">─ その他（' + rest.length + '）</div>';
+    html += rest.map(trendItemHtml).join('');
+  }
   trendListEl.innerHTML = html;
 }
 
@@ -4488,7 +4435,7 @@ function trendPatchItem(w) {
 }
 
 trendFilterBtn.addEventListener('click', () => {
-  trendGoOnly = !trendGoOnly;
+  trendEntryOnly = !trendEntryOnly;
   renderTrendList();
 });
 trendStaleBtn.addEventListener('click', () => {
@@ -4521,23 +4468,24 @@ function trendPatchById(id) {
 }
 
 trendListEl.addEventListener('click', (e) => {
-  /* S33: セットアップバッジ＝根拠パネルの開閉。押した足がそのまま上位足になる。
+  /* S44: 足の行の「根拠」ボタン＝根拠パネルの開閉。押した足がそのまま上位足になる
+     （S33 でセットアップバッジが担っていた役割を、圏内の足そのものに移した）。
      ⚠️ 全体を描き直さない理由は trendPatchItem のコメントと同じ（並べ替えで行が指の下から消える）。
         開閉で動くのは最大2行なので、その2行だけを差し替える。 */
-  const setupBtn = e.target.closest('[data-trend-setup-open]');
-  if (setupBtn) {
-    const id = setupBtn.dataset.trendSetupOpen;
-    const setupKey = setupBtn.dataset.setup;
+  const panelBtn = e.target.closest('[data-trend-panel-open]');
+  if (panelBtn) {
+    const id = panelBtn.dataset.trendPanelOpen;
+    const tfKey = panelBtn.dataset.tf;
     const prev = trendPanel;
-    const same = prev && prev.id === id && prev.setupKey === setupKey;
+    const same = prev && prev.id === id && prev.tfKey === tfKey;
     if (same) {
       trendPanel = null;
     } else {
-      const setup = MV_SETUPS.find(s => s.k === setupKey);
-      if (!setup) return;
-      /* 上位足はこのセットアップで確定する。保存に失敗したら開かない（UIと保存内容の食い違いを防ぐ）。 */
-      if (!mvSetTf(id, 'tfHigher', MV_TREND_KEY_TO_TF[setup.tf])) return;
-      trendPanel = { id, setupKey };
+      const higherTf = MV_TREND_KEY_TO_TF[tfKey];
+      if (!higherTf) return;
+      /* 上位足はこの足で確定する。保存に失敗したら開かない（UIと保存内容の食い違いを防ぐ）。 */
+      if (!mvSetTf(id, 'tfHigher', higherTf)) return;
+      trendPanel = { id, tfKey };
     }
     if (prev && prev.id !== id) trendPatchById(prev.id);   /* 直前に開いていた別ペアを畳む */
     trendPatchById(id);
@@ -4545,7 +4493,7 @@ trendListEl.addEventListener('click', (e) => {
   }
 
   /* S34: 根拠チェック。ボタン群に統一（旧: select の change イベント）。
-     ⚠️ ここでは再描画しない ── 判定（setupVerdict）が読むのは w.trend だけなのでバッジも並び順も動かず、
+     ⚠️ ここでは再描画しない ── 並び順（pairEntryDistance）が読むのは w.trend だけなので順位も動かず、
      押したボタンの .on クラスだけ直接付け替える。差し替えるとパネルごと作り直されて位置がズレる。 */
   const checkBtn = e.target.closest('[data-trend-check-btn]');
   if (checkBtn) {
@@ -4669,17 +4617,14 @@ trendListEl.addEventListener('change', (e) => {
    S40: 図そのものがタップ面になった。今のローソク足の位置を指すと wpos に % で残り、
    最寄りの公式ポジションが granville として確定する。 */
 const trendGvModal   = document.getElementById('trendGvModal');
-const trendGvGrid    = document.getElementById('trendGvGrid');
 const trendGvMeta    = document.getElementById('trendGvMeta');
 const trendGvImg     = document.getElementById('trendGvImg');
-const trendGvAll     = document.getElementById('trendGvAll');
 const trendGvFig     = document.getElementById('trendGvFig');
 const trendGvAnchors = document.getElementById('trendGvAnchors');
 const trendGvMarker  = document.getElementById('trendGvMarker');
 const trendGvReadout = document.getElementById('trendGvReadout');
 let trendGvTarget = null;   // { id, tf }
-let trendGvShowAll = false;
-let trendGvDirty = false;   // タップ／ボタンで動かしたか（閉じるときに行を差し替えるため）
+let trendGvDirty = false;   // 図をタップして動かしたか（閉じるときに行を差し替えるため）
 
 /* 画像の実寸から縦横比を CSS 変数に流す。ハードコードしないので図を差し替えても崩れない。
    ⚠️ これを入れないと .gv-fig の比率が既定値のままで、重ね物と絵が数 px ずれる。 */
@@ -4697,18 +4642,13 @@ function gvLoadImg(img) {
   img.src = IMG_GRANVILLE;
 }
 
-/* 記録できる波＝現在の方向側の4つ。
-   ⚠️ S42: ここに trendGvShowAll を混ぜてはいけない。mvWriteTrend() は方向と逆 side の
-      granville を保存直後に必ず消すので、逆側を候補に入れると「タップしても何も起きない
-      領域」が図の広範囲に生まれる（＝S40 で報告された不反応バグの正体）。
-      「売買8つすべて表示」はグリッドの見た目にだけ効かせ、書き込み経路には効かせない。 */
+/* スナップ候補＝現在の方向側の4つ。図タップ時の唯一の候補集合。
+   ⚠️ S42: ここに逆 side を混ぜてはいけない。mvWriteTrend() は方向と逆 side の granville を
+      保存直後に必ず消すので、逆側を候補に入れると「タップしても何も起きない領域」が
+      図の広範囲に生まれる（＝S40 で報告された不反応バグの正体）。 */
 function gvCandidates(cur) {
   const side = cur.state === 'down' ? 'sell' : 'buy';
   return MV_GRANVILLE_POSITIONS.filter(g => g.side === side);
-}
-/* グリッドに並べる集合。showAll のときだけ逆側も薄く出す（押すと理由を出して弾く）。 */
-function gvGridOptions(cur) {
-  return trendGvShowAll ? MV_GRANVILLE_POSITIONS.slice() : gvCandidates(cur);
 }
 
 function openTrendGv(watchId, tfKey) {
@@ -4717,7 +4657,6 @@ function openTrendGv(watchId, tfKey) {
   const cur = (w.trend && w.trend[tfKey]) || {};
   if (!isTrendingState(cur.state)) return;   // 方向未記録では開かない
   trendGvTarget = { id: watchId, tf: tfKey };
-  trendGvShowAll = false;
   trendGvDirty = false;
   gvLoadImg(trendGvImg);
   renderTrendGv();
@@ -4731,17 +4670,7 @@ function renderTrendGv() {
   const t = MV_TREND_TFS.find(x => x.k === trendGvTarget.tf);
   const cur = (w.trend && w.trend[trendGvTarget.tf]) || {};
   trendGvMeta.textContent = w.pair + ' / ' + (t ? t.label : trendGvTarget.tf);
-  trendGvAll.classList.toggle('on', trendGvShowAll);
   const opts = gvCandidates(cur);
-  const candSetGrid = {};
-  opts.forEach(g => { candSetGrid[g.v] = true; });
-  trendGvGrid.innerHTML = gvGridOptions(cur).map(g =>
-    '<button type="button" class="gv-opt' + (cur.granville === g.v ? ' on' : '') +
-    (candSetGrid[g.v] ? '' : ' opp') + '"' +
-    ' data-gv-pick="' + g.v + '">' +
-    '<span class="s">' + esc(g.short) + '</span>' +
-    '<span class="l">' + esc(g.label.replace(/^[^（]*（/, '').replace(/）$/, '')) + '</span>' +
-    '</button>').join('');
 
   /* 8つの公式ポジションを薄い目印として重ねる。今スナップ先になりうるものだけ強調する。 */
   const candSet = {};
@@ -4765,17 +4694,26 @@ function renderTrendGv() {
   }
   trendGvFig.classList.add('tappable');
 
-  /* スナップ結果は必ず言語化して見せる（どこに丸め込まれたか分からないまま保存させない）。 */
+  /* S44: 読み取り表示は波番号ではなく「エントリー水準までの距離」。
+     知りたいのは買②③/売②③にどれだけ近いかであって、丸め込まれた波の名前ではない。
+     ⚠️ 距離は gvEntryDistance()（＝% 座標の素の距離）で測る。波マップの圏内判定と
+        同じ関数を通すことで、ここで「圏内」と出たものが波マップでも必ず 🎯 になる。 */
   const arrow = cur.state === 'down' ? '↘' : '↗';
   const sideJa = cur.state === 'down' ? '売り' : '買い';
-  const hint = trendGvShowAll
-    ? '8つ表示中ですが、方向が' + arrow + 'なので記録できるのは' + sideJa + 'の4つだけです。'
-    : '方向が' + arrow + 'なので' + sideJa + 'の波に絞っています（「売買8つすべて表示」で参考表示）。';
-  trendGvReadout.innerHTML = (g
-      ? '<b>' + esc(g.short) + '</b> ' + esc(g.label.replace(/^\S+\s*/, ''))
-        + (tapped ? '' : '（ボタン選択・位置は概算）')
-      : '図の上で、今のローソク足の位置をタップしてください。')
-    + '<i>' + esc(hint) + '</i>';
+  const hint = '方向が' + arrow + 'なので' + sideJa +
+    'の波に絞ってスナップします。図の上を押し直せば何度でも調整できます。';
+  let main;
+  if (!tapped) {
+    main = '図の上で、今のローソク足の位置をタップしてください。' +
+      (g ? '（現在は' + esc(g.short) + 'の概算位置）' : '');
+  } else {
+    const d = gvEntryDistance(tapped.x, tapped.y);
+    main = d <= GV_ENTRY_RADIUS
+      ? '<b class="hot">🎯 エントリー圏内</b> 中心まで ' + d.toFixed(1) + '%'
+      : '<b>圏外</b> エントリー水準まで ' + d.toFixed(1) + '%' +
+        '（圏内は ' + GV_ENTRY_RADIUS + '% 以内）';
+  }
+  trendGvReadout.innerHTML = main + '<i>' + esc(hint) + '</i>';
 }
 
 function closeTrendGv() {
@@ -4809,26 +4747,6 @@ trendGvFig.addEventListener('click', (e) => {
   renderTrendGv();
 });
 
-trendGvGrid.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-gv-pick]');
-  if (!btn || !trendGvTarget) return;
-  /* ⚠️ S42: 逆 side を書くと mvWriteTrend() が即座に消して「押しても点かないボタン」になる。
-     書かずに理由を出す（タップ側と同じく、無反応な経路を1つも残さないため）。 */
-  const w0 = loadMarket().pairs.find(p => p.id === trendGvTarget.id);
-  const cur0 = (w0 && w0.trend && w0.trend[trendGvTarget.tf]) || {};
-  if (!gvCandidates(cur0).some(g => g.v === btn.dataset.gvPick)) {
-    showToast('方向が' + (cur0.state === 'down' ? '↘なので買い' : '↗なので売り') +
-              'の波は記録できません。先に方向を変えてください');
-    return;
-  }
-  /* ボタンは「言葉で選ぶ」経路なので位置の記録は持たせない（wpos を空にして概算に戻す）。 */
-  const w = mvWriteTrend(trendGvTarget.id, trendGvTarget.tf,
-                         { granville: btn.dataset.gvPick, wpos: '' });
-  if (!w) return;
-  trendGvDirty = true;
-  renderTrendGv();
-});
-trendGvAll.addEventListener('click', () => { trendGvShowAll = !trendGvShowAll; renderTrendGv(); });
 document.getElementById('trendGvGuide').addEventListener('click', () => {
   closeTrendGv();
   openGuideDrawer('guide-granville');
@@ -4869,7 +4787,6 @@ function wmDayKey(d) {
 function wmBuildItems(pairs) {
   const items = [];
   (pairs || []).forEach(w => {
-    const st = pairStatus(w);
     MV_TREND_TFS.forEach(t => {
       const cur = (w.trend && w.trend[t.k]) || {};
       if (!cur.granville) return;
@@ -4877,7 +4794,9 @@ function wmBuildItems(pairs) {
       items.push({
         p: w.pair, t: t.k, g: cur.granville,
         w: p ? Math.round(p.x) + ',' + Math.round(p.y) : '',
-        s: st,
+        /* S44: GO/WAIT/NO を廃止したので中身は空。キー自体は残す ── 既存スナップショットと
+           形を揃えるためだけのもので、以後どこからも読まない（圏内かどうかは w から測る）。 */
+        s: '',
       });
     });
   });
@@ -4983,7 +4902,8 @@ function trendMapEntryOf(src) {
     hot: dist !== null && dist <= GV_ENTRY_RADIUS,
     x: tapped ? tapped.x : a[0],
     y: tapped ? tapped.y : a[1],
-    status: src.status || 'no',
+    /* S44: 判定を廃したので色は中立1色。エントリー圏（hot）だけが強調される。 */
+    status: 'plain',
     /* 単一銘柄モードでは銘柄名ではなく足名を出す（同じ銘柄の日足と4Hを見分けるため）。 */
     label: trendMapPair ? (t ? t.short : src.tfKey) : src.pair,
     key: src.pair + '|' + src.tfKey,
@@ -4998,19 +4918,19 @@ function trendMapLiveEntries() {
   const tfs = trendMapPair ? trendMapVisibleTfs() : [{ k: trendMapTf }];
   const out = [];
   pairs.forEach(w => {
-    const st = pairStatus(w);
     tfs.forEach(t => {
       const cur = (w.trend && w.trend[t.k]) || {};
       const en = trendMapEntryOf({ pair: w.pair, tfKey: t.k, granville: cur.granville,
-                                   wpos: cur.wpos, status: st });
+                                   wpos: cur.wpos });
       if (en) out.push(en);
     });
   });
   return out;
 }
 
-/* 過去日のレコードから。⚠️ items は p/t/g/w/s しか持たないので、鮮度と目線の絞り込みは
-   そもそも導出できない（renderTrendMap がその旨を注記に出す）。 */
+/* 過去日のレコードから。⚠️ items は p/t/g/w しか持たないので、鮮度と目線の絞り込みは
+   そもそも導出できない（renderTrendMap がその旨を注記に出す）。
+   S44: エントリー圏は w（座標）から測れるので、🎯 の絞り込みは過去日でも効く。 */
 function trendMapDayEntries(rec) {
   if (!rec) return [];
   const tfOk = {};
@@ -5019,10 +4939,8 @@ function trendMapDayEntries(rec) {
   (rec.items || []).forEach(it => {
     if (!tfOk[it.t]) return;
     if (trendMapPair && it.p !== trendMapPair) return;
-    if (trendGoOnly && ['go', 'rd'].indexOf(it.s) < 0) return;
     if (trendCategory && trendCategoryOf(it.p) !== trendCategory) return;
-    const en = trendMapEntryOf({ pair: it.p, tfKey: it.t, granville: it.g,
-                                 wpos: it.w, status: it.s });
+    const en = trendMapEntryOf({ pair: it.p, tfKey: it.t, granville: it.g, wpos: it.w });
     if (en) out.push(en);
   });
   return out;
@@ -5141,7 +5059,7 @@ function renderTrendMap() {
     const p = prevAt[en.key];
     /* 動いていないものに線は引かない（読み取りの邪魔にしかならない）。 */
     if (!p || (Math.abs(p.x - en.x) < 0.6 && Math.abs(p.y - en.y) < 0.6)) return '';
-    return '<line class="' + (trendMapPair ? 'no' : en.status) + '" x1="' + p.x + '" y1="' + p.y +
+    return '<line class="plain" x1="' + p.x + '" y1="' + p.y +
       '" x2="' + en.x + '" y2="' + en.y + '"></line>';
   }).join('');
 
@@ -5155,7 +5073,8 @@ function renderTrendMap() {
   note.push(prevDay
     ? '薄いドットと線は ' + prevDay + ' からの動きです。'
     : '比較できる過去の記録がまだありません（🔭一覧を開くたびに今日の分が記録されます）。');
-  if (trendMapDay) note.push('⚠ 過去日では「未更新のみ」「目線」の絞り込みは効きません（記録に含まれないため）。');
+  if (trendMapDay) note.push('⚠ 過去日では「未更新のみ」「目線」の絞り込みは効きません（記録に含まれないため）。' +
+    '🎯 とカテゴリは座標とペア名から測れるので効きます。');
   if (trendMapPair) note.push('単一銘柄モード：色は時間足を表します。');
   note.push('🎯 の緑の圏はエントリー水準（買②③ / 売②③）です。' +
     '◦ 概算（ボタン選択）は位置を測っていないため圏内に数えません。');
