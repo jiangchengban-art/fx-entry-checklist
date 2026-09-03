@@ -4269,7 +4269,7 @@ function trendItemHtml(w) {
         ' data-trend-granville-open="' + esc(w.id) + '" data-tf="' + t.k + '"' +
         ' title="' + esc(g ? g.label + (tapped ? '（図の上で記録）' : '（ボタン選択・位置は概算）')
                             : 'グランビルの波を選ぶ') + '">' +
-        (g ? esc(g.short) : '波?') + '</button>' +
+        (g ? '🌊' : '波?') + '</button>' +
       trendEntryChipHtml(w, t.k) +
     '</div>';
   }).join('');
