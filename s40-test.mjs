@@ -173,14 +173,15 @@ console.log('\n[5] 一覧行への反映');
   await tapFig(page, '#trendGvFig', 36, 70);
   await page.click('#trendGvCancel');
   ok('閉じると行のチップが更新される', (await page.textContent(chip)).includes('買②'));
-  eq('タップ記録の行にはミニ波形が出る', await page.locator(chip + ' .gv-mini').count(), 1);
+  /* S45: ミニ波形（.gv-mini）はタップ位置と無関係な表示だったため撤去済み。出ないことを確認 */
+  eq('タップ記録の行にミニ波形は出ない(S45で撤去)', await page.locator(chip + ' .gv-mini').count(), 0);
 
   /* S44: 圏内なので 🎯 チップと「根拠」ボタンが同じ行に出る */
   eq('圏内の行に 🎯 が出る', await page.locator(W1 + '.trend-tf .tent').count(), 1);
   eq('根拠パネルを開くボタンが出る',
      await page.locator(W1 + '[data-trend-panel-open][data-tf="d"]').count(), 1);
 
-  /* 概算（wpos なし）の記録にはミニ波形も 🎯 も出ない */
+  /* 概算（wpos なし）の記録には 🎯 も出ない */
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('mochipoyo_market_view_v1'));
     const w = d.pairs.find(p => p.id === 'w1');
@@ -189,7 +190,6 @@ console.log('\n[5] 一覧行への反映');
   });
   await page.reload();
   await page.click('[data-tab="trend"]');
-  eq('概算の行にはミニ波形を出さない', await page.locator(chip + ' .gv-mini').count(), 0);
   ok('文字ラベルは残る', (await page.textContent(chip)).includes('買③'));
   eq('概算は圏内に数えないので 🎯 も出ない', await page.locator(W1 + '.trend-tf .tent').count(), 0);
   await page.context().close();
@@ -332,9 +332,9 @@ console.log('\n[9] 375px のレイアウト');
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth > document.documentElement.clientWidth);
   ok('横スクロールが出ない', !overflow);
-  /* 巡回はスマホでするので、ミニ波形は 375px でも残っていること。 */
-  ok('375px でもミニ波形が見える',
-     await page.locator('[data-trend-granville-open][data-tf="d"] .gv-mini').first().isVisible());
+  /* S45: ミニ波形は撤去済み。375px でもラベルチップ自体は見えること。 */
+  ok('375px でもグランビルチップが見える',
+     await page.locator('[data-trend-granville-open][data-tf="d"]').first().isVisible());
   const row = await page.locator('.trend-tf').first().evaluate(el => {
     const p = el.parentElement.getBoundingClientRect();
     return { inner: p.width, need: el.scrollWidth, has: el.clientWidth };

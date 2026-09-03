@@ -1030,10 +1030,6 @@
   .gv-legend button.approx { border-style: dashed; color: var(--ink-muted); }
   .gv-legend button .st { font-size: 9px; }
 
-  /* 一覧の行に出す極小の波形。記録の質（タップ＝正確／ボタン＝概算）が見た目で分かる。 */
-  .gv-mini { display: block; width: 26px; height: 15px; flex: none; overflow: visible; }
-  .gv-mini path { fill: none; stroke: currentColor; stroke-width: 4; opacity: 0.45; }
-  .gv-mini circle { fill: currentColor; }
   /* S44: 行末のエントリー圏チップ兼「根拠パネルを開く」ボタン（圏内の足にだけ出る）。 */
   .tent {
     display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
@@ -1095,7 +1091,6 @@
      チップだけ少し詰めて余裕を作る。 */
   @media (max-width: 380px) {
     .tgv { padding: 0 7px; gap: 4px; }
-    .tgv .gv-mini { width: 22px; height: 13px; }
   }
 </style>
 </head>
@@ -1623,16 +1618,9 @@ function tfEntryDistance(w, tfKey) {
 function pairIsHot(w)        { return pairEntryDistance(w) <= GV_ENTRY_RADIUS; }
 function tfIsHot(w, tfKey)   { const d = tfEntryDistance(w, tfKey); return d !== null && d <= GV_ENTRY_RADIUS; }
 
-/* 一覧の行に出す極小の波形。アンカーと同じ 0-100 の座標系で、8つのポジションを通るように
-   引いてある（上げ → 天井 → 下げ）ので、記録した % をそのまま点として重ねられる。
-   ⚠️ 縦は GV_MINI_H に潰して描く。横長の図を正方形の viewBox に入れると
-      preserveAspectRatio="none" で点が歪み、肝心の「波のどこにいるか」が読めなくなる。 */
-const GV_MINI_H = 57;   /* 100 : 57 ≒ 図の縦横比 */
-const GV_MINI_POINTS = [[2, 95], [10, 88], [19, 85], [28, 43], [33, 60], [38, 72], [45, 38],
-                        [50, 18], [54, 30], [58, 23], [63, 46], [68, 32], [74, 24], [78, 42],
-                        [83, 50], [90, 72], [97, 88]];
-const GV_MINI_PATH = GV_MINI_POINTS
-  .map((p, i) => (i ? 'L' : 'M') + p[0] + ',' + (p[1] * GV_MINI_H / 100).toFixed(1)).join(' ');
+/* S45: 一覧の行に出していた極小の波形（gvMiniSvg）を撤去した。手描きの汎用パスが
+   実アンカー座標（MV_GRANVILLE_ANCHORS）と一致しておらず、点の位置がタップ位置と
+   無関係に見える紛らわしい表示だったため。タップ記録か概算かは title の文言だけで示す。 */
 
 const MV_TF_CHECKS = [
   /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
@@ -4127,16 +4115,6 @@ function trendFreshChip(w) {
   return '<span class="fresh' + cls + '" title="最終更新 ' + esc(fmtDatetime(w.trendAt)) + '">' +
     esc(text) + '</span>';
 }
-/* S40: 記録した波の位置を行の中で示す極小の波形。タップ記録が無いときは何も出さない
-   （文字ラベルだけの従来の見た目に戻る＝「概算」と「正確」が並んでも区別が付く）。 */
-function gvMiniSvg(pos) {
-  if (!pos) return '';
-  return '<svg class="gv-mini" viewBox="0 0 100 ' + GV_MINI_H + '" aria-hidden="true">' +
-    '<path d="' + GV_MINI_PATH + '"/>' +
-    '<circle cx="' + pos.x.toFixed(1) + '" cy="' + (pos.y * GV_MINI_H / 100).toFixed(1) +
-      '" r="8"/></svg>';
-}
-
 /* アラートバッジと判定ボタンは環境認識ボードと同じ data 属性を出す。
    ⚠️ 属性を変えると共有ハンドラ（mvToggleAlert / mvSetJudge）から外れ、
    judgeLog が落ちて振り返りタブの時間足別統計が壊れるので触らないこと。 */
@@ -4280,7 +4258,8 @@ function trendItemHtml(w) {
       ' data-trend-zone="' + esc(w.id) + '" data-tf="' + t.k + '" data-value="' + z.v + '"' +
       ' title="' + esc(t.label) + ' EMAゾーン ' + esc(z.label) + '"><span class="dot"></span></button>').join('');
     /* グランビルは方向が決まっている足でだけ意味を持つ。レンジ・未記録では押せない。
-       S40: 図の上でタップして記録した足だけミニ波形を前置する（＝記録の質が見た目で分かる）。 */
+       S45: タップ記録か概算かは title のツールチップだけで示す（ミニ波形の点表示は
+       実際のタップ位置と対応しない紛らわしい表示だったため S45 で撤去。gvMiniSvg 参照）。 */
     const tapped = trending ? gvParsePos(cur.wpos) : null;
     return '<div class="trend-tf">' +
       '<span class="tf">' + esc(t.short) + '</span>' +
@@ -4290,7 +4269,7 @@ function trendItemHtml(w) {
         ' data-trend-granville-open="' + esc(w.id) + '" data-tf="' + t.k + '"' +
         ' title="' + esc(g ? g.label + (tapped ? '（図の上で記録）' : '（ボタン選択・位置は概算）')
                             : 'グランビルの波を選ぶ') + '">' +
-        gvMiniSvg(tapped) + (g ? esc(g.short) : '波?') + '</button>' +
+        (g ? esc(g.short) : '波?') + '</button>' +
       trendEntryChipHtml(w, t.k) +
     '</div>';
   }).join('');
