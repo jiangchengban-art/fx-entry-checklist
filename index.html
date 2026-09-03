@@ -796,6 +796,14 @@
   .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
 
+  /* S46: ⏳待ちバッジ。RCI到達待ち・MACD発生待ちの根拠数を鮮度チップの隣に出す。 */
+  .twait {
+    font-size: 10.5px; font-weight: 700; flex: none;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--warn-soft); color: var(--warn);
+    border: 1px solid var(--warn);
+  }
+
   /* S33: 根拠パネル。上位足とエントリー足を横並び2列にして、375pxでも縦に伸ばさない。 */
   .trend-panel {
     border-top: 1px solid var(--border);
@@ -1245,6 +1253,8 @@
     <div class="trend-toolbar">
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🎯 エントリー圏のみ</button>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterWait"
+              title="RCI到達待ち・MACD発生待ちなど、⏳待ちの根拠があるペアだけに絞る">⏳ 待ちあり</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
       <select class="trend-category-select" id="trendModeSelect"></select>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendMapOpen"
@@ -1629,10 +1639,14 @@ const MV_TF_CHECKS = [
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
   { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
-  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '❌'] },
-  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
+  /* S46: 「待ち」＝到達/発生していないが潰えてもいない中間状態。他の条件が揃っていても
+     これが崩れていなければエントリー可能性が残ることを一覧の巡回で拾えるようにする。
+     項目そのものの状態なので新規チェック項目にはせず opts に足す（定義元1箇所でボード・
+     根拠パネル・CSV・履歴サマリーすべてに自動反映される、S37/S38 と同じ拡張パターン）。 */
+  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
+  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
+  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
+  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
   /* S38: エントリー再現性向上のため、エントリー足の1波のどのフィボナッチ水準で
@@ -4048,6 +4062,7 @@ const trendListEl    = document.getElementById('trendList');
 const trendSummaryEl = document.getElementById('trendSummary');
 const trendFilterBtn = document.getElementById('trendFilterAligned');
 const trendStaleBtn  = document.getElementById('trendFilterStale');
+const trendWaitBtn   = document.getElementById('trendFilterWait');
 const trendTfBar     = document.getElementById('trendTfToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 const trendModeSelect = document.getElementById('trendModeSelect');
@@ -4057,6 +4072,7 @@ const trendModeSelect = document.getElementById('trendModeSelect');
       参照とハンドラの対応を崩さないため、変えるのは文言と条件だけにする。 */
 let trendEntryOnly   = false;
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
+let trendWaitOnly    = false; // S46: 「⏳待ちあり」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 let trendModeFilter  = '';    // 目線絞り込み（MV_TREND_MODES の v、空文字=すべて）。永続化しない
 /* S33: 開いている根拠パネル。S44 で { id, setupKey } → { id, tfKey }（開いた足がそのまま上位足）。
@@ -4085,17 +4101,30 @@ function saveTrendTfs() {
 }
 let trendVisibleTfs = loadTrendTfs();
 
-/* S38: 根拠の確度。MV_TF_CHECKS のうち ❌ を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
-   分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
+/* S46: ❌（未達成）と ⏳（待ち＝未達成だが潰えてもいない）は確度スコアでは同じ扱いにする。
+   待ちだけを満点扱いにすると「条件がまだ揃っていない」のに確度が実態より高く出るため。
+   一覧の ⏳ バッジ（pairWaitCount）側でこの2つを描き分ける。 */
+function isUnmetCheck(v) { return v === '❌' || (v || '').indexOf('⏳') === 0; }
+
+/* S38: 根拠の確度。MV_TF_CHECKS のうち未達成（isUnmetCheck）を選んだ項目数だけ減点する
+   （未選択の空欄は減点しない）。分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
 function checkConfidence(checks) {
   const total = MV_TF_CHECKS.length;
-  const cross = MV_TF_CHECKS.reduce((n, c) => n + ((checks && checks[c.k]) === '❌' ? 1 : 0), 0);
+  const cross = MV_TF_CHECKS.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
   return Math.round((total - cross) / total * 100);
 }
 function setupConfidence(w) {
   const higher = checkConfidence(w.checksHigher || {});
   const entry  = checkConfidence(w.checksEntry  || {});
   return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
+}
+
+/* S46: 「⏳待ち」の項目数（上位足・エントリー足の合計）。w に保存しない純粋な導出関数
+   （S32〜S44 の GO/WAIT 判定・エントリー圏判定と同じ原則）。行の⏳バッジと絞り込みで使う。 */
+function pairWaitCount(w) {
+  const count = checks => MV_TF_CHECKS.reduce((n, c) =>
+    n + ((checks && (checks[c.k] || '')).indexOf('⏳') === 0 ? 1 : 0), 0);
+  return count(w.checksHigher || {}) + count(w.checksEntry || {});
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -4106,6 +4135,13 @@ function trendAgeHours(w) {
   return (Date.now() - t) / 3600000;
 }
 function isTrendStale(w) { return trendAgeHours(w) > TREND_STALE_H; }
+
+/* S46: RCI到達待ち・MACD発生待ちなど「⏳待ち」の根拠数を行ヘッダに出す。0件なら何も出さない。 */
+function trendWaitBadgeHtml(w) {
+  const n = pairWaitCount(w);
+  if (!n) return '';
+  return '<span class="twait" title="⏳待ちの根拠が' + n + '件あります（RCI到達待ち・MACD発生待ちなど）">⏳' + n + '</span>';
+}
 
 function trendFreshChip(w) {
   const h = trendAgeHours(w);
@@ -4279,6 +4315,7 @@ function trendItemHtml(w) {
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendModeBtnsHtml(w) +
       trendFreshChip(w) +
+      trendWaitBadgeHtml(w) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
@@ -4353,6 +4390,7 @@ function trendApplyFilters(pairs) {
   /* S44: 図の上でタップした位置が買②③/売②③の圏内にあるペアだけに絞る。 */
   if (trendEntryOnly)  shown = shown.filter(pairIsHot);
   if (trendStaleOnly)  shown = shown.filter(isTrendStale);
+  if (trendWaitOnly)   shown = shown.filter(w => pairWaitCount(w) > 0);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   if (trendModeFilter) shown = shown.filter(w => (w.mode || 'trend') === trendModeFilter);
   return shown;
@@ -4371,6 +4409,7 @@ function renderTrendList() {
   renderTrendModeOptions();
   trendFilterBtn.classList.toggle('on', trendEntryOnly);
   trendStaleBtn.classList.toggle('on', trendStaleOnly);
+  trendWaitBtn.classList.toggle('on', trendWaitOnly);
 
   if (!pairs.length) {
     trendListEl.innerHTML = '<div class="empty-state">表示するペアがありません。</div>';
@@ -4419,6 +4458,10 @@ trendFilterBtn.addEventListener('click', () => {
 });
 trendStaleBtn.addEventListener('click', () => {
   trendStaleOnly = !trendStaleOnly;
+  renderTrendList();
+});
+trendWaitBtn.addEventListener('click', () => {
+  trendWaitOnly = !trendWaitOnly;
   renderTrendList();
 });
 trendCategorySelect.addEventListener('change', () => {
