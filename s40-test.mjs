@@ -176,8 +176,9 @@ console.log('\n[5] 一覧行への反映');
   /* S45: ミニ波形（.gv-mini）はタップ位置と無関係な表示だったため撤去済み。出ないことを確認 */
   eq('タップ記録の行にミニ波形は出ない(S45で撤去)', await page.locator(chip + ' .gv-mini').count(), 0);
 
-  /* S44: 圏内なので 🎯 チップと「根拠」ボタンが同じ行に出る */
-  eq('圏内の行に 🎯 が出る', await page.locator(W1 + '.trend-tf .tent').count(), 1);
+  /* S44: 圏内なので 🎯 チップと「根拠」ボタンが同じ行に出る（S48: 🎯 自体は常時表示、圏内は非muted） */
+  eq('圏内の行に 🎯 が出る（強調）',
+     await page.locator(W1 + '.tent[data-tf="d"]:not(.muted)').count(), 1);
   eq('根拠パネルを開くボタンが出る',
      await page.locator(W1 + '[data-trend-panel-open][data-tf="d"]').count(), 1);
 
@@ -191,7 +192,9 @@ console.log('\n[5] 一覧行への反映');
   await page.reload();
   await page.click('[data-tab="trend"]');
   ok('文字ラベルは残る', (await page.textContent(chip)).includes('買③'));
-  eq('概算は圏内に数えないので 🎯 も出ない', await page.locator(W1 + '.trend-tf .tent').count(), 0);
+  /* S48: 🎯 自体は常時表示になったので、概算では muted（強調なし）で出る */
+  eq('概算は圏内に数えないので 🎯 は muted',
+     await page.locator(W1 + '.tent[data-tf="d"]:not(.muted)').count(), 0);
   await page.context().close();
 }
 

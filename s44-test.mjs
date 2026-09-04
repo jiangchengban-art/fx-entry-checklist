@@ -138,9 +138,10 @@ console.log('\n[②] 目線は絞り込みタグとして残る');
     },
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
-  /* 〰レンジでも記録は生きているので 🎯 は出る（S43 までは NO に落ちて沈んでいた） */
+  /* 〰レンジでも記録は生きているので 🎯 は出る（S43 までは NO に落ちて沈んでいた）。
+     S48: 🎯 は常時表示なので表示中の全tf行ぶん出る（既定は日足・4時間足の2行） */
   eq('レンジ指定でも 🎯 は出る',
-     await page.locator('[data-trend-item="w1"] .tent').count(), 1);
+     await page.locator('[data-trend-item="w1"] .tent').count(), 2);
   await page.selectOption('#trendModeSelect', 'range');
   eq('目線で絞り込める', await page.locator('[data-trend-item="w1"]').count(), 1);
   eq('他は消える', await page.locator('[data-trend-item="w2"]').count(), 0);
@@ -176,9 +177,11 @@ console.log('\n[③] エントリー圏に近い順に並ぶ');
   ok('圏内の件数が見出しに入る', heads[0].includes('2'));
   ok('圏外は「その他」でまとまる', heads.some(h => h.includes('その他')));
 
-  /* 記録の無いプリセット28銘柄は必ず圏内グループより後ろ */
+  /* 記録の無いプリセット28銘柄は必ず圏内グループより後ろ。
+     S48: 🎯 は常時表示になったので「.tent の有無」では判別できない。
+     グランビル未記録＝波を一度もタップ/選択していない行で判定する。 */
   const firstNoRecord = await page.locator('.trend-item').evaluateAll(els =>
-    els.findIndex(e => !e.querySelector('.tent')));
+    els.findIndex(e => !e.querySelector('.tgv.on')));
   ok('記録の無いペアは圏内より後ろ  [index ' + firstNoRecord + ']', firstNoRecord >= 2);
 
   /* 絞り込み */
@@ -209,15 +212,20 @@ console.log('\n[④] 🎯 と根拠ボタンの出し分け');
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
   const W1 = '[data-trend-item="w1"] ';
-  eq('圏内の日足には 🎯 が出る', await page.locator(W1 + '.trend-tf .tent').count(), 1);
+  /* S48: 🎯 は圏外でも常時表示（あらかじめ根拠を記録できるように）。圏内だけ緑で強調される */
+  eq('🎯 は日足・4時間足どちらにも出る', await page.locator(W1 + '.trend-tf .tent').count(), 2);
+  eq('圏内の日足は強調（muted でない）',
+     await page.locator(W1 + '.tent[data-tf="d"]:not(.muted)').count(), 1);
+  eq('圏外の4時間足は中立色（muted）',
+     await page.locator(W1 + '.tent[data-tf="h4"].muted').count(), 1);
   eq('根拠ボタンは日足の行にある',
      await page.locator(W1 + '[data-trend-panel-open][data-tf="d"]').count(), 1);
-  eq('圏外の4時間足には出ない',
-     await page.locator(W1 + '[data-trend-panel-open][data-tf="h4"]').count(), 0);
+  eq('根拠ボタンは圏外の4時間足の行にもある',
+     await page.locator(W1 + '[data-trend-panel-open][data-tf="h4"]').count(), 1);
   ok('距離が title に入る',
-     (await page.getAttribute(W1 + '[data-trend-panel-open]', 'title')).includes('エントリー水準まで'));
+     (await page.getAttribute(W1 + '[data-tf="d"][data-trend-panel-open]', 'title')).includes('エントリー水準まで'));
 
-  /* 概算（wpos 空）は圏内に数えない */
+  /* 概算（wpos 空）は圏内に数えない。それでもボタン自体は muted で出る */
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('mochipoyo_market_view_v1'));
     d.pairs.find(p => p.id === 'w1').trend.d.wpos = '';
@@ -225,7 +233,8 @@ console.log('\n[④] 🎯 と根拠ボタンの出し分け');
   });
   await page.reload();
   await page.click('[data-tab="trend"]');
-  eq('概算（ボタン選択）では 🎯 が出ない', await page.locator(W1 + '.tent').count(), 0);
+  eq('概算（ボタン選択）でも 🎯 は出る（muted）',
+     await page.locator(W1 + '.tent[data-tf="d"].muted').count(), 1);
   await page.context().close();
 }
 

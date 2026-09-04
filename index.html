@@ -1053,12 +1053,15 @@
   .gv-legend button.approx { border-style: dashed; color: var(--ink-muted); }
   .gv-legend button .st { font-size: 9px; }
 
-  /* S44: 行末のエントリー圏チップ兼「根拠パネルを開く」ボタン（圏内の足にだけ出る）。 */
+  /* S48: 行末のエントリー圏チップ兼「根拠パネルを開く」ボタン。常時表示、圏内だけ緑で強調。 */
   .tent {
     display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
     font-family: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
     padding: 3px 7px; border-radius: 999px; white-space: nowrap;
     border: 1px solid var(--good); background: var(--good-soft); color: var(--good);
+  }
+  .tent.muted {
+    border-color: var(--border); background: var(--surface-2); color: var(--ink-2);
   }
   .tent-btn { cursor: pointer; }
   .tent-btn:active { transform: scale(0.96); }
@@ -4195,24 +4198,26 @@ function trendJudgeBtnsHtml(w) {
     esc(j.label.slice(0, 1)) + '</button>').join('');
 }
 
-/* S44: 足1本ぶんのエントリー圏チップと、根拠パネルを開くボタン。
-   図の上でタップして記録した位置が圏内（買②③/売②③ ± GV_ENTRY_RADIUS）のときだけ出す。
-   ⚠️ 圏外・概算（wpos が空）・未記録では何も出さない。押しても意味のないボタンを置かないため
-      （S42-③「押しても反応しない」の再演を避ける）。
+/* S48: 足1本ぶんのエントリー圏チップと、根拠パネルを開くボタン。
+   S44 では圏内（買②③/売②④ ± GV_ENTRY_RADIUS）の足にだけ出していたが、
+   「圏外のうちから RCI/MACD などの根拠をあらかじめ記録しておき、条件が揃うほど
+   達成%が上がっていく」運用のため、常時表示に変更（距離が無くても・圏外でも押せる）。
+   圏内は緑の強調、それ以外は中立色で「まだ記録できる」ことだけ示す。
    ⚠️ 月足のように MV_TREND_KEY_TO_TF が引けない足はボタンを出さない。引けないと tfHigher に
       入れる値が無く、パネルを開いても marketFieldsFromBoard() の要求を満たせない。 */
 function trendEntryChipHtml(w, tfKey) {
   const d = tfEntryDistance(w, tfKey);
-  if (d === null || d > GV_ENTRY_RADIUS) return '';
+  const hot = d !== null && d <= GV_ENTRY_RADIUS;
   const open = trendPanel && trendPanel.id === w.id && trendPanel.tfKey === tfKey;
   /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
-     2要素にすると圏内の行だけが2段に折り返して巡回の縦スクロールが増える。
+     2要素にすると2段に折り返して巡回の縦スクロールが増える。
      幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
-  const body = '🎯<span class="d">' + Math.round(d) + '%</span><span class="d">根拠</span>';
-  const title = 'エントリー水準まで ' + d.toFixed(1) + '%';
+  const pct = d === null ? '' : '<span class="d">' + Math.round(d) + '%</span>';
+  const body = '🎯' + pct + '<span class="d">根拠</span>';
+  const title = d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%';
   if (!MV_TREND_KEY_TO_TF[tfKey])
-    return '<span class="tent" title="' + esc(title) + '">' + body + '</span>';
-  return '<button type="button" class="tent tent-btn' + (open ? ' open' : '') + '"' +
+    return '<span class="tent' + (hot ? '' : ' muted') + '" title="' + esc(title) + '">' + body + '</span>';
+  return '<button type="button" class="tent tent-btn' + (hot ? '' : ' muted') + (open ? ' open' : '') + '"' +
     ' data-trend-panel-open="' + esc(w.id) + '" data-tf="' + esc(tfKey) + '"' +
     ' title="' + esc(title + '。この足を上位足にして根拠を記録') + '">' + body + '</button>';
 }
