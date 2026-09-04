@@ -1035,7 +1035,7 @@
   .gv-daynav { display: flex; align-items: center; gap: 3px; }
   .gv-daynav b { min-width: 84px; text-align: center; font-size: 11.5px; color: var(--ink-2); }
   .gv-daynav button { padding: 4px 8px; }
-  #trendMapEntryOnly, #trendMapShot { padding: 5px 10px; font-size: 11.5px; }
+  #trendMapEntryOnly, #trendMapPrevToggle, #trendMapShot { padding: 5px 10px; font-size: 11.5px; }
   #trendMapEntryOnly { margin-left: auto; }
   .gv-mapnote { margin-bottom: 10px; font-size: 11px; color: var(--ink-muted); line-height: 1.5; }
 
@@ -1503,6 +1503,8 @@
       </span>
       <button type="button" class="btn-ghost" id="trendMapEntryOnly"
               title="エントリー水準（買②③/売②③）に近い位置で記録したものだけを表示します">🎯 エントリー圏のみ</button>
+      <button type="button" class="btn-ghost on" id="trendMapPrevToggle"
+              title="前日との比較（薄いドットと軌跡線）の表示を切り替えます">🕓 前日比較</button>
       <button type="button" class="btn-ghost" id="trendMapShot"
               title="今日の波マップを今の状態で上書き保存します">📸 記録</button>
     </div>
@@ -4967,10 +4969,12 @@ const trendMapPairSelect = document.getElementById('trendMapPairSelect');
 const trendMapDayLabel   = document.getElementById('trendMapDayLabel');
 const trendMapZones      = document.getElementById('trendMapZones');
 const trendMapEntryBtn   = document.getElementById('trendMapEntryOnly');
+const trendMapPrevBtn    = document.getElementById('trendMapPrevToggle');
 let trendMapTf   = '';   // 空なら開いたときに表示中の先頭の足を採る
 let trendMapDay  = '';   // S42: '' = 今（ライブ）。それ以外は day キー
 let trendMapPair = '';   // S42: '' = 全銘柄。それ以外は単一銘柄モード（全時間足を重ねる）
 let trendMapEntryOnly = false;  // S43: エントリー圏内の記録だけに絞る
+let trendMapShowPrev = true;    // S49: 前日の薄いドット・軌跡線の表示切り替え
 
 function trendMapVisibleTfs() {
   return trendVisibleTfs.length ? trendVisibleTfs : MV_TREND_DEFAULT_TFS;
@@ -5089,6 +5093,7 @@ function openTrendMap() {
   trendMapDay = '';
   trendMapPair = '';
   trendMapEntryOnly = false;
+  trendMapShowPrev = true;
   gvLoadImg(trendMapImg);
   renderTrendMap();
   trendMapModal.classList.add('show');
@@ -5137,11 +5142,12 @@ function renderTrendMap() {
 
   /* ⚠️ ライブ表示のときは今日の分を比較対象から外す。一覧タブを開くたびに今日が保存される
      ので、外さないと「今の状態」に対して今日のスナップショット＝自分自身が重なる。 */
-  const prevDay = trendMapDay
+  const prevDay = (trendMapShowPrev && trendMapDay)
     ? days.filter(d => d < trendMapDay)[0]
-    : days.filter(d => d < wmDayKey())[0];
+    : (trendMapShowPrev ? days.filter(d => d < wmDayKey())[0] : null);
   const prev = prevDay ? trendMapDayEntries(byDay[prevDay]) : [];
   wmApplyOffsets(prev, offsets);
+  trendMapPrevBtn.classList.toggle('on', trendMapShowPrev);
 
   trendMapMeta.textContent = entries.length + '件' +
     (trendMapEntryOnly ? '' : '（うち 🎯 ' + hotAll + '件）') +
@@ -5164,9 +5170,13 @@ function renderTrendMap() {
 
   /* 何を見ているか・何が効いていないかを必ず書く（黙って無視するとフィルタが壊れて見える）。 */
   const note = [];
-  note.push(prevDay
-    ? '薄いドットと線は ' + prevDay + ' からの動きです。'
-    : '比較できる過去の記録がまだありません（🔭一覧を開くたびに今日の分が記録されます）。');
+  if (!trendMapShowPrev) {
+    note.push('前日比較は非表示中です（🕓 前日比較ボタンで表示できます）。');
+  } else {
+    note.push(prevDay
+      ? '薄いドットと線は ' + prevDay + ' からの動きです。'
+      : '比較できる過去の記録がまだありません（🔭一覧を開くたびに今日の分が記録されます）。');
+  }
   if (trendMapDay) note.push('⚠ 過去日では「未更新のみ」「目線」の絞り込みは効きません（記録に含まれないため）。' +
     '🎯 とカテゴリは座標とペア名から測れるので効きます。');
   if (trendMapPair) note.push('単一銘柄モード：色は時間足を表します。');
@@ -5249,6 +5259,10 @@ trendMapPairSelect.addEventListener('change', () => {
 });
 trendMapEntryBtn.addEventListener('click', () => {
   trendMapEntryOnly = !trendMapEntryOnly;
+  renderTrendMap();
+});
+trendMapPrevBtn.addEventListener('click', () => {
+  trendMapShowPrev = !trendMapShowPrev;
   renderTrendMap();
 });
 document.getElementById('trendMapPrev').addEventListener('click', () => trendMapStepDay(-1));
