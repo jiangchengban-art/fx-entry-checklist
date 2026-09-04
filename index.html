@@ -914,6 +914,21 @@
 
   /* グランビル・ピッカー */
   .gv-meta { font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+  /* S47: 記録中の時間足はそのまま図をタップして書き込むが、他の時間足の既存記録位置を
+     参考として薄く重ね表示できる。色は .gv-dot の足別配色（tf-d/h4/w/mn）と揃える。
+     ⚠️ ここはあくまで参考表示の切替であり、書き込みは開いた時間足だけの操作のまま。 */
+  .gv-reftfs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+  .gv-ref-btn {
+    font-family: inherit; cursor: pointer; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--ink-muted); padding: 4px 10px; font-size: 11.5px; font-weight: 700;
+  }
+  .gv-ref-btn:hover:not(:disabled) { background: var(--surface); }
+  .gv-ref-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .gv-ref-btn.on.tf-d  { background: rgba(209, 98, 11, 0.14);  border-color: #d1620b; color: #d1620b; }
+  .gv-ref-btn.on.tf-h4 { background: rgba(42, 120, 214, 0.14); border-color: #2a78d6; color: #2a78d6; }
+  .gv-ref-btn.on.tf-w  { background: rgba(122, 63, 191, 0.14); border-color: #7a3fbf; color: #7a3fbf; }
+  .gv-ref-btn.on.tf-mn { background: rgba(10, 143, 106, 0.14); border-color: #0a8f6a; color: #0a8f6a; }
   /* S40: 図をタップ面にするため、画像と重ね物を同じ座標系に載せる箱。
      ⚠️ object-fit: contain のままだと「要素の箱」と「実際に絵が描かれる領域」がズレ、
         レターボックスの余白ぶんだけ重ね物が浮く。箱に画像の実寸比（--gv-ar、JSが load 時に入れる）を
@@ -1452,9 +1467,11 @@
 <div class="modal-backdrop" id="trendGvModal">
   <div class="modal wide">
     <h3>グランビルの波 <span class="gv-meta" id="trendGvMeta"></span></h3>
+    <div class="gv-reftfs" id="trendGvRefTfs"></div>
     <div class="gv-fig" id="trendGvFig">
       <img class="gv-img" id="trendGvImg" alt="グランビルの法則">
       <div class="gv-anchors" id="trendGvAnchors"></div>
+      <div class="gv-dots" id="trendGvRefDots"></div>
       <div class="gv-marker" id="trendGvMarker" hidden><span></span></div>
     </div>
     <div class="gv-readout" id="trendGvReadout"></div>
@@ -4643,10 +4660,13 @@ const trendGvMeta    = document.getElementById('trendGvMeta');
 const trendGvImg     = document.getElementById('trendGvImg');
 const trendGvFig     = document.getElementById('trendGvFig');
 const trendGvAnchors = document.getElementById('trendGvAnchors');
+const trendGvRefTfsEl = document.getElementById('trendGvRefTfs');
+const trendGvRefDots  = document.getElementById('trendGvRefDots');
 const trendGvMarker  = document.getElementById('trendGvMarker');
 const trendGvReadout = document.getElementById('trendGvReadout');
 let trendGvTarget = null;   // { id, tf }
 let trendGvDirty = false;   // 図をタップして動かしたか（閉じるときに行を差し替えるため）
+let trendGvRefOn = new Set();   // S47: 参考重ね表示ON中の時間足キー。開くたびにリセット
 
 /* 画像の実寸から縦横比を CSS 変数に流す。ハードコードしないので図を差し替えても崩れない。
    ⚠️ これを入れないと .gv-fig の比率が既定値のままで、重ね物と絵が数 px ずれる。 */
@@ -4680,9 +4700,34 @@ function openTrendGv(watchId, tfKey) {
   if (!isTrendingState(cur.state)) return;   // 方向未記録では開かない
   trendGvTarget = { id: watchId, tf: tfKey };
   trendGvDirty = false;
+  trendGvRefOn = new Set();
   gvLoadImg(trendGvImg);
   renderTrendGv();
   trendGvModal.classList.add('show');
+}
+
+/* S47: 他の時間足の記録位置を参考として重ねるための1件分。書き込みには一切関与しない読み取り専用の導出。
+   ⚠️ 距離・座標の決め方は trendMapEntryOf() と同じ（tapped があればその座標、無ければアンカー＝概算）。
+      波マップと表示が食い違わないよう、圏内判定は同じ gvEntryDistance() を通す。 */
+function gvRefEntry(w, tfKey) {
+  const cur = (w.trend && w.trend[tfKey]) || {};
+  const g = MV_GRANVILLE_MAP[cur.granville];
+  if (!g) return null;
+  const tapped = gvParsePos(cur.wpos);
+  const a = MV_GRANVILLE_ANCHORS[g.v];
+  const t = MV_TREND_TFS.find(x => x.k === tfKey);
+  const dist = tapped ? gvEntryDistance(tapped.x, tapped.y) : null;
+  return {
+    tfKey: tfKey, approx: !tapped,
+    x: tapped ? tapped.x : a[0], y: tapped ? tapped.y : a[1],
+    hot: dist !== null && dist <= GV_ENTRY_RADIUS,
+    label: t ? t.short : tfKey,
+  };
+}
+function gvRefDotHtml(en) {
+  return '<div class="gv-dot tf-' + en.tfKey + (en.approx ? ' approx' : '') + (en.hot ? ' hot' : '') +
+    '" style="left:' + en.x + '%;top:' + en.y + '%">' +
+    '<span class="pt"></span><span class="nm">' + esc(en.label) + '</span></div>';
 }
 
 function renderTrendGv() {
@@ -4693,6 +4738,21 @@ function renderTrendGv() {
   const cur = (w.trend && w.trend[trendGvTarget.tf]) || {};
   trendGvMeta.textContent = w.pair + ' / ' + (t ? t.label : trendGvTarget.tf);
   const opts = gvCandidates(cur);
+
+  /* S47: 他の時間足を参考重ね表示するトグル。表示中の時間足（trendVisibleTfs）だけを候補にし、
+     記録が無い足はボタンを disabled にする（押しても何も出ないボタンを置かない）。 */
+  const refTfs = MV_TREND_TFS.filter(x => x.k !== trendGvTarget.tf &&
+    trendVisibleTfs.some(v => v.k === x.k));
+  trendGvRefTfsEl.innerHTML = refTfs.map(x => {
+    const has = !!((w.trend && w.trend[x.k] || {}).granville);
+    const on = trendGvRefOn.has(x.k);
+    return '<button type="button" class="gv-ref-btn tf-' + x.k + (on ? ' on' : '') + '"' +
+      (has ? '' : ' disabled') + ' data-gv-ref-tf="' + x.k + '">' + esc(x.short) + '</button>';
+  }).join('');
+  trendGvRefDots.innerHTML = refTfs.filter(x => trendGvRefOn.has(x.k)).map(x => {
+    const en = gvRefEntry(w, x.k);
+    return en ? gvRefDotHtml(en) : '';
+  }).join('');
 
   /* 8つの公式ポジションを薄い目印として重ねる。今スナップ先になりうるものだけ強調する。 */
   const candSet = {};
@@ -4769,6 +4829,13 @@ trendGvFig.addEventListener('click', (e) => {
   renderTrendGv();
 });
 
+trendGvRefTfsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-gv-ref-tf]');
+  if (!btn || btn.disabled) return;
+  const k = btn.dataset.gvRefTf;
+  if (trendGvRefOn.has(k)) trendGvRefOn.delete(k); else trendGvRefOn.add(k);
+  renderTrendGv();
+});
 document.getElementById('trendGvGuide').addEventListener('click', () => {
   closeTrendGv();
   openGuideDrawer('guide-granville');
