@@ -548,21 +548,6 @@
   .tab-bar .tab-btn.active { color: var(--accent); }
   .tab-bar .tab-btn.active .tab-icon { transform: translateY(-1px); }
 
-  /* ============ ステップナビ（🎯トレードタブ内サブナビ） ============ */
-  .step-nav {
-    position: sticky; top: 0; z-index: 30;
-    display: flex; gap: 8px; padding: 10px 2px; margin-bottom: 14px;
-    background: var(--page);
-  }
-  .step-nav .step-nav-btn {
-    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-    background: var(--surface); color: var(--ink-muted);
-    border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 6px; font-size: 12.5px; font-weight: 700; font-family: inherit;
-    cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
-  }
-  .step-nav .step-nav-btn:hover { background: var(--surface-2); }
-  .step-nav .step-nav-btn.current { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
   .trade-step { scroll-margin-top: 60px; }
   .trade-step + .trade-step { margin-top: 18px; }
 
@@ -1138,35 +1123,14 @@
   <!-- S28: 保存済みデータを読めなかったときの警告。表示中は全書き込みが停止している -->
   <div id="fatalBanner"></div>
 
-  <!-- ============ 🎯 トレード（環境認識→チェック→記録の一連フロー） ============ -->
+  <!-- ============ 🎯 トレード（🔭一覧で環境認識を終えたペアを記録するフォーム） ============ -->
   <div class="tab-panel" id="tabPanel-trade">
-  <nav class="step-nav" id="stepNav">
-    <button type="button" class="step-nav-btn" data-step="tabPanel-market">🌐 環境</button>
-    <button type="button" class="step-nav-btn" data-step="tabPanel-form">📝 記録</button>
-  </nav>
 
-  <section class="card trade-step" id="tabPanel-market">
-    <h2><span class="step-badge">1</span> 環境認識ボード</h2>
-    <div class="section-note">通貨ペアを選び、上位足・エントリー足とその根拠、アラート発生足、判定をここで記録します。記録フォームはこの内容を引き継ぎます。</div>
-
-    <div class="mv-toolbar">
-      <select id="mvGroupSelect">
-        <option value="">グループを選択…</option>
-      </select>
-      <select id="mvPairSelect" disabled>
-        <option value="">通貨ペアを選択…</option>
-      </select>
-      <span class="spacer"></span>
-    </div>
-
-    <div id="mvList"></div>
-  </section>
-
-  <!-- ============ ② トレード記録フォーム ============ -->
+  <!-- ============ トレード記録フォーム ============ -->
   <section class="card trade-step" id="tabPanel-form">
-    <h2><span class="step-badge">2</span> トレード記録フォーム<span id="editModeBadge" class="badge demo hidden" style="margin-left:8px;">✎ 編集中</span></h2>
-    <div class="section-note">通貨ペア・時間足・根拠・判定は環境認識ボードから引き継がれます。ここでは実行と結果だけを入力します。エグジット日時は未確定なら空欄のままで保存できます。</div>
-    <!-- 環境認識ボードの選択内容を読み取り専用で表示する。内容は syncFormFromMarket() が描画する -->
+    <h2>トレード記録フォーム<span id="editModeBadge" class="badge demo hidden" style="margin-left:8px;">✎ 編集中</span></h2>
+    <div class="section-note">通貨ペア・時間足・根拠・判定は🔭一覧タブの根拠パネルで設定してから来てください。ここでは実行と結果だけを入力します。エグジット日時は未確定なら空欄のままで保存できます。</div>
+    <!-- 🔭一覧タブで選択・記録した内容を読み取り専用で表示する。内容は syncFormFromMarket() が描画する -->
     <div class="form-mv-summary" id="formMarketSummary"></div>
     <form id="tradeForm" autocomplete="off">
       <div class="form-grid">
@@ -1562,8 +1526,7 @@ const IMG_MACD_DIVERGENCE = "data:image/webp;base64,UklGRjYmAQBXRUJQVlA4IComAQDw
    CSV_HEADERS が MV_TF_CHECKS を参照するため、CSV セクションより前に宣言しておく。 */
 const MARKET_KEY = 'mochipoyo_market_view_v1';
 
-/* 上位足・エントリー足のプルダウン選択肢 */
-const MV_TF_HIGHER_OPTIONS = ['週足', '日足', '4時間足', '1時間足'];
+/* エントリー足のプルダウン選択肢（🔭一覧の根拠パネルで使用。上位足はS44以降タップした足から確定するため選択肢不要） */
 const MV_TF_ENTRY_OPTIONS  = ['5分足', '15分足', '1時間足', '4時間足'];
 
 /* 上位足・エントリー足それぞれで確認する根拠のチェック項目。
@@ -2142,14 +2105,14 @@ INDICATOR_GROUPS.forEach(groupName => {
         '<span class="guide-label">基礎知識</span>' +
         '<div class="guide-text">' + esc(item.basics) + '</div>' +
       '</div>' +
-      (item.id ? '<button type="button" class="btn-ghost guide-back-btn">← 環境認識ボードに戻る</button>' : '');
+      (item.id ? '<button type="button" class="btn-ghost guide-back-btn">← 🔭一覧に戻る</button>' : '');
     ul.appendChild(li);
   });
   details.appendChild(ul);
   guideEl.appendChild(details);
 });
 
-/* 解説ドロワー内の「戻る」ボタン。ジャンプ元（環境認識ボードの根拠チェック行）へ戻る */
+/* 解説ドロワー内の「戻る」ボタン。ジャンプ元（🔭一覧の根拠パネル）へ戻る */
 guideEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.guide-back-btn');
   if (!btn) return;
@@ -2276,19 +2239,19 @@ function syncFormFromMarket() {
 
   if (!mv) {
     formMarketSummary.innerHTML =
-      '<div class="head"><span>🌐 環境認識ボードより</span></div>' +
-      '<div class="warn">⚠ 記録の前に、環境認識ボードで <b>通貨ペア</b> / <b>上位足</b> / ' +
+      '<div class="head"><span>🔭一覧より</span></div>' +
+      '<div class="warn">⚠ 記録の前に、🔭一覧タブの根拠パネルで <b>通貨ペア</b> / <b>上位足</b> / ' +
       '<b>エントリー足</b> / <b>判定</b> を設定してください。</div>' +
       '<div class="head" style="margin:10px 0 0;">' +
-      '<button class="btn-ghost" type="button" id="gotoMarketBtn">🌐 環境認識ボードへ</button></div>';
+      '<button class="btn-ghost" type="button" id="gotoMarketBtn">🔭 一覧タブへ</button></div>';
     return;
   }
 
   const row = (k, v) => '<div class="row"><span class="k">' + k + '</span>' +
     '<span class="v">' + v + '</span></div>';
   formMarketSummary.innerHTML =
-    '<div class="head"><span>🌐 環境認識ボードより</span><span class="spacer"></span>' +
-      '<button class="btn-ghost" type="button" id="gotoMarketBtn">🌐 ボードへ</button></div>' +
+    '<div class="head"><span>🔭一覧より</span><span class="spacer"></span>' +
+      '<button class="btn-ghost" type="button" id="gotoMarketBtn" data-watch-id="' + esc(mv.watchId || '') + '">🔭 一覧タブへ</button></div>' +
     '<div class="rows">' +
       row('通貨ペア', esc(mv.pair)) +
       row('時間足', esc(mv.tfHigher) + ' × ' + esc(mv.tfEntry)) +
@@ -2298,13 +2261,24 @@ function syncFormFromMarket() {
         '<span style="font-weight:400;opacity:.6;">未選択</span>') : '') +
     '</div>' +
     (editingId
-      ? '<div class="frozen">✎ 編集中：この欄の内容は記録された当時の値です。ボードを操作しても変更されません。</div>'
+      ? '<div class="frozen">✎ 編集中：この欄の内容は記録された当時の値です。🔭一覧を操作しても変更されません。</div>'
       : '');
 }
 
+/* S51: 環境認識ボード廃止に伴い、飛び先は🔭一覧タブの該当ペア行へ変更（元ボードと同じハイライト演出）。 */
 formMarketSummary.addEventListener('click', (e) => {
-  if (!e.target.closest('#gotoMarketBtn')) return;
-  document.getElementById('tabPanel-market').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const btn = e.target.closest('#gotoMarketBtn');
+  if (!btn) return;
+  const watchId = btn.dataset.watchId;
+  setActiveTab('trend', { keepScroll: true });
+  if (!watchId) return;
+  requestAnimationFrame(() => {
+    const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(watchId) + '"]');
+    if (!item) return;
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    item.classList.add('trend-highlight');
+    setTimeout(() => item.classList.remove('trend-highlight'), 1600);
+  });
 });
 
 function setDatetimeNow() {
@@ -2332,7 +2306,7 @@ function doSave() {
      編集時は保存済みの値を引き継ぎ、今日のボード状態で上書きしない。 */
   const mv = existing ? pickMarketFields(existing) : marketFieldsFromBoard();
   if (!mv) {
-    showToast('⚠ 環境認識ボードで 通貨ペア / 上位足 / エントリー足 / 判定 を設定してください');
+    showToast('⚠ 🔭一覧タブで 通貨ペア / 上位足 / エントリー足 / 判定 を設定してください');
     return;
   }
 
@@ -2548,7 +2522,7 @@ function renderStats() {
 }
 
 /* ---- アラート発生足別の判定統計 ---- */
-/* 環境認識ボードで判定（エントリー/保留/スルー）を押すたびに記録される judgeLog を、
+/* 🔭一覧タブで判定（エントリー/保留/スルー）を押すたびに記録される judgeLog を、
    そのときONだった各時間足（1H/4H/D/W）ごとに集計する。複数の足が同時にONの場合は
    それぞれの足のカウントに重複して加算される（同時アラートの傾向を見るため）。 */
 function renderMvAlertStats() {
@@ -2557,7 +2531,7 @@ function renderMvAlertStats() {
   const log = loadMarket().judgeLog || [];
   if (!log.length) {
     el.innerHTML = '<h3>アラート発生足別の判定統計</h3><div class="empty-state">' +
-      '環境認識ボードで判定（✅エントリー/⏸保留/⏭スルー）を記録するとここに集計されます。</div>';
+      '🔭一覧タブで判定（✅エントリー/⏸保留/⏭スルー）を記録するとここに集計されます。</div>';
     return;
   }
   const rows = MV_ALERT_TFS.map(t => {
@@ -2575,7 +2549,7 @@ function renderMvAlertStats() {
           '<span class="n">' + r.n + '件</span>' +
           '<span class="rr" style="width:auto;">✅' + r.entered + ' ⏸' + r.hold + ' ⏭' + r.through + '</span>' +
         '</div>').join('')
-    : '<div class="empty-state">環境認識ボードで判定を記録するとここに集計されます。</div>');
+    : '<div class="empty-state">🔭一覧タブで判定を記録するとここに集計されます。</div>');
 }
 function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -3642,7 +3616,6 @@ function saveMarket(data) {
     return false;
   }
 }
-const mvListEl = document.getElementById('mvList');
 /* S25: 一覧タブは全通貨横断のチャート巡回画面なので、プリセット銘柄をグループ分けして持つ。
    ここに1行足せば選択肢・一覧タブの巡回対象の両方に自動反映される（loadMarket の自動生成が参照）。 */
 const MV_PAIR_GROUPS = [
@@ -3654,196 +3627,16 @@ const MV_PAIR_GROUPS = [
 ];
 const MV_PRESET_PAIRS = MV_PAIR_GROUPS.flatMap(g => g.pairs);
 
-/* グループに属するペア名一覧。「自由入力」はプリセット外の既存ペア（過去に自由入力で作成済みのもの）。 */
-function pairsInGroup(groupLabel, data) {
-  if (groupLabel === '自由入力') {
-    const known = new Set(MV_PRESET_PAIRS);
-    return data.pairs.map(w => w.pair).filter(p => !known.has(p));
-  }
-  const g = MV_PAIR_GROUPS.find(g => g.label === groupLabel);
-  return g ? g.pairs : [];
-}
-
-/* グループ選択に応じて銘柄プルダウンを差し替える。グループ未選択なら無効化。 */
-function syncPairOptionsForGroup(groupLabel, data, selectedPair) {
-  const pairs = pairsInGroup(groupLabel, data);
-  let html = '<option value="">通貨ペアを選択…</option>';
-  pairs.forEach(p => { html += '<option' + (p === selectedPair ? ' selected' : '') + '>' + esc(p) + '</option>'; });
-  mvPairSelect.innerHTML = html;
-  mvPairSelect.disabled = !groupLabel;
-}
-
-/* 選択中の通貨ペアIDを反映しつつ、これまでにカスタム入力したペアも選択肢に含める。
-   グループ選択→銘柄選択の2段プルダウン（グループごとに optgroup 化する代わりにカスケード化）。 */
-function syncPairSelectOptions(data, selectedId) {
-  const known = new Set(MV_PRESET_PAIRS);
-  const customPairs = data.pairs.map(w => w.pair).filter(p => !known.has(p));
-  const selectedPair = (data.pairs.find(w => w.id === selectedId) || {}).pair || '';
-  const presetGroup = selectedPair && MV_PAIR_GROUPS.find(g => g.pairs.includes(selectedPair));
-  const selectedGroup = presetGroup ? presetGroup.label : (selectedPair && customPairs.includes(selectedPair) ? '自由入力' : '');
-
-  let groupHtml = '<option value="">グループを選択…</option>';
-  MV_PAIR_GROUPS.forEach(g => {
-    groupHtml += '<option' + (g.label === selectedGroup ? ' selected' : '') + '>' + esc(g.label) + '</option>';
-  });
-  if (customPairs.length) {
-    groupHtml += '<option' + (selectedGroup === '自由入力' ? ' selected' : '') + '>自由入力</option>';
-  }
-  mvGroupSelect.innerHTML = groupHtml;
-
-  syncPairOptionsForGroup(selectedGroup, data, selectedPair);
-}
-
-/* ボードの内容は記録フォームの入力元でもあるため、描画のたびにフォーム側も同期する。
-   （ペア選択・時間足・根拠・判定のどのハンドラも最後に renderMarket() を呼ぶ） */
+/* S51: 環境認識ボード廃止（🔭一覧タブへ機能統合）に伴い renderMarketBoard() 等は削除。
+   renderMarket() はフォーム同期の呼び出し名として各所から呼ばれ続けるため、名前はそのまま残す。 */
 function renderMarket() {
-  renderMarketBoard();
   syncFormFromMarket();
 }
-function renderMarketBoard() {
-  const data = loadMarket();
-  let selectedId = loadSelectedPairId();
-  let w = data.pairs.find(p => p.id === selectedId);
-  if (!w) { selectedId = ''; saveSelectedPairId(''); }
-
-  syncPairSelectOptions(data, selectedId);
-
-  if (!w) {
-    mvListEl.innerHTML = '<div class="empty-state">上で通貨ペアを選択すると、ここにボードが表示されます。</div>';
-    return;
-  }
-
-  /* 上位足・エントリー足はプルダウンで選択し、選んだ瞬間にそのペアへ即保存される。 */
-  function tfSelectOptions(options, selected) {
-    return '<option value="">選択してください</option>' +
-      options.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
-  }
-  /* 各時間足の下に根拠チェックを並べる。上位足とエントリー足で別々の値を保持するため、
-     保存先フィールド（checksHigher / checksEntry）を data 属性で持ち回る。 */
-  /* S29: グランビルは対応する時間足（週足・日足・4時間足）を選んでいる間、
-     🔭一覧タブの記録を映すだけの読み取り専用行になる（クリックすると一覧側の値と食い違うため）。 */
-  function tfCheckBlock(field, checks, tfLabel) {
-    const gvTfKey = MV_TF_TO_TREND_KEY[tfLabel];
-    return '<div class="mv-tf-checks">' + MV_TF_CHECKS.map(c => {
-      const synced = c.k === 'granville' && gvTfKey;
-      return '<div class="mv-tfcheck-row">' +
-        (c.link
-          ? '<button type="button" class="label mv-guide-link" data-guide-link="' + c.link + '">' +
-            esc(c.label) + ' 📖</button>'
-          : '<span class="label">' + esc(c.label) + '</span>') +
-        (synced
-          ? '<div class="mv-choice mv-gv-synced">' +
-              '<span class="mv-gv-synced-value' + (checks[c.k] ? ' on' : '') + '">' +
-                (checks[c.k] ? esc(checks[c.k]) : '🔭未記録') + '</span>' +
-              '<button type="button" class="mv-gv-synced-tag" data-mv-gv-goto-trend="' + esc(w.id) + '"' +
-                ' data-tf="' + esc(gvTfKey) + '" title="🔭一覧タブのグランビル記録から自動反映。変更は一覧側で行う">' +
-                '🔭一覧と連動 →</button>' +
-            '</div>'
-          : '<div class="mv-choice' + (c.opts.length > 3 ? ' wrap' : '') + '">' + c.opts.map(o =>
-              '<button type="button" class="mv-tfcheck-btn' + (checks[c.k] === o ? ' on' : '') + '"' +
-              ' data-mv-tfcheck="' + esc(w.id) + '" data-field="' + field + '"' +
-              ' data-key="' + c.k + '" data-value="' + esc(o) + '">' + esc(o) + '</button>').join('') +
-            '</div>') +
-      '</div>';
-    }).join('') + '</div>';
-  }
-  function tfSection(label, field, options, selected) {
-    return '<div class="mv-tf-block">' +
-      '<div class="mv-tf-select-row">' +
-        '<span class="tf">' + label + '</span>' +
-        '<select data-mv-tf-select="' + field + '" data-watch="' + esc(w.id) + '">' +
-          tfSelectOptions(options, selected) +
-        '</select>' +
-      '</div>' +
-      tfCheckBlock(field, w[MV_CHECK_FIELDS[field]] || {}, selected) +
-    '</div>';
-  }
-  const rows =
-    tfSection('上位足', 'tfHigher', MV_TF_HIGHER_OPTIONS, w.tfHigher) +
-    tfSection('エントリー足', 'tfEntry', MV_TF_ENTRY_OPTIONS, w.tfEntry);
-
-  const alerts = w.alerts || {};
-  const alertBadges = MV_ALERT_TFS.map(t => {
-    const a = alerts[t.k] || {};
-    return '<button type="button" class="mv-alert-badge' + (a.on ? ' on' : '') + '"' +
-      ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
-      t.label + '</button>';
-  }).join('');
-  const activeAlertTimes = MV_ALERT_TFS
-    .filter(t => (alerts[t.k] || {}).on)
-    .map(t => '<span class="item">' + t.full + ': ' + fmtDatetime((alerts[t.k] || {}).at) + '</span>');
-  const alertTimesRow = activeAlertTimes.length
-    ? '<div class="mv-alert-times">' + activeAlertTimes.join('') + '</div>' : '';
-
-  mvListEl.innerHTML = '<div class="mv-card">' +
-    '<div class="mv-card-head">' +
-      '<span class="pair">' + esc(w.pair) + '</span>' +
-      /* S44: セットアップ判定バッジは廃止（🔭一覧の各足の行に出る 🎯 エントリー圏に置き換え）。 */
-      '<div class="mv-alert-badges">' + alertBadges + '</div>' +
-      '<span class="spacer"></span>' +
-      '<button class="btn-ghost" type="button" data-mv-del-pair="' + esc(w.id) + '">このペアのデータを削除</button>' +
-      alertTimesRow +
-    '</div>' +
-    rows +
-    '<div class="mv-goto-row">' +
-      '<button class="btn-accent-solid mv-goto-checklist" type="button" data-mv-goto-form="' + esc(w.id) + '">📝 記録フォームへ</button>' +
-      '<button class="btn-ghost mv-goto-checklist" type="button" data-mv-goto-trend="' + esc(w.id) + '" title="このペアを🔭一覧タブで見る">🔭 一覧タブへ</button>' +
-    '</div>' +
-    '<div class="mv-judge-row">' +
-      '<span class="label">判定</span>' +
-      '<div class="mv-choice">' +
-        MV_JUDGES.map(j =>
-          '<button type="button" class="mv-judge-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
-          ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' + j.label + '</button>').join('') +
-      '</div>' +
-    '</div>';
-}
-
-/* ---- 通貨ペアの選択 ---- */
-const mvGroupSelect  = document.getElementById('mvGroupSelect');
-const mvPairSelect   = document.getElementById('mvPairSelect');
-
-/* 選択したペアの監視項目がなければ新規作成し、そのペア1枚だけをボードに表示する。 */
-function selectPair(pair) {
-  pair = (pair || '').trim();
-  if (!pair) return;
-  const data = loadMarket();
-  let w = data.pairs.find(p => p.pair === pair);
-  if (!w) {
-    const alerts = {};
-    MV_ALERT_TFS.forEach(t => { alerts[t.k] = { on: false, at: '' }; });
-    w = { id: mvGenId('w'), pair, alerts, judge: '', tfHigher: '', tfEntry: '',
-          checksHigher: {}, checksEntry: {} };
-    mvEnsureTrend(w);
-    data.pairs.push(w);
-    if (!saveMarket(data)) return;
-  }
-  saveSelectedPairId(w.id);
-  renderMarket();
-}
-
-mvGroupSelect.addEventListener('change', () => {
-  syncPairOptionsForGroup(mvGroupSelect.value, loadMarket(), '');
-});
-mvPairSelect.addEventListener('change', () => {
-  if (mvPairSelect.value) selectPair(mvPairSelect.value);
-});
-
-/* ---- 一覧内の操作 ---- */
+/* ---- ペア削除の確認モーダル（S51: トリガーは🔭一覧の行へ移設、モーダル自体は共有） ---- */
 const mvDeleteModal = document.getElementById('mvDeleteModal');
 let mvPendingDeleteId = null;
 
-mvListEl.addEventListener('change', (e) => {
-  /* 上位足・エントリー足のプルダウン。選んだ瞬間にそのペアへ即保存する。 */
-  const tfSelect = e.target.closest('[data-mv-tf-select]');
-  if (tfSelect) {
-    /* S28: 保存が止まっているのに選択が残ると、UI と保存内容が食い違ったまま気づけない。 */
-    if (!mvSetTf(tfSelect.dataset.watch, tfSelect.dataset.mvTfSelect, tfSelect.value)) renderMarket();
-    return;
-  }
-});
-
-/* ---- アラート・判定の共有ハンドラ（環境認識ボード / トレンド一覧の両方から呼ぶ） ---- */
+/* ---- アラート・判定の共有ハンドラ（🔭一覧タブから呼ぶ） ---- */
 
 /* 上位足・エントリー足の設定（S33でボードのハンドラから切り出し）。
    ボードのプルダウンと🔭一覧の根拠パネルの両方がここを通る。戻り値は更新後の w（失敗時 null）。 */
@@ -3981,93 +3774,6 @@ function mvWriteTrend(watchId, tfKey, patch) {
   return w;
 }
 
-mvListEl.addEventListener('click', (e) => {
-  /* 根拠チェックのラベル 📖 から解説ドロワーを開く。背後のスクロール位置は保たれる。 */
-  const guideLink = e.target.closest('[data-guide-link]');
-  if (guideLink) {
-    openGuideDrawer('guide-' + guideLink.dataset.guideLink);
-    return;
-  }
-
-  /* 見立てが固まったら、そのまま記録フォームへ移動する。 */
-  const gotoForm = e.target.closest('[data-mv-goto-form]');
-  if (gotoForm) {
-    setActiveTab('trade', { keepScroll: true });
-    requestAnimationFrame(() => {
-      document.getElementById('tabPanel-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return;
-  }
-
-  /* S29: 「🔭一覧タブへ」— ボードからトレンド一覧タブへの逆導線。一覧側にある「→ボードへ」の対になる。 */
-  const gotoTrend = e.target.closest('[data-mv-goto-trend]');
-  if (gotoTrend) {
-    const watchId = gotoTrend.dataset.mvGotoTrend;
-    setActiveTab('trend', { keepScroll: true });
-    requestAnimationFrame(() => {
-      const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(watchId) + '"]');
-      if (!item) return;
-      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      item.classList.add('trend-highlight');
-      setTimeout(() => item.classList.remove('trend-highlight'), 1600);
-    });
-    return;
-  }
-
-  /* S29: 「🔭一覧と連動」タグから、このペア・この足のグランビル記録元へ移動する（ボード→一覧の逆導線）。 */
-  const gvGotoTrend = e.target.closest('[data-mv-gv-goto-trend]');
-  if (gvGotoTrend) {
-    const watchId = gvGotoTrend.dataset.mvGvGotoTrend;
-    const tfKey = gvGotoTrend.dataset.tf;
-    setActiveTab('trend', { keepScroll: true });
-    requestAnimationFrame(() => {
-      const item = trendListEl.querySelector('[data-trend-item="' + CSS.escape(watchId) + '"]');
-      if (!item) return;
-      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      item.classList.add('trend-highlight');
-      setTimeout(() => item.classList.remove('trend-highlight'), 1600);
-      const gvBtn = item.querySelector('[data-trend-granville-open][data-tf="' + CSS.escape(tfKey) + '"]');
-      if (gvBtn) gvBtn.focus({ preventScroll: true });
-    });
-    return;
-  }
-
-  /* 上位足・エントリー足それぞれの根拠チェック。選んだ瞬間に保存する。
-     同じものを再度押すと未選択に戻せる（❌ は「該当なし」を明示的に記録する選択肢）。 */
-  const tfCheckBtn = e.target.closest('[data-mv-tfcheck]');
-  if (tfCheckBtn) {
-    const { mvTfcheck: watchId, field, key, value } = tfCheckBtn.dataset;
-    if (mvWriteCheck(watchId, field, key, value)) renderMarket();
-    return;
-  }
-
-  /* アラート・判定のトグルは環境認識ボードとトレンド一覧の両方から呼ばれるため、
-     処理本体は mvToggleAlert / mvSetJudge に切り出してある（セッション23）。 */
-  const alertBadge = e.target.closest('[data-mv-alert-toggle]');
-  if (alertBadge) {
-    mvToggleAlert(alertBadge.dataset.mvAlertToggle, alertBadge.dataset.tf);
-    return;
-  }
-
-  const judgeBtn = e.target.closest('[data-mv-judge]');
-  if (judgeBtn) {
-    mvSetJudge(judgeBtn.dataset.mvJudge, judgeBtn.dataset.value);
-    return;
-  }
-
-  const delPair = e.target.closest('[data-mv-del-pair]');
-  if (delPair) {
-    const id = delPair.dataset.mvDelPair;
-    const data = loadMarket();
-    const w = data.pairs.find(p => p.id === id);
-    if (!w) return;
-    mvPendingDeleteId = id;
-    document.getElementById('mvDeleteText').textContent =
-      '「' + w.pair + '」のデータを削除します。この操作は取り消せません。';
-    mvDeleteModal.classList.add('show');
-    return;
-  }
-});
 document.getElementById('mvDeleteCancel').addEventListener('click', () => {
   mvDeleteModal.classList.remove('show');
   mvPendingDeleteId = null;
@@ -4360,9 +4066,11 @@ function trendItemHtml(w) {
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
-        ' title="このペアの巡回記録（方向/ゾーン/波/目線）をクリア">🗑</button>' +
+        ' title="このペアの巡回記録（方向/ゾーン/波/目線）をクリア">🧹</button>' +
+      '<button type="button" class="tclear" data-trend-del-pair="' + esc(w.id) + '"' +
+        ' title="このペアのデータを完全に削除（元に戻せません）">🗑</button>' +
       '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
-        ' title="このペアの環境認識ボードへ">→</button>' +
+        ' title="このペアを選択して記録フォームへ">→</button>' +
     '</div>' + tfRows + panel +
   '</div>';
 }
@@ -4615,6 +4323,21 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
+  /* S51: ペアのデータを完全に削除（環境認識ボード廃止に伴い、旧ボードにあった削除操作をここへ移設）。
+     巡回記録だけを消す🧹クリアとは別の、より強い操作なので確認モーダルを挟む。 */
+  const delPairBtn = e.target.closest('[data-trend-del-pair]');
+  if (delPairBtn) {
+    const id = delPairBtn.dataset.trendDelPair;
+    const data = loadMarket();
+    const w = data.pairs.find(p => p.id === id);
+    if (!w) return;
+    mvPendingDeleteId = id;
+    document.getElementById('mvDeleteText').textContent =
+      '「' + w.pair + '」のデータを削除します。この操作は取り消せません。';
+    mvDeleteModal.classList.add('show');
+    return;
+  }
+
   /* S35: 目線3択。判定を差し替えるのでバッジも書き換わるが、行だけ差し替えて並べ替えはしない。 */
   const modeBtn = e.target.closest('[data-trend-mode]');
   if (modeBtn) {
@@ -4651,7 +4374,7 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
-  /* そのペアを選択状態にして環境認識ボードへ移動する。 */
+  /* そのペアを選択状態にして🎯記録フォームへ移動する（S51: 環境認識ボード廃止に伴い行き先変更）。 */
   const goto = e.target.closest('[data-trend-goto-board]');
   if (goto) {
     saveSelectedPairId(goto.dataset.trendGotoBoard);
@@ -5446,27 +5169,6 @@ tabBar.addEventListener('click', (e) => {
   setActiveTab(btn.dataset.tab);
 });
 setActiveTab(localStorage.getItem(TAB_KEY) || 'trade');
-
-/* ============ 🎯トレード内 ステップナビ ============ */
-const stepNav = document.getElementById('stepNav');
-const stepSections = Array.from(document.querySelectorAll('.trade-step'));
-stepNav.addEventListener('click', (e) => {
-  const btn = e.target.closest('.step-nav-btn');
-  if (!btn) return;
-  const target = document.getElementById(btn.dataset.step);
-  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-function updateStepNavCurrent() {
-  const navBtns = Array.from(stepNav.querySelectorAll('.step-nav-btn'));
-  let currentId = stepSections[0] && stepSections[0].id;
-  const offset = 70;
-  stepSections.forEach(sec => {
-    if (sec.getBoundingClientRect().top - offset <= 0) currentId = sec.id;
-  });
-  navBtns.forEach(btn => btn.classList.toggle('current', btn.dataset.step === currentId));
-}
-window.addEventListener('scroll', updateStepNavCurrent, { passive: true });
-updateStepNavCurrent();
 
 /* ============ 📖 解説ドロワー ============ */
 const guideDrawerBackdrop = document.getElementById('guideDrawerBackdrop');
