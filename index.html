@@ -345,6 +345,8 @@
   }
 
   .modal.wide { max-width: 560px; max-height: 88vh; overflow-y: auto; }
+  .modal.trade-modal { max-width: 640px; text-align: left; }
+  .trade-modal-close { float: right; }
 
   /* ============ S54: 結果タグ・損益・建値タッチ・チャート画像（記録フォーム） ============ */
   .pnl-input-row { display: flex; align-items: center; gap: 8px; }
@@ -1039,12 +1041,14 @@
   <div id="fatalBanner"></div>
 
   <!-- ============ 🎯 トレード（🔭一覧で環境認識を終えたペアを記録するフォーム） ============ -->
-  <div class="tab-panel" id="tabPanel-trade">
-
-  <!-- ============ トレード記録フォーム ============ -->
+  <!-- ============ トレード記録モーダル（S55: 🎯タブ廃止・🔭一覧から直接開く） ============ -->
+  <div class="modal-backdrop" id="tradeModal">
+  <div class="modal wide trade-modal">
   <section class="card trade-step" id="tabPanel-form">
-    <h2>トレード記録フォーム<span id="editModeBadge" class="badge demo hidden" style="margin-left:8px;">✎ 編集中</span></h2>
-    <div class="section-note">通貨ペア・時間足・根拠・判定は🔭一覧タブの根拠パネルで設定してから来てください。ここでは実行と結果だけを入力します。エグジット日時は未確定なら空欄のままで保存できます。</div>
+    <h2>トレード記録フォーム<span id="editModeBadge" class="badge demo hidden" style="margin-left:8px;">✎ 編集中</span>
+      <button type="button" class="btn-ghost trade-modal-close" id="tradeModalClose" title="閉じる">✕</button>
+    </h2>
+    <div class="section-note">エグジット日時は未確定なら空欄のままで保存できます。</div>
     <!-- 🔭一覧タブで選択・記録した内容を読み取り専用で表示する。内容は syncFormFromMarket() が描画する -->
     <div class="form-mv-summary" id="formMarketSummary"></div>
     <form id="tradeForm" autocomplete="off">
@@ -1152,6 +1156,7 @@
       </div>
     </form>
   </section>
+  </div>
   </div>
 
   <!-- ============ 📚 振り返り（統計＋履歴、区分フィルタ共通） ============ -->
@@ -1307,9 +1312,6 @@
 
 <!-- ============ 下部タブバー ============ -->
 <nav class="tab-bar" id="tabBar">
-  <button class="tab-btn" type="button" data-tab="trade">
-    <span class="tab-icon">🎯</span><span class="tab-label">トレード</span>
-  </button>
   <button class="tab-btn" type="button" data-tab="trend">
     <span class="tab-icon">🔭</span><span class="tab-label">一覧</span>
   </button>
@@ -2256,6 +2258,7 @@ formMarketSummary.addEventListener('click', (e) => {
   const btn = e.target.closest('#gotoMarketBtn');
   if (!btn) return;
   const watchId = btn.dataset.watchId;
+  closeTradeModal();
   setActiveTab('trend', { keepScroll: true });
   if (!watchId) return;
   requestAnimationFrame(() => {
@@ -2266,6 +2269,21 @@ formMarketSummary.addEventListener('click', (e) => {
     setTimeout(() => item.classList.remove('trend-highlight'), 1600);
   });
 });
+
+/* ============ トレード記録モーダル（S55） ============ */
+const tradeModal = document.getElementById('tradeModal');
+function openTradeModal(watchId) {
+  if (watchId) { saveSelectedPairId(watchId); renderMarket(); }
+  syncFormFromMarket();
+  tradeModal.classList.add('show');
+  const inner = tradeModal.querySelector('.modal');
+  if (inner) inner.scrollTop = 0;
+}
+function closeTradeModal() {
+  tradeModal.classList.remove('show');
+}
+document.getElementById('tradeModalClose').addEventListener('click', closeTradeModal);
+tradeModal.addEventListener('click', (e) => { if (e.target === tradeModal) closeTradeModal(); });
 
 function setDatetimeNow() {
   const d = new Date();
@@ -2337,6 +2355,7 @@ function doSave() {
   ['entry', 'higher', 'others'].forEach(renderImagePreview);
   setDatetimeNow();
   renderAll();
+  closeTradeModal();
   showToast(wasEditing
     ? '✔ 記録を更新しました'
     : '✔ ' + (MV_JUDGE_LABELS[trade.result] || trade.result) + ' を記録しました（' + trade.pair + '）');
@@ -2710,10 +2729,9 @@ function loadTradeIntoForm(t) {
   editModeBadge.classList.remove('hidden');
   formSubmitBtn.textContent = '💾 更新を保存';
   cancelEditBtn.classList.remove('hidden');
-  setActiveTab('trade');
-  requestAnimationFrame(() => {
-    document.getElementById('tabPanel-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  tradeModal.classList.add('show');
+  const inner = tradeModal.querySelector('.modal');
+  if (inner) inner.scrollTop = 0;
   showToast('編集モード: 内容を変更して保存してください');
 }
 
@@ -3962,12 +3980,7 @@ trendListEl.addEventListener('click', (e) => {
         saveSelectedPairId を renderMarket より先に呼ぶこと。 */
   const gotoForm = e.target.closest('[data-trend-goto-form]');
   if (gotoForm) {
-    saveSelectedPairId(gotoForm.dataset.trendGotoForm);
-    renderMarket();
-    setActiveTab('trade', { keepScroll: true });
-    requestAnimationFrame(() => {
-      document.getElementById('tabPanel-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    openTradeModal(gotoForm.dataset.trendGotoForm);
     return;
   }
 
@@ -4048,9 +4061,7 @@ trendListEl.addEventListener('click', (e) => {
   /* そのペアを選択状態にして🎯記録フォームへ移動する（S51: 環境認識ボード廃止に伴い行き先変更）。 */
   const goto = e.target.closest('[data-trend-goto-board]');
   if (goto) {
-    saveSelectedPairId(goto.dataset.trendGotoBoard);
-    renderMarket();
-    setActiveTab('trade');
+    openTradeModal(goto.dataset.trendGotoBoard);
   }
 });
 
@@ -4268,6 +4279,7 @@ document.getElementById('trendGvCancel').addEventListener('click', closeTrendGv)
 trendGvModal.addEventListener('click', (e) => { if (e.target === trendGvModal) closeTrendGv(); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && trendGvModal.classList.contains('show')) closeTrendGv();
+  if (e.key === 'Escape' && tradeModal.classList.contains('show')) closeTradeModal();
 });
 
 /* ============ S42: 波マップの日次記録 ============
@@ -4813,13 +4825,12 @@ const TAB_KEY = 'mochipoyo_active_tab';
 const tabBar = document.getElementById('tabBar');
 const tabButtons = Array.from(tabBar.querySelectorAll('.tab-btn'));
 const tabPanels = {
-  trade:    document.getElementById('tabPanel-trade'),
   trend:    document.getElementById('tabPanel-trend'),
   review:   document.getElementById('tabPanel-review'),
   settings: document.getElementById('tabPanel-settings'),
 };
 function setActiveTab(name, opts) {
-  if (!tabPanels[name]) name = 'trade';
+  if (!tabPanels[name]) name = 'trend';
   Object.entries(tabPanels).forEach(([key, panel]) => {
     panel.classList.toggle('active', key === name);
   });
@@ -4839,7 +4850,7 @@ tabBar.addEventListener('click', (e) => {
   if (!btn) return;
   setActiveTab(btn.dataset.tab);
 });
-setActiveTab(localStorage.getItem(TAB_KEY) || 'trade');
+setActiveTab(localStorage.getItem(TAB_KEY) || 'trend');
 
 /* ============ 📖 解説ドロワー ============ */
 const guideDrawerBackdrop = document.getElementById('guideDrawerBackdrop');

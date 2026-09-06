@@ -139,7 +139,7 @@ console.log('\n[①-1] 一覧タブを開くと今日の分が記録される');
   eq('概算は wpos を持たない', s[0].items.find(i => i.p === 'USDJPY' && i.t === 'h4').w, '');
 
   /* 同じ日に2回開いても1件のまま（今日は常に上書き） */
-  await page.click('[data-tab="trade"]');
+  await page.click('[data-tab="review"]');
   await page.click('[data-tab="trend"]');
   const s2 = await snapsOf(page);
   eq('同じ日に開き直しても1件のまま', s2.filter(x => x.day === dayKey()).length, 1);

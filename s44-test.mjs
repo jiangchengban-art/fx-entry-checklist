@@ -117,9 +117,8 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
   eq('ツールバーの絞り込みが 🎯 エントリー圏のみ になる',
      (await page.textContent('#trendFilterAligned')).trim(), '🎯 エントリー圏のみ');
 
-  /* ボードにもバッジは残っていない */
-  await page.click('[data-tab="trade"]');
-  eq('ボードにも判定バッジが無い', await page.locator('.mv-card-head .sbadge').count(), 0);
+  /* S55: 🎯タブ自体が廃止されたので、ボードにバッジが残っていないことはタブ不在で証明される */
+  eq('🎯トレードタブ自体が存在しない', await page.locator('[data-tab="trade"]').count(), 0);
   await page.context().close();
 }
 
