@@ -1854,6 +1854,13 @@ function storageBackupIfShrinking(key, prevRaw, nextObj, counts) {
   } catch (e) { /* 判定できないなら何もしない */ }
 }
 
+/* 容量超過（QuotaExceededError）だけを見分ける。他のエラー（JSON循環参照等）まで
+   「容量が原因」として軽量化を試みると、本当の原因を隠して延々と失敗し続けるため。 */
+function isQuotaError(e) {
+  return e && (e.name === 'QuotaExceededError' || e.code === 22 ||
+    (typeof e.message === 'string' && /quota/i.test(e.message)));
+}
+
 function loadTrades() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw == null || raw === '') return [];   /* 真の初回 */
@@ -1881,7 +1888,16 @@ function saveTrades(trades) {
     localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
     return true;
   } catch (e) {
-    alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
+    /* ⚠️ トレード記録側には market の wavemap のような「安全に削って良い付随データ」が無い
+       （チャート画像は S54 で Firebase Storage の URL のみを持つので、既にここでは軽い）。
+       中身を推測で間引くと記録そのものが欠けるので、リーン保存はせず失敗として扱う。 */
+    if (isQuotaError(e)) {
+      alert('保存に失敗しました（localStorage の容量制限）。\n' +
+            '記録件数が多い場合は、⚙設定タブの「全データJSONエクスポート」で退避してから、' +
+            '古い記録の整理をご検討ください。\n' + e.message);
+    } else {
+      alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
+    }
     return false;
   }
 }
@@ -3301,6 +3317,22 @@ function saveMarket(data) {
     localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
     return true;
   } catch (e) {
+    /* ⚠️ 容量超過のときだけ、波マップ（wavemap）の保持を直近7日に切り詰めて再試行する。
+       ペア・チェック・判定・トレードは1件も削らない ── 波マップは定点観測の補助データで、
+       「記録本体 > 使い捨てられる履歴」の優先順位に沿う唯一の候補だから。
+       それでも収まらなければ、これまで通り失敗させて（データを消したことにしない）ユーザーに知らせる。 */
+    if (isQuotaError(e) && Array.isArray(data.snapshots)) {
+      try {
+        const cutoff = wmDayKey(new Date(Date.now() - 7 * 86400000));
+        const lean = Object.assign({}, data, {
+          snapshots: data.snapshots.filter(s => !s || s.kind !== WM_KIND || String(s.day || '') >= cutoff),
+        });
+        localStorage.setItem(MARKET_KEY, JSON.stringify(lean));
+        localStorage.setItem('mochipoyo_lastwrite_v1', new Date().toISOString());
+        showToast('⚠ 容量が逼迫したため、波マップの履歴を直近7日分に圧縮して保存しました');
+        return true;
+      } catch (e2) { /* リーン保存も失敗 → 下の失敗扱いへ */ }
+    }
     alert('保存に失敗しました。localStorage の容量制限の可能性があります。\n' + e.message);
     return false;
   }
@@ -5183,6 +5215,41 @@ async function runSync(opts) {
   }
 }
 
+/* ---- 端末間の食い違いが直らないときの最終手段（コンソール専用・UIには出さない） ----
+   通常の同期は要素キー単位でマージするので、マージ結果自体が壊れているような
+   異常時（例：クラウド側の doc が壊れて runSync が毎回エラーになる）は
+   マージでは直らない。この端末のローカルを正としてクラウド側を丸ごと作り直す。
+   ⚠️ 他端末の未同期分は消える。実行前に必ずその端末側で同期を済ませておくこと。 */
+async function resetCloudToLocal() {
+  if (!syncCfg() || !syncAuth()) { console.error('[resetCloudToLocal] 未ログインです'); return; }
+  if (!confirm('クラウド側のデータを、この端末のローカル内容で丸ごと上書きします。\n' +
+               '他の端末にまだ同期していない変更があれば消えます。よろしいですか？')) return;
+  try {
+    const a = await syncValidToken();
+    const q = '?user_id=eq.' + encodeURIComponent(a.user_id);
+    const doc = localDoc();
+    const rows = await sbFetch('/rest/v1/app_state' + q + '&select=rev', undefined);
+    const row = rows && rows[0];
+    if (!row) {
+      await sbFetch('/rest/v1/app_state', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: a.user_id, doc, rev: 1 }),
+      });
+    } else {
+      await sbFetch('/rest/v1/app_state' + q, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ doc, rev: row.rev + 1, updated_at: new Date().toISOString() }),
+      });
+    }
+    syncWriteJson(SYNC_STATE_KEY, { lastAt: new Date().toISOString(), dirty: false });
+    console.log('[resetCloudToLocal] 完了。トレード ' + doc.trades.length + '件／ペア ' +
+                doc.market.pairs.length + '件をクラウドへ書き込みました。');
+    showToast('☁ クラウド側をこの端末の内容で上書きしました');
+  } catch (e) {
+    console.error('[resetCloudToLocal] 失敗:', e);
+  }
+}
+
 /* ---- 表示 ---- */
 const syncChipEl = document.getElementById('syncChip');
 function setSyncChip(kind, text) {
@@ -5295,12 +5362,28 @@ function syncMarkDirty() {
 
 window.addEventListener('online', () => { refreshSyncChip(); runSync(); });
 window.addEventListener('offline', refreshSyncChip);
-document.addEventListener('visibilitychange', () => {
+function syncPullIfVisible() {
   if (document.visibilityState !== 'visible') return;
   const s = syncState();
   /* 戻ってくるたびに通信すると無駄なので、前回から1分あいたときだけ。 */
   if (s.dirty || !s.lastAt || Date.now() - ts(s.lastAt) > 60000) runSync();
-});
+}
+document.addEventListener('visibilitychange', syncPullIfVisible);
+/* ⚠️ iOS Safari はバックグラウンドタブの setInterval を止める・タブ自体を kill することがあるので、
+   visibilitychange 単体では「開きっぱなしの iPhone に PC の更新が届かない」まま起こる。
+   復帰・再表示・操作系のイベントを総動員して拾う（S28拡張）。 */
+window.addEventListener('pageshow', syncPullIfVisible);
+window.addEventListener('focus', syncPullIfVisible);
+let syncTouchLast = 0;
+document.addEventListener('touchstart', () => {
+  const now = Date.now();
+  if (now - syncTouchLast < 4000) return;
+  syncTouchLast = now;
+  syncPullIfVisible();
+}, { passive: true });
+/* 前面にいる間だけの定期ポーリング。個人利用の巡回ツールなので30秒で十分、
+   短くしすぎると同期の課金枠を無駄に消費する（移植元プロジェクトで実際に踏んだ）。 */
+setInterval(syncPullIfVisible, 30000);
 
 /* 保存が起きたことを検知して同期予約する。全書き込み経路が saveMarket / saveTrades を
    通る規約になっているので、この2つを包むだけで漏れなく拾える。 */
