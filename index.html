@@ -827,6 +827,7 @@
   }
   .gv-ref-btn:hover:not(:disabled) { background: var(--surface); }
   .gv-ref-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .gv-ref-btn.on.tf-h1 { background: rgba(194, 37, 92, 0.14);   border-color: #c2255c; color: #c2255c; }
   .gv-ref-btn.on.tf-d  { background: rgba(209, 98, 11, 0.14);  border-color: #d1620b; color: #d1620b; }
   .gv-ref-btn.on.tf-h4 { background: rgba(42, 120, 214, 0.14); border-color: #2a78d6; color: #2a78d6; }
   .gv-ref-btn.on.tf-w  { background: rgba(122, 63, 191, 0.14); border-color: #7a3fbf; color: #7a3fbf; }
@@ -897,6 +898,7 @@
   .gv-dot.plain { color: #8a8a8a; }
   /* S42: 単一銘柄モードは足ごとに色を変える。1銘柄では全足が同じ色になって用を成さないため、
      記録の質（タップ＝実線／ボタン＝中空）は .pt に残し、色は足の識別に振り直す。 */
+  .gv-dot.tf-h1 { color: #c2255c; }
   .gv-dot.tf-d  { color: #d1620b; }
   .gv-dot.tf-h4 { color: #2a78d6; }
   .gv-dot.tf-w  { color: #7a3fbf; }
@@ -1528,8 +1530,8 @@ function gvEntryDistance(x, y) {
 
 /* S44: ペアが「チャンスにどれだけ近いか」。小さいほど上に並ぶ（記録が無ければ Infinity）。
    GO / WAIT / NO の3段階ラベルを置き換える連続量で、S32 と同じく w には一切保存しない導出。
-   ⚠️ 見るのは MV_TREND_DEFAULT_TFS（日足・4時間足）だけ。週足・月足は表示トグルで出入りするので、
-      混ぜると「表示を切り替えただけで並び順が飛ぶ」。
+   ⚠️ 見るのは MV_TREND_DEFAULT_TFS（1時間足・4時間足・日足、S57で1H追加）だけ。週足・月足は表示トグルで
+      出入りするので、混ぜると「表示を切り替えただけで並び順が飛ぶ」。
    ⚠️ 概算（ボタンで選んだだけ＝wpos が空）は数えない。概算の座標はアンカーそのもので距離0になり、
       買②③/売②③を選んだ全件が無条件で最上位に来てしまう（S43 の圏内判定と同じ理由）。
    方向と逆 side の波は mvWriteTrend() が自動で消すので、ここで side を見る必要はない。 */
@@ -1582,12 +1584,13 @@ const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
 
 /* ボードの上位足・エントリー足ラベル → トレンド一覧の時間足キー。
    一致するものだけ「🔭一覧と連動」表示になり、一覧のグランビル記録が自動で流れ込む。
-   一覧は日足・4時間足（＋週足・月足）しか持たないため、1時間足・5分足・15分足は対象外＝従来どおり手動選択。 */
-const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4' };
+   一覧は1時間足・4時間足・日足（＋週足・月足）を持つため、5分足・15分足は対象外＝従来どおり手動選択。
+   S57: 1時間足を追加（一覧が h1 を追跡するようになったため）。 */
+const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4', '1時間足': 'h1' };
 /* S33: 上の逆引き。🔭一覧で根拠パネルを開いた足（S44 以降は行の「根拠」ボタンを押した足）から
    ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。
    ⚠️ ここに無い足（月足）では根拠パネルを開けない ── tfHigher に入れる値が無いため。 */
-const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足' };
+const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足', h1: '1時間足' };
 /* トレンド一覧の該当足からボードの checksHigher/checksEntry.granville へ書き込む唯一の入り口。
    一覧が入力元・ボードは複製という向きを守るため、ボード側からここへは書き込まない。 */
 function mvGranvilleSyncField(w, field) {
@@ -1636,15 +1639,16 @@ const MV_JUDGE_LABELS = Object.fromEntries(MV_JUDGES.map(j => [j.v, j.label]));
    保存し、既存の記録・CSV・統計には一切影響させない。
    MV_TREND_TFS に1行足せば、一覧の行・移行処理・集計すべてに自動反映される。 */
 const MV_TREND_TFS = [
-  { k: 'd',  label: '日足',    short: '日' },
+  { k: 'h1', label: '1時間足', short: '1H' },
   { k: 'h4', label: '4時間足', short: '4H' },
+  { k: 'd',  label: '日足',    short: '日' },
   { k: 'w',  label: '週足',    short: '週', optional: true },
   { k: 'mn', label: '月足',    short: '月', optional: true },
 ];
-/* ⚠️ 並び順・サマリーの主軸はこの2足。週足・月足は表示トグルで出入りするため、
+/* ⚠️ 並び順・サマリーの主軸はこの3足（S57で1時間足を追加）。週足・月足は表示トグルで出入りするため、
    主軸に入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
-   また記録済み4足すべてを必須にすると、月足が未記録なだけで全ペアが最上位から落ちる（初日は必ずそうなる）。
-   S44: pairEntryDistance()（並び順とサマリーの 🎯 圏内）が見るのもこの2足だけ。行に出る
+   また記録済み全足を必須にすると、月足が未記録なだけで全ペアが最上位から落ちる（初日は必ずそうなる）。
+   S44: pairEntryDistance()（並び順とサマリーの 🎯 圏内）が見るのもこの3足だけ。行に出る
    🎯 チップは足ごとなので週足・月足でも出るが、ペアの順位は動かさない。 */
 const MV_TREND_DEFAULT_TFS = MV_TREND_TFS.filter(t => !t.optional);
 
@@ -3552,7 +3556,7 @@ function trendCategoryOf(pairName) {
   return g ? g.label : 'その他';
 }
 
-/* 表示する時間足。日足・4時間足が既定で、週足・月足は希望時だけ出す。
+/* 表示する時間足。1時間足・4時間足・日足が既定で、週足・月足は希望時だけ出す。
    端末ごとの表示設定にすぎないので、市場データ（saveMarket）ではなく専用キーに持つ。 */
 function loadTrendTfs() {
   try {
@@ -3669,7 +3673,7 @@ function trendEntryChipHtml(w, tfKey) {
 }
 
 /* 根拠チェック1項目のセル。上位足・エントリー足で同じ形を使う。
-   S29 と同じ判定式で、一覧が追跡している足（週足・日足・4時間足）のグランビルは
+   S29 と同じ判定式で、一覧が追跡している足（週足・日足・4時間足・1時間足）のグランビルは
    読み取り専用にする ── ここで手入力できると一覧側の記録と食い違うため。 */
 function trendCheckCell(w, field, c) {
   const checks = w[MV_CHECK_FIELDS[field]] || {};

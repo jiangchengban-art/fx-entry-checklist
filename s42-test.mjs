@@ -209,6 +209,8 @@ console.log('\n[①-5] 日付を戻すと前日＋軌跡が出る');
   }));
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   ok('マップが開く', await page.locator('#trendMapModal.show').isVisible());
   eq('当日は2件（USDJPY / EURUSD の日足）', await page.locator('#trendMapDots .gv-dot:not(.prev)').count(), 2);
   eq('前日レイヤーが出る', await page.locator('#trendMapDots .gv-dot.prev').count(), 2);
@@ -246,6 +248,8 @@ console.log('\n[②] 単一銘柄で日足と4Hを同時表示');
   await page.click('[data-tab="trend"]');
   const before = await page.locator('#trendList .trend-item').count();
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   eq('全銘柄モードでは日足の2件', await page.locator('#trendMapDots .gv-dot:not(.prev)').count(), 2);
 
   await page.selectOption('#trendMapPairSelect', 'USDJPY');

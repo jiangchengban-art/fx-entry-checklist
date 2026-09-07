@@ -80,6 +80,8 @@ async function openMap(viewport) {
   const page = await newPage(SEED, viewport);
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   return page;
 }
 
@@ -151,6 +153,7 @@ console.log('\n[③] 凡例の先頭に 🎯 圏内グループ');
 
   /* 波番号別のグループは従来どおり全件（圏内も圏外も）読める */
   await page.click('#trendMapOpen');
+  await page.click('[data-map-tf="d"]');
   const buy2 = page.locator('#trendMapLegend .grp').filter({ hasText: '買②' }).last();
   eq('買②グループには3件とも残る', await buy2.locator('.plist button').count(), 3);
   await page.context().close();
@@ -207,6 +210,8 @@ console.log('\n[⑤] S42 の挙動を壊していない');
   });
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   eq('前日レイヤーが出る', await page.locator('#trendMapDots .gv-dot.prev').count(), 1);
   eq('動いたものに軌跡線が引かれる', await page.locator('#trendMapTrail line').count(), 1);
   /* ⚠️ 前日レイヤーまで光ると「今どこが圏内か」が読めなくなる */

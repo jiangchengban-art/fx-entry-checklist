@@ -233,6 +233,8 @@ console.log('\n[7] 🗺 波マップ');
   }, { width: 900, height: 900 });
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   ok('マップが開く', await page.locator('#trendMapModal.show').isVisible());
   eq('記録のある2件だけ載る', await page.locator('#trendMapDots .gv-dot').count(), 2);
   eq('タップ記録は実線', await page.locator('#trendMapDots .gv-dot:not(.approx)').count(), 1);
@@ -280,10 +282,13 @@ console.log('\n[8] マップと絞り込みの連動');
   }, { width: 900, height: 900 });
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   eq('絞り込みなしでは2件', await page.locator('#trendMapDots .gv-dot').count(), 2);
   await page.click('#trendMapClose');
   await page.click('#trendFilterAligned');            /* S44: 🎯 エントリー圏のみ */
   await page.click('#trendMapOpen');
+  await page.click('[data-map-tf="d"]');
   eq('エントリー圏のみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
   ok('残るのは圏内のペア', await page.locator('#trendMapDots .gv-dot.hot').count() === 1);
   await page.context().close();
@@ -305,6 +310,8 @@ console.log('\n[8b] 重なりの解消');
   }, { width: 900, height: 900 });
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   const styles = await page.locator('#trendMapDots .gv-dot').evaluateAll(
     els => els.map(el => el.getAttribute('style')));
   eq('3件とも描かれる', styles.length, 3);

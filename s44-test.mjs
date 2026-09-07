@@ -138,9 +138,9 @@ console.log('\n[②] 目線は絞り込みタグとして残る');
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
   /* 〰レンジでも記録は生きているので 🎯 は出る（S43 までは NO に落ちて沈んでいた）。
-     S48: 🎯 は常時表示なので表示中の全tf行ぶん出る（既定は日足・4時間足の2行） */
+     S48: 🎯 は常時表示なので表示中の全tf行ぶん出る（既定は1時間足・4時間足・日足の3行、S57で1H追加） */
   eq('レンジ指定でも 🎯 は出る',
-     await page.locator('[data-trend-item="w1"] .tent').count(), 2);
+     await page.locator('[data-trend-item="w1"] .tent').count(), 3);
   await page.selectOption('#trendModeSelect', 'range');
   eq('目線で絞り込める', await page.locator('[data-trend-item="w1"]').count(), 1);
   eq('他は消える', await page.locator('[data-trend-item="w2"]').count(), 0);
@@ -211,8 +211,9 @@ console.log('\n[④] 🎯 と根拠ボタンの出し分け');
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
   const W1 = '[data-trend-item="w1"] ';
-  /* S48: 🎯 は圏外でも常時表示（あらかじめ根拠を記録できるように）。圏内だけ緑で強調される */
-  eq('🎯 は日足・4時間足どちらにも出る', await page.locator(W1 + '.trend-tf .tent').count(), 2);
+  /* S48: 🎯 は圏外でも常時表示（あらかじめ根拠を記録できるように）。圏内だけ緑で強調される
+     S57: 既定の表示足が1時間足・4時間足・日足の3本になったため、記録の無い1時間足も含めて3件出る。 */
+  eq('🎯 は1時間足・4時間足・日足いずれにも出る', await page.locator(W1 + '.trend-tf .tent').count(), 3);
   eq('圏内の日足は強調（muted でない）',
      await page.locator(W1 + '.tent[data-tf="d"]:not(.muted)').count(), 1);
   eq('圏外の4時間足は中立色（muted）',
@@ -339,6 +340,8 @@ console.log('\n[⑦] 🗺 波マップ');
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
   await page.click('#trendMapOpen');
+  /* S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
+  await page.click('[data-map-tf="d"]');
   eq('2件とも載る', await page.locator('#trendMapDots .gv-dot').count(), 2);
   eq('色は中立1色になる', await page.locator('#trendMapDots .gv-dot.plain').count(), 2);
   eq('GO/WAIT/NO の色分けが残っていない',
@@ -374,8 +377,10 @@ console.log('\n[⑧] 日次スナップショット（S42 の互換）');
   eq('新しい items の s は空', today.items.map(i => i.s), ['']);
   ok('旧レコードは残る', snaps.some(s => s.id === 'wm_old'));
 
-  /* 昨日へ戻して、s: 'go' 入りの旧レコードがそのまま描けることを見る */
+  /* 昨日へ戻して、s: 'go' 入りの旧レコードがそのまま描けることを見る
+     S57: 既定タブは表示中の先頭の足（1時間足）になったため、記録済みの日足タブを明示的に選ぶ */
   await page.click('#trendMapOpen');
+  await page.click('[data-map-tf="d"]');
   await page.click('#trendMapPrev');
   eq('旧レコードでもドットが描ける（s を読まない）',
      await page.locator('#trendMapDots .gv-dot:not(.prev)').count(), 1);
