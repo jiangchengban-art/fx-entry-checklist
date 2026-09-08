@@ -100,7 +100,7 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
       pairs: [
         mkPair('w1', 'USDJPY', upAt('2', pos(IN))),
         mkPair('w2', 'EURUSD', upAt('1', pos(OUT))),
-        mkPair('w3', 'GBPUSD', { mode: 'rd' }),
+        mkPair('w3', 'GBPUSD', {}),
       ],
       snapshots: [], judgeLog: [],
     },
@@ -123,27 +123,30 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
 }
 
 /* ═════════════════════════════════════════════════════════
-   ② 目線（📈〰🔄）は自動判定に効かない絞り込みタグとして残る
+   ② S58: 手動GOフラグが最上位グループに来る（エントリー圏の自動距離とは独立）
    ═════════════════════════════════════════════════════════ */
-console.log('\n[②] 目線は絞り込みタグとして残る');
+console.log('\n[②] 手動GOフラグは最上位グループ・独立の絞り込みになる');
 {
   const page = await newPage({
     [MARKET]: {
       pairs: [
-        mkPair('w1', 'USDJPY', { ...upAt('2', pos(IN)), mode: 'range' }),
-        mkPair('w2', 'EURUSD', upAt('2', pos(IN))),
+        mkPair('w1', 'USDJPY', upAt('2', pos(IN))),   // 圏内・GO無し
+        mkPair('w2', 'EURUSD', {}),                    // 未記録・GO無し
       ],
       snapshots: [], judgeLog: [],
     },
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
-  /* 〰レンジでも記録は生きているので 🎯 は出る（S43 までは NO に落ちて沈んでいた）。
-     S48: 🎯 は常時表示なので表示中の全tf行ぶん出る（既定は1時間足・4時間足・日足の3行、S57で1H追加） */
-  eq('レンジ指定でも 🎯 は出る',
-     await page.locator('[data-trend-item="w1"] .tent').count(), 3);
-  await page.selectOption('#trendModeSelect', 'range');
-  eq('目線で絞り込める', await page.locator('[data-trend-item="w1"]').count(), 1);
-  eq('他は消える', await page.locator('[data-trend-item="w2"]').count(), 0);
+  eq('GOグループはまだ無い', await page.locator('.trend-group-head.go').count(), 0);
+  await page.click('[data-trend-item="w2"] [data-trend-go]');
+  eq('GOグループが現れる', await page.locator('.trend-group-head.go').count(), 1);
+  const order = await page.locator('[data-trend-item]').evaluateAll(els => els.map(e => e.dataset.trendItem));
+  eq('圏外でもGOを付けたw2が圏内のw1より先頭に来る', order[0], 'w2');
+  await page.click('#trendFilterGo');
+  eq('GOのみ絞り込みで圏内のw1が消える', await page.locator('[data-trend-item="w1"]').count(), 0);
+  eq('GO付きのw2は残る', await page.locator('[data-trend-item="w2"]').count(), 1);
+  await page.click('[data-trend-item="w2"] [data-trend-go]');
+  eq('再タップで解除するとGOのみ絞り込みで0件になる', await page.locator('[data-trend-item]').count(), 0);
   await page.context().close();
 }
 

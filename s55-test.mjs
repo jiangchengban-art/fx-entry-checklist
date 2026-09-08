@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import path from 'path';
 
-const URL = 'file:///' + path.resolve('c:/Users/owner/fx-entry-checklist/index.html').replace(/\\/g, '/');
+const URL = 'file:///' + path.resolve('index.html').replace(/\\/g, '/');
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n); } };
 const eq = (n, a, b) => ok(n + '  [got ' + JSON.stringify(a) + ']', JSON.stringify(a) === JSON.stringify(b));
