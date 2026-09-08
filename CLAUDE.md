@@ -508,7 +508,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 
 **⚠️ 利用開始にあたって必須の作業**：3端末とも**ホーム画面に追加**し、以後アイコンから起動すること（iOS の7日削除を回避する唯一の方法）。同期を使うには設定タブで Supabase の Project URL / anon key を入力してログインする。
 
-### セッション履歴（最新 S28-50 / 詳細は参考を）
+### セッション履歴（S1-57 統合、最新は S57）
 
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
@@ -543,10 +543,10 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 | 51 | 🧹 **🎯タブの環境認識ボード（Step①）を完全廃止**。S33〜S48で🔭一覧の根拠パネルが `tfHigher`/`tfEntry`/`judge`/`checksHigher`/`checksEntry` を書ける唯一の入力元として成熟しており、旧ボードは同じ内容を二重編集させるだけのUIになっていた。①`renderMarketBoard()`・`selectPair()`・ペア選択カスケードプルダウン・ステップナビを削除 ②ペア削除（旧「このペアのデータを削除」）は🔭一覧の行に🗑ボタンとして統合、既存の🧹（巡回記録クリア）とは別操作に分離 ③記録フォームの「⚠未設定」警告・「🔭一覧タブへ」ボタンは選択中ペアの行までスクロール＆ハイライトする（旧ボードの同機能を踏襲）④`mvSetTf`/`mvWriteCheck`/`mvToggleAlert`/`mvSetJudge` 等の共有書き込み関数はそのまま温存（🔭一覧が引き続き使用）。データモデル・CSV・端末間マージ・統計は無変更。s44 61項目・s43 35項目・s42 45項目通過、実際のUIフロー（🎯根拠ボタン→判定→「→」で記録フォームへ）をPlaywrightで実地確認。sw.js: v25→v26 | 2026-09-05 |
 | 54 | 🧹 **トレード記録フォームを建玉ブロック・決済モーダル・RR計算方式から結果タグ・円建て損益方式に全面置換**（ユーザーの明示的な指示による完全置換、確認済み）。①フォームに「アラート発生日時」「アラート発生時間足」（`manualAlertAt`/`manualAlertTf`、🔭一覧のボード由来アラートとは別名で独立）を新設 ②建玉ブロック（エントリー価格/損切り価格/損切り根拠・計画ターゲット表示）と3分割決済モーダル（`#exitModal`）を丸ごと削除し、代わりに結果タグ（REG/BIG/MAX/微益/建値決済/損切/その他、既存の `.result-toggle`/`.result-btn` パターンを再利用）・円建て損益（符号切替ボタン付き）・建値タッチ（3択）・チャート画像添付（エントリー足/上位足/その他）を追加 ③画像は Firebase Storage の REST API へ**fetchのみ**でアップロード（`uploadChartImage()`、SDK不使用、単一ファイル原則を維持）。bucket・API Keyは⚙設定タブの新セクションで入力・保存 ④削除した関数：`calcRR`/`fmtRR`/`tradeExits`/`isSplitTrade`/`slotExits`/`tradeNetRR`/`planTargetPrices`/`decimals`、決済モーダル一式（`openExitModal`/`renderExitAll/Risk/Slots/Rows`/`exitRowInner`/`renderExitSum`/`fillRemainingSlots`ほか）、`exitSummaryHtml`/`rrCls` ⑤CSV列を `entryPrice`/`slPrice`/`slBasis`/`splitCount`/`exits` から `manualAlertAt`/`manualAlertTf`/`resultTag`/`resultOtherReason`/`pnlAmount`/`beTouch`/`imgEntry`/`imgHigher`/`imgOthers` に置換（旧建玉・決済データは import しても復帰しない）⑥統計タブを合計損益/平均損益/勝率（pnlAmount基準）・結果タグ別成績・建値タッチ別成績に刷新、`fiboStats`（エントリーFibo別成績）は損益ベースに更新した上で維持、`mvAlertStats`（アラート発生足別の判定統計）は無変更 ⑦履歴カードは決済ボタン・RR表示・損切り根拠行を撤去し、アラート発生日時/結果タグバッジ/損益（色分け）/建値タッチ/画像サムネイルに置換。データモデル以外（🔭一覧・端末間マージ・波マップ等）は無変更。構文チェック OK。sw.js: v26→v27 | 2026-09-06 |
 
-詳細ログはアーカイブとメモリを参照：
-- S1-13: `memory/sessions/session1_to_13_archive.md`（別ファイルに移行検討中）
-- S14-18: `docs/SESSIONS_14_TO_18_ARCHIVE.md`, `docs/CHANGELOG_ARCHIVE.md`（別ファイルに移行検討中）
-- S19-50: `memory/sessions/` 内の個別ファイル（＋MEMORY.md インデックス）
+詳細ログはアーカイブを参照：
+- S1-13: CLAUDE.md 内に統合済み
+- S14-18: `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` で保存
+- S19-57: CLAUDE.md 内のセッション履歴テーブル（行515以降）に統合
 
 ## 開発上の注意点
 
