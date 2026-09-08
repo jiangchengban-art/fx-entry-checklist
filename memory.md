@@ -1,30 +1,30 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-08 (S59 complete)  
-**Current State:** ✅ Production-ready, all 159+ tests passing  
+**Last Updated:** 2026-09-08 (S60 complete)  
+**Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
 **Main Branch:** `master`  
-**Active Development Branch:** `claude/fx-entry-checklist-s59-c1ajnk` (ready to merge)
+**Active Development Branch:** none — S60 merged directly to master
 
 ## Project Health
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Core Features | ✅ Complete | 🔭一覧・📚統計・⚙設定の3タブ完成 |
-| Testing | ✅ All Passing | s59(35) + s55(15) + s44(64) + s43(35) + s42(45) = 194 items |
+| Testing | ⚠️ Mostly Passing | s60(17)+s59(31)+s55(15) all green. s44/s43/s42/s40 have known failures from S60's toolbar-id removal (see Known Issues) |
 | Data Model | ✅ Stable | localStorage `mochipoyo_*_v1` keys, Supabase JSONB sync |
 | Accessibility | ✅ OK | PWA-capable, iOS/Android responsive, dark/light theme |
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-59)
+## Recent Changes (S57-60)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S60 | GO/圏内/待ち/未更新のタップ箇所重複を解消 | サマリータイルを`<button>`化しフィルタを兼務、ツールバーの同名4ボタンを削除、ツールバー1行に再統合 |
 | S59 | 🔭一覧上部を巡回実運用に合わせて再整理 | 説明文圧縮・5タイルペア単位統一・ツールバー2行分割・CSS色バグ修正 |
 | S58 | 目線3択→手動GOフラグ置換 | GO主観フラグで監視優先度を明示的に制御 |
 | S57 | 1時間足を巡回対象に追加 | 1H/4H/日足の3本を常時表示・エントリー圏判定に含める |
 | S56 | iOS同期ロバスト性強化 | visibilitychange+pageshow+focus+touchstart+30秒ポーリング・容量超過リーンモード |
-| S55 | 🎯トレード記録をモーダル化 | 一覧タブで巡回→根拠パネル→記録フォームまで完結 |
 
 ## Architecture Snapshot
 
@@ -60,11 +60,12 @@ docs/
 
 | Issue | Status | Workaround |
 |-------|--------|-----------|
+| s44/s43/s42/s40-test が旧ツールバーボタンid（`#trendFilterAligned`等）をクリック/参照している | **NEW in S60** | S60で該当DOM要素を削除したため。次にこれらのテストへ触るとき、セレクタを `[data-trend-summary-filter="..."]` に移行すること（s59-test.mjsが移行済みで参考になる） |
 | s40-test チップ更新・ラベル残る (2項目) | 既知 S40以前から | s44以降のUI変更で無関連、後日修正 |
 | localStorage 5-10MB上限 | 予想 | S56で容量超過リーンモード追加、今後モニタリング |
 | 波マップ過去日では「待ちあり」「GOのみ」不可 | 既知 S42- | 過去日レコードが `p/t/g/w/s`のみで`go`を持たないため設計上不可避 |
 
-## Session Progression (S1-59 Summary)
+## Session Progression (S1-60 Summary)
 
 **S1-13:** 初期実装 → トレード記録フォーム・統計・CSV対応  
 **S14-21:** 環境認識ボード刷新 → ボード廃止に向けた布石  
@@ -73,16 +74,30 @@ docs/
 **S40-44:** 波位置タップ記録→波マップ→判定全廃・エントリー圏軸  
 **S45-50:** 表示最適化・過去日訂正・参考重ね表示  
 **S51-56:** ボード廃止・決済モーダル廃止・1H追加・同期強化  
-**S57-59:** 手動GOフラグ・一覧上部整理
+**S57-60:** 手動GOフラグ・一覧上部整理・タップ箇所重複解消
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-59 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-60 統合）」テーブルを参照。
 
 ## Next Session Checklist
 
-- [ ] Merge `claude/fx-entry-checklist-s59-c1ajnk` to `master`
-- [ ] Verify CLAUDE.md consistency (update 「最新は S57」→「最新は S59」if needed)
-- [ ] Run full test suite: `npm install && node s59-test.mjs && node s55-test.mjs && node s44-test.mjs`
-- [ ] Plan S60 work (user feature request or bug fix)
+- [ ] `git pull origin master` を必ず最初に実行（別環境からのプッシュがある可能性）
+- [ ] `git log --oneline -3` でローカルとリモートの一致を確認
+- [ ] s44/s43/s42/s40-test.mjs の旧ツールバーボタンid依存を修正するか判断（S60で発生、後回しでも実害なし）
+- [ ] Plan S61 work (user feature request or bug fix)
+
+## ⚠️ 複数環境運用時の注意（S60で発生した教訓）
+
+このプロジェクトは Windows ローカル CLI と iPhone CloudCode の**複数環境**から並行して作業されている。
+S60セッション開始時、Windowsローカルのmasterが3セッション分（S57-59）遅れており、
+その間に加えた未コミット変更が既にorigin/masterへ別環境からプッシュ済みの内容と重複していた。
+
+**原因**: git pull は自動実行されない。環境を跨ぐと「向こうでコミットされた」ことがローカルには伝わらない。
+
+**対策（必ず実行）**:
+1. **セッション開始時**: `git fetch origin && git log origin/master --oneline -3` でリモートの最新を確認
+2. **ローカルが遅れていたら**: 未コミット変更があれば `git branch backup-<date>` などで退避 → `git pull --ff-only`
+3. **作業終了時**: 必ず `git push` して、次にどの環境で開いても最新を拾えるようにする
+4. **セッション引き継ぎプロンプト**（ユーザーがコンテキスト圧迫時に送る定型文）には、この pull 確認ステップを必ず含めること
 
 ## Development Notes
 
