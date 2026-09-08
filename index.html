@@ -767,6 +767,8 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .tp-synced.on { color: var(--ink); font-weight: 700; border-style: solid; }
+  /* S61: entryOnly の項目で上位足の列を埋めるプレースホルダ（3列 grid の枠を保つため）。 */
+  .tp-na { font-size: 11px; color: var(--ink-muted); text-align: center; opacity: 0.5; }
   /* S34: 根拠14項目をボードと同じボタン群に統一（旧: select）。狭い2列に収めるため折り返す。 */
   .tp-row .tp-choice { row-gap: 4px; column-gap: 4px; min-width: 0; }
   .tp-row .tp-choice .mv-tfcheck-btn { padding: 3px 3px !important; font-size: 10px !important; min-width: 0; }
@@ -1589,22 +1591,30 @@ const MV_TF_CHECKS = [
      ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
-  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
-  /* S46: 「待ち」＝到達/発生していないが潰えてもいない中間状態。他の条件が揃っていても
-     これが崩れていなければエントリー可能性が残ることを一覧の巡回で拾えるようにする。
-     項目そのものの状態なので新規チェック項目にはせず opts に足す（定義元1箇所でボード・
-     根拠パネル・CSV・履歴サマリーすべてに自動反映される、S37/S38 と同じ拡張パターン）。 */
-  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd' },
-  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
-  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
+  /* S61: wHi = 上位足の確度（higherConfidence）での重み。合計 100 になるよう配分する。
+     RCI（3本で35）と MACD（35）を主軸に、ラウンドナンバー・ロールリバーサルは各10の補助扱い。
+     グランビルが10なのは、波の位置が🔭一覧の並び順（pairEntryDistance）で既に主軸として
+     効いているため ── 確度でも大きく重ねると同じ情報を二重に数えることになる。
+     entryOnly の項目（entryFibo）は上位足の列に出さないので wHi を持たない。 */
+  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville', wHi: 10 },
+  /* S61: 「⏳待ち」（S46）を選択肢から撤去。到達/発生していない状態は ❌ と同じ扱いで
+     運用することにしたため、中間状態を分けて記録する必要が無くなった。
+     既存データに残る ⏳ は isUnmetCheck / pairWaitCount が従来どおり拾う（表示は保つ）。 */
+  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '❌'], wHi: 35 / 3 },
+  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '❌'], wHi: 35 / 3 },
+  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '❌'], wHi: 35 / 3 },
+  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd', wHi: 35 },
+  /* S61: 「無」「未確認」は ❌（未達成）と同じ意味になっていたため撤去し、有/確認 と ❌ の2択に。 */
+  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '❌'], short: 'ラウンド', wHi: 10 },
+  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '❌'], short: 'ロールRv', wHi: 10 },
   /* S38: エントリー再現性向上のため、エントリー足の1波のどのフィボナッチ水準で
-     エントリーしたかを記録する。小数点は省略（23.6%→23% 等）。上位足でも記録は可能
-     （封鎖しない）が、意味を持つのは主にエントリー足での使用時。 */
-  { k: 'entryFibo',    label: 'エントリーFibo',   opts: ['23%', '38%', '50%', '61%', '78%', '❌'], short: 'Fibo' },
+     エントリーしたかを記録する。小数点は省略（23.6%→23% 等）。
+     S61: entryOnly ── 上位足の1波にフィボナッチ水準を引く場面が無いため、上位足の列には
+     出さない。既存データの hi_entryFibo と CSV 列はそのまま残す（読み出しは従来どおり）。 */
+  { k: 'entryFibo',    label: 'エントリーFibo',   opts: ['23%', '38%', '50%', '61%', '78%', '❌'], short: 'Fibo', entryOnly: true },
 ];
+/* S61: 上位足の確度で使う項目と重みの合計。wHi の合計が 100 であることを前提に減点する。 */
+const MV_HIGHER_CHECKS = MV_TF_CHECKS.filter(c => !c.entryOnly);
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
 
 /* ボードの上位足・エントリー足ラベル → トレンド一覧の時間足キー。
@@ -3593,17 +3603,17 @@ let trendVisibleTfs = loadTrendTfs();
    一覧の ⏳ バッジ（pairWaitCount）側でこの2つを描き分ける。 */
 function isUnmetCheck(v) { return v === '❌' || (v || '').indexOf('⏳') === 0; }
 
-/* S38: 根拠の確度。MV_TF_CHECKS のうち未達成（isUnmetCheck）を選んだ項目数だけ減点する
-   （未選択の空欄は減点しない）。分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
-function checkConfidence(checks) {
-  const total = MV_TF_CHECKS.length;
-  const cross = MV_TF_CHECKS.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
-  return Math.round((total - cross) / total * 100);
-}
-function setupConfidence(w) {
-  const higher = checkConfidence(w.checksHigher || {});
-  const entry  = checkConfidence(w.checksEntry  || {});
-  return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
+/* S38: 根拠の確度。未達成（isUnmetCheck）を選んだ項目のぶんだけ 100 から引く
+   （未選択の空欄は減点しない ── まだ見ていないだけで、崩れたわけではないため）。
+   S61: 項目数の等分から wHi の重み付けに変更した。RCI(35)・MACD(35) を主軸に、
+   グランビル・ラウンドナンバー・ロールリバーサルが各10。合計は MV_HIGHER_CHECKS で 100。
+   ⚠️ 対象は上位足だけ。エントリー足の確度（旧 setupConfidence の entry / combined）は
+      S61 で撤去した ── 根拠が揃っているかを見たいのは環境認識＝上位足の側だけで、
+      エントリー足は水準（Fibo）と波を見る役割なので、同じ物差しで測る意味が無い。 */
+function higherConfidence(checks) {
+  const lost = MV_HIGHER_CHECKS.reduce((n, c) =>
+    n + (isUnmetCheck(checks && checks[c.k]) ? c.wHi : 0), 0);
+  return Math.round(100 - lost);
 }
 
 /* S46: 「⏳待ち」の項目数（上位足・エントリー足の合計）。w に保存しない純粋な導出関数
@@ -3725,7 +3735,11 @@ function trendPanelHtml(w) {
         ? '<button type="button" class="tp-label link" data-guide-link="' + c.link + '"' +
           ' title="' + esc(c.label) + ' の解説を開く">' + esc(c.short || c.label) + ' 📖</button>'
         : '<span class="tp-label" title="' + esc(c.label) + '">' + esc(c.short || c.label) + '</span>') +
-      trendCheckCell(w, 'tfHigher', c) +
+      /* S61: entryOnly（エントリーFibo）は上位足の列を出さない。⚠️ .tp-row は3列固定の
+         grid なので、セルを省くのではなく空のプレースホルダで枠を埋めること。 */
+      (c.entryOnly
+        ? '<span class="tp-na" title="エントリー足でのみ記録する項目です">—</span>'
+        : trendCheckCell(w, 'tfHigher', c)) +
       trendCheckCell(w, 'tfEntry', c) +
     '</div>').join('');
 
@@ -3736,10 +3750,10 @@ function trendPanelHtml(w) {
   if (!w.tfEntry) missing.push('エントリー足');
   if (!w.judge)   missing.push('判定');
 
-  /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。 */
-  const conf = setupConfidence(w);
-  const confHtml = '<div class="tp-conf">🎯 確度 上位足 ' + conf.higher + '% ／ エントリー足 ' +
-    conf.entry + '% ／ 合算 <b>' + conf.combined + '%</b></div>';
+  /* S38: 根拠の確度（未達成を選んだぶんだけ減点）。S44 以降は判定に関係なく常に出す。
+     S61: 重み付けに変更し、上位足だけを出す（エントリー足・合算は撤去）。 */
+  const confHtml = '<div class="tp-conf">🎯 上位足の確度 <b>' +
+    higherConfidence(w.checksHigher || {}) + '%</b></div>';
 
   return '<div class="trend-panel">' +
     confHtml +
