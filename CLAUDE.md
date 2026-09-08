@@ -291,11 +291,14 @@ function pairIsHot(w) / tfIsHot(w, tfKey)   // <= GV_ENTRY_RADIUS
 
 ⚠️ **ボタンが出るのは「図の上でタップして記録した位置がエントリー圏内の足」だけ**。概算・圏外・未記録の行にはボタン自体が無い（押しても意味のないボタンを置かない ── S42-③「タップ不反応」の再演を避ける）。別の足のボタンを押せば上位足がそのまま入れ替わる。
 
-**パネルの構成**（上位足とエントリー足の**横並び2列**）:
-- ヘッダ行：上位足（押した足から確定・表示のみ）/ エントリー足 `<select>`（`w.tfEntry` を初期選択＝前回値）
-- `MV_TF_CHECKS` の7行 × 2列。ボードのボタン群に対し**一覧は `<select>`**（14個をスマホ幅に収めるため）。先頭の空 option `—` がボードの「再タップで解除」に相当
-- 一覧が追跡する足（週足・日足・4時間足・1時間足、S57で1時間足を追加）のグランビルは **S29 と同じ判定式で読み取り専用**。上位足は常に該当、エントリー足は `4時間足`・`1時間足` のときだけ
+**パネルの構成**（S62 で**縦2セクション**に変更。S33〜S61 は横並び2列だった）:
+- **上位足セクション**：見出しに押した足を固定表示（`.tp-fixed`）＋ `MV_TF_CHECKS` の7行
+- **エントリー足セクション**：見出しにエントリー足 `<select>`（`w.tfEntry` を初期選択＝前回値）と目線バッジ（`.tp-side`）＋ `MV_ENTRY_CHECKS` の4行
+- 各行は「ラベル｜選択肢ボタン群」の2列。先頭の空ボタン `—` が「再タップで解除」に相当
+- 一覧が追跡する足（週足・日足・4時間足・1時間足、S57で1時間足を追加）のグランビルは **S29 と同じ判定式で読み取り専用**（S62 以降は上位足のみ。エントリー足はグランビルを持たない）
 - フッター：判定3ボタン（`trendJudgeBtnsHtml()` を再利用）＋「📝 記録フォームへ」
+
+⚠️ **横並び2列に戻さないこと（S62）**。上位足とエントリー足は**項目そのものが違う**（7項目 vs 4項目）ので、ラベル列を共有する3列グリッドは成立しない。縦に積むと1項目が横幅をフルに使えるぶん、選択肢の折り返しはむしろ減る（375px 実測で各行1〜2段）。
 
 ⚠️ **最重要仕様1**: **スキーマ・CSV・端末間マージ・統計はすべて無変更**。フォームのデータ元 `marketFieldsFromBoard()` が要求するのは `tfHigher` / `tfEntry` / `judge` / `checksHigher` / `checksEntry` の5つだけなので、一覧からこの5つを書ければ目的を達する。書き込み先はボードとまったく同じフィールド。
 
@@ -310,6 +313,36 @@ function pairIsHot(w) / tfIsHot(w, tfKey)   // <= GV_ENTRY_RADIUS
 **ボードは残す** — 同じフィールドを読み書きするので放置しても自動で整合する。一覧が主動線、ボードは詳細/編集用。※ S44 でボードの `.mv-card-head` からセットアップ判定バッジを撤去した（判定そのものが無くなったため）。
 
 **スコープ境界**: 一覧で完結するのは**環境認識まで**。区分・エントリー日時・建玉は実際のトレード記録なので 🎯フォームに残る。
+
+### 12b. エントリー足の3ステップ確認フロー（セッション62で追加）
+
+**ユースケース**: エントリー足の根拠は S20 以来ずっと上位足と同じ項目（グランビル/RCI×3/MACD/ラウンドナンバー/ロールリバーサル/Fibo）だった。しかし実運用の手順は**上位足の確度が高いことを前提に、5分足で3つのステップを順に確認する**もので、上位足の環境認識項目をもう一度押しても意味を持っていなかった。
+
+**実際の確認手順** — これをそのまま項目にしてある:
+
+| ステップ | 確認すること | 項目（`k`） | 選択肢 |
+|---|---|---|---|
+| ❶ | 上位足のネックライン付近で、5分足に反転の形が出たか | `necklineForm` | ダブルボトム / 逆三尊（買）・ダブルトップ / 三尊（売）・⏳待ち・❌ |
+| ❷ | 5分足のMAを明確に抜けたか（＝ここからを1波と見なす） | `maBreak` | 上抜け（買）・下抜け（売）・⏳待ち・❌ |
+| ❸ | 1波のフィボナッチとロールリバーサルが重なるか | `fiboRoll` | 重なり有 / 重なり無 / ⏳待ち / ❌ |
+| ❸ | 実際に入ったフィボ水準 | `entryFibo` | 23% / 38% / 50% / 61% / 78% / ❌ |
+
+定義は **`MV_ENTRY_CHECKS`**（上位足は従来どおり `MV_TF_CHECKS`）。`short` に ❶❷❸ を含めてあるので、パネルではステップ番号がそのままラベルに出る。
+
+**方向による選択肢の絞り込み**: `opts` の要素に `side: 'buy' | 'sell'` を書くと、**上位足の方向（`w.trend[tfKey].state`）に合う選択肢だけ**が出る（`mvEntrySide()` → `trendCheckCell()`）。↗の押し目狙いで「ダブルトップ」を選べても意味がないため。方向未記録・レンジのときは両サイド出す（選べる手が無くなる方が事故）。目線は見出しの `.tp-side` バッジに常時表示する。
+
+⚠️ **最重要仕様1**: **向きに紐づく記録の後始末は `mvSyncEntrySideChecks()` に集約し、`mvWriteTrend()` と `mvSetTf()`（`tfHigher` のとき）から呼ぶ**。方向と上位足が変わる経路はこの2つだけなので、ここに置けば「↗で記録したダブルボトムが↘に変えても残る」取りこぼしが構造的に起きない。**グランビルと `wpos` の後始末を `mvWriteTrend()` の1箇所に寄せてあるのと同じ理由**（§13 最重要仕様3）。向きを持たない❸（`fiboRoll` / `entryFibo`）は方向を変えても消さない。
+
+⚠️ **最重要仕様2**: **`entryFibo` のキー名は変えないこと**。CSV列 `en_entryFibo` と、📚振り返りの「エントリーFibo水準別の成績」（`byFibo` が `t.mvChecks.entry.entryFibo` を読む）がこの名前に依存している。S38 から続く記録がそのまま集計に乗り続ける。
+
+⚠️ **最重要仕様3**: 項目を走査する側は必ず**区分ごとの定義**を引く。分母・列・表示がずれる箇所は5つ:
+`checkConfidence(checks, list)`（分母が上位足7・エントリー足4に分かれた）/ `pairWaitCount()` / `basisItemsOf(checks, list)` / `CSV_BASIS_COLUMNS`（`MV_CHECK_SNAPSHOTS[].checks` から生成）/ `trendPanelHtml()` の `rowsOf()`。
+
+**`opts` の書き方**: 文字列でも `{ v, side }` でも書けるが、`mvNormalizeChecks()` が宣言時に後者へ揃えるので**描画側は常にオブジェクトとして扱う**。正規化を1箇所に閉じておかないと、選択肢の形を意識する場所が増えて `side` の考慮漏れが出る。
+
+**上位足から外したもの**: `entryFibo`（❸専用になったため）。CSV列 `hi_entryFibo` は消えるが、旧CSVを import しても未知の列として無視されるだけで実害はない。エントリー足から外したもの: `granville` ほか上位足の7項目。既存データに残る `w.checksEntry.granville` は読み書きされないだけで無害（S58 の `w.mode` と同じ扱い）。
+
+**スコープ境界**: 端末間マージ・波マップ・エントリー圏の距離計算（`pairEntryDistance()`）・並び順は無変更。`checksEntry` は S28 の表で「チェック項目単位」でマージされるので、中の項目が入れ替わっても同期コードは1行も触らなくてよい。
 
 ### 13. 波の位置タップ記録と 🗺 波マップ（セッション40で追加）
 
@@ -468,7 +501,9 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 
 ## 実装状態
 
-**✅ 本番使用可能** — セッション60で**GO/圏内/待ち/未更新のタップ箇所重複を解消**。ユーザー指摘「サマリータイルとツールバーボタンで同じラベルが2箇所に並んでいてどちらを押せばいいか分からない（スクリーンショット添付）」に対応。①サマリーの🚩GO／🎯圏内／⏳待ち／🕐未更新の4タイルを`<span>`から`<button>`化し、`data-trend-summary-filter="go|hot|wait|stale"`でフィルタそのものを兼務させた（クリックで`trendGoOnly`/`trendEntryOnly`/`trendWaitOnly`/`trendStaleOnly`をトグル）②ツールバー1行目にあった同名4ボタン（`#trendFilterGo`/`#trendFilterAligned`/`#trendFilterWait`/`#trendFilterStale`）をDOMごと削除し、ツールバーは「カテゴリ選択・表示する足・🗺波マップ」の1行に統合（S59で分けた2行を再統合）③サマリータイルの選択中表示はCSS `.trend-summary button.item.on { outline: 2px solid currentColor; }` で追加。既存の色分け（`.item.go/.hot/.wait/.stale`）はそのまま流用し、選択中だけ枠を強調する設計 ④クリックハンドラは`trendSummaryEl`への1つのイベント委任に統合し、旧・4つの個別`addEventListener`を削除。`renderTrendList()`内の`classList.toggle('on', ...)`4行も、`renderTrendSummary()`側で`on`フラグから直接クラスを出すように移管したため不要になり削除。巡回タイル（進捗n/mペア）はフィルタ手段が無いため従来通り`<span>`のまま。データモデル・CSV・端末間マージ・統計・並び順ロジック（`pairEntryDistance()`）はすべて無変更。新設`s60-test.mjs`17項目通過（タイルのボタン化・旧ツールバーボタンの不在・フィルタON/OFFのトグル・outline表示・1行化の確認）、`s59-test.mjs`のツールバー2行前提だった④⑤⑥をS60仕様に更新し31項目通過、s55 15項目通過。sw.js: v32のまま（キャッシュ無効化不要、CSSクラス名・DOM構造の変更のみでJSロジックの実質的な副作用なし）。
+**✅ 本番使用可能** — セッション62で**エントリー足の根拠を3ステップ確認フローに全面置換**。ユーザー指摘「エントリー足の選択項目は既存の項目を使わず、上位足の確度が高いことを前提にした①ネックライン付近の反転形→②5分足MA抜け→③1波のフィボ×ロールリバーサルの重なり、という確認の流れで記録したい」に対応。①エントリー足専用の定義 `MV_ENTRY_CHECKS`（`necklineForm`／`maBreak`／`fiboRoll`／`entryFibo` の4項目）を新設し、上位足の `MV_TF_CHECKS` からは `entryFibo` を外して7項目に ②`opts` に `side` を持たせ、上位足の方向（`w.trend[tfKey].state`）に合う選択肢だけを出すようにした（↗なら「ダブルボトム／逆三尊」「上抜け」だけ。方向未記録・レンジでは両サイド）。目線は見出しの `.tp-side` バッジに常時表示 ③方向を反転・レンジ化したときに向きの合わない記録だけを落とす `mvSyncEntrySideChecks()` を新設し、`mvWriteTrend()` と `mvSetTf('tfHigher')` から呼ぶ（グランビル・`wpos` の後始末を1箇所に寄せてあるのと同じ規約）④パネルは項目数が違うため横並び2列をやめ、「上位足セクション（7行）→ エントリー足セクション（4行）」の縦2段に。1項目が横幅をフルに使えるので選択肢の折り返しはむしろ減った（375px 実測で各行1〜2段）⑤区分ごとに定義が分かれたことに追随させたのは5箇所：`checkConfidence(checks, list)`（分母が上位足7・エントリー足4）／`pairWaitCount()`／`basisItemsOf(checks, list)`／`CSV_BASIS_COLUMNS`（`MV_CHECK_SNAPSHOTS[].checks` から生成）／`trendPanelHtml()` の `rowsOf()` ⑥`entryFibo` のキー名は据え置き（CSV列 `en_entryFibo` と📚の「エントリーFibo水準別の成績」が依存）。CSV列は `hi_*`×7／`en_*`×4 に入れ替わり、旧列は import 時に未知の列として無視される。端末間マージ・波マップ・エントリー圏の距離計算（`pairEntryDistance()`）・並び順・統計タブは無変更。新設`s62-test.mjs` 48項目通過、s44 64項目・s43 35項目・s42 45項目・s60 17項目・s59 31項目・s55 15項目 全通過（s44/s40 の旧ツールバーid依存はこのセッションで `[data-trend-summary-filter]` へ移行済み）。sw.js: v32→v33。
+
+セッション60時点：**GO/圏内/待ち/未更新のタップ箇所重複を解消**。ユーザー指摘「サマリータイルとツールバーボタンで同じラベルが2箇所に並んでいてどちらを押せばいいか分からない（スクリーンショット添付）」に対応。①サマリーの🚩GO／🎯圏内／⏳待ち／🕐未更新の4タイルを`<span>`から`<button>`化し、`data-trend-summary-filter="go|hot|wait|stale"`でフィルタそのものを兼務させた（クリックで`trendGoOnly`/`trendEntryOnly`/`trendWaitOnly`/`trendStaleOnly`をトグル）②ツールバー1行目にあった同名4ボタン（`#trendFilterGo`/`#trendFilterAligned`/`#trendFilterWait`/`#trendFilterStale`）をDOMごと削除し、ツールバーは「カテゴリ選択・表示する足・🗺波マップ」の1行に統合（S59で分けた2行を再統合）③サマリータイルの選択中表示はCSS `.trend-summary button.item.on { outline: 2px solid currentColor; }` で追加。既存の色分け（`.item.go/.hot/.wait/.stale`）はそのまま流用し、選択中だけ枠を強調する設計 ④クリックハンドラは`trendSummaryEl`への1つのイベント委任に統合し、旧・4つの個別`addEventListener`を削除。`renderTrendList()`内の`classList.toggle('on', ...)`4行も、`renderTrendSummary()`側で`on`フラグから直接クラスを出すように移管したため不要になり削除。巡回タイル（進捗n/mペア）はフィルタ手段が無いため従来通り`<span>`のまま。データモデル・CSV・端末間マージ・統計・並び順ロジック（`pairEntryDistance()`）はすべて無変更。新設`s60-test.mjs`17項目通過（タイルのボタン化・旧ツールバーボタンの不在・フィルタON/OFFのトグル・outline表示・1行化の確認）、`s59-test.mjs`のツールバー2行前提だった④⑤⑥をS60仕様に更新し31項目通過、s55 15項目通過。sw.js: v32のまま（キャッシュ無効化不要、CSSクラス名・DOM構造の変更のみでJSロジックの実質的な副作用なし）。
 
 セッション59時点：**🔭一覧タブ上部（説明文・サマリー・ツールバー）を巡回の実運用に合わせて整理**。ユーザー指摘「一覧タブ上部の文言とソート用の項目を今に最適な形で整理したい」に対応。①説明文をS24〜S58の継ぎ足しで5話題・306文字に肥大していたのを常時2行に圧縮し、波タップ手順・GOの仕様・波マップへの言及は`<details>`の折りたたみへ退避（初回だけ読む使い方なので毎回のスクロールから外した）②サマリーを「🎯圏内2ペア／↗上昇6／↘下降2／─レンジ1／未記録75／🕐未更新25ペア」（ペア単位と足単位が同じピル形状で混在）から**5タイル全てペア単位**（🚩GO／🎯圏内／⏳待ち／🕐未更新／巡回n/mペア）に統一。足単位の方向カウントは各行のトグル色で常時見えており集計の価値が薄いため撤去、代わりに「巡回n/mペア」で今日どこまで見終えたかの進捗を追加 ③【バグ修正】サマリーのCSS配色クラス`.item.rd/.go/.wait`にS44以降JSが出す`.item.hot/.stale`が定義されておらず、圏内・未更新タイルが無色の灰色ピルのままだった（S58で撤去済みの目線3択の残骸`.rd`も削除）④ツールバーを「絞り込み（GOのみ→エントリー圏のみ→待ちあり→未更新のみ→カテゴリ）」と「表示設定・波マップ」の2行に役割分離し、`trendApplyFilters()`の適用順もツールバー表示順に揃えた（AND条件なので結果は不変）。DOM id・データモデル・CSV・端末間マージ・統計・並び順ロジック（`pairEntryDistance()`）はすべて無変更。s42/s43/s44/s55 全159項目通過、新設s59-test.mjs 35項目通過（説明文圧縮・折りたたみ・5タイルの単位統一・配色バグ修正の確認・ツールバー2行分割・絞り込み順入替後のAND結果一致）。sw.js: v31→v32。
 
@@ -518,6 +553,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
 | セッション | 主な変更 | 日付 |
+| 62 | 🪜 **エントリー足の根拠を3ステップ確認フローに全面置換**。ユーザー要望「エントリー足の選択項目は既存の項目を使わない。上位足の確度が高いことが前提で、❶上位足のネックライン付近で5分足にダブルトップ/三尊/ダブルボトム/逆三尊が出るのを確認 → ❷5分足のMAを明確に上抜けor下抜け（1波と仮定）→ ❸1波のフィボナッチとロールリバーサルが重なる箇所でエントリー（フィボの%を記録）、という流れで記録しやすい項目に」に対応。①エントリー足専用の `MV_ENTRY_CHECKS`（`necklineForm`／`maBreak`／`fiboRoll`／`entryFibo`）を新設。上位足 `MV_TF_CHECKS` からは `entryFibo` を外し7項目に。エントリー足からはグランビル/RCI×3/MACD/ラウンド/ロールRvが外れた ②`opts` は文字列でも `{v, side}` でも書けるようにし、`mvNormalizeChecks()` が宣言時に後者へ揃える。`side` があると上位足の方向に合う選択肢だけが出る（`mvEntrySide()` → `trendCheckCell()`）。方向未記録・レンジでは両サイド ③`mvSyncEntrySideChecks()` を新設し `mvWriteTrend()` と `mvSetTf('tfHigher')` から呼ぶ。方向反転・レンジ化で❶❷（向きに紐づく）だけ落とし、❸は残す ④パネルを縦2セクションに再構成（`.tp-sec` 見出し＋`.tp-row` は「ラベル｜選択肢」の2列に。旧 `.tp-head` の3列グリッドは廃止）。エントリー足の見出しには足の `<select>` と目線バッジ `.tp-side` を置く ⑤区分ごとの定義に追随させた5箇所：`checkConfidence(checks, list)`／`pairWaitCount()`／`basisItemsOf(checks, list)`／`CSV_BASIS_COLUMNS`（`MV_CHECK_SNAPSHOTS[].checks`）／`trendPanelHtml()` の `rowsOf()` ⑥`mvGranvilleSyncField()` は `tfHigher` のみに限定（エントリー足がグランビルを持たなくなったため）。既存データの `w.checksEntry.granville` は読み書きされないだけで無害 ⑦`entryFibo` のキー名据え置きにより📚の「エントリーFibo水準別の成績」とCSV `en_entryFibo` はそのまま動く。CSV列は `hi_*`×7／`en_*`×4 に入れ替え（旧列は import 時に無視）。端末間マージ・波マップ・`pairEntryDistance()`・並び順・統計タブは無変更。新設`s62-test.mjs` 48項目通過。併せて S60 で撤去済みの旧ツールバーid（`#trendFilterAligned`/`#trendFilterGo`）を参照して中断していた `s44-test.mjs`／`s40-test.mjs` を `[data-trend-summary-filter="hot|go"]` へ移行し、s44 は最後まで走って64項目通過（パネル行数の期待値も新仕様へ更新）。sw.js: v32→v33 | 2026-09-08 |
 | 60 | 🎯 **GO/圏内/待ち/未更新のタップ箇所重複を解消**。ユーザーがスクリーンショットで指摘：サマリータイル（表示専用）とツールバーボタン（フィルタ用）に同じラベルの要素が2箇所並び、どちらを押せばいいか分からない状態だった。①サマリーの4タイル（🚩GO/🎯圏内/⏳待ち/🕐未更新）を`<span>`から`<button>`に変更し、`data-trend-summary-filter="go|hot|wait|stale"`でタップ即フィルタを兼務させた ②ツールバー1行目にあった同名4ボタン（`#trendFilterGo`/`#trendFilterAligned`/`#trendFilterWait`/`#trendFilterStale`）をDOMごと削除。S59で分離していたツールバー2行を「カテゴリ選択・表示する足・🗺波マップ」の1行に再統合 ③選択中の視覚表現はCSS `.trend-summary button.item.on { outline: 2px solid currentColor; }` を追加し、既存の色分け（`.item.go/.hot/.wait/.stale`）はそのまま活かして枠だけ強調 ④クリック処理を`trendSummaryEl`への1つのイベント委任に統合、旧4つの`addEventListener`と`renderTrendList()`内の`classList.toggle('on', ...)`4行を削除（`on`状態は`renderTrendSummary()`が直接クラスに出す）。巡回タイルはフィルタ手段が無いため`<span>`のまま維持。データモデル・CSV・端末間マージ・統計・並び順ロジック（`pairEntryDistance()`）はすべて無変更。新設`s60-test.mjs`17項目通過、`s59-test.mjs`のツールバー2行前提の④⑤⑥をS60仕様に更新し31項目通過、s55 15項目通過。sw.js: v32のまま（DOM/CSSのみの変更でキャッシュ無効化不要） | 2026-09-08 |
 | 59 | 🧹 **🔭一覧タブ上部（説明文・サマリー・ツールバー）を巡回の実運用に合わせて整理**。ユーザー要望「一覧タブの上部のトレンド一覧の下の文言とソート用の項目を今に最適な形で整理したい」に対応。並び順のロジック自体（GO群→エントリー圏の距離順→同値は名前順）は変更せず、表示の整理のみ。①説明文はS24〜S58の継ぎ足しで5話題・306文字（375pxで12行=230px）に肥大していたのを常時2行に圧縮し、波タップ手順・GOの仕様・波マップへの言及は`.trend-help`（`<details>`）の折りたたみへ退避（初回だけ読む使い方を毎回のスクロールから外す）②サマリーを6タイル（🎯圏内=ペア単位／↗上昇・↘下降・─レンジ・未記録=足単位／🕐未更新=ペア単位、単位混在で誤読の元）から**5タイル全てペア単位**（🚩GO／🎯圏内／⏳待ち／🕐未更新／巡回n/mペア）に統一。足単位の方向カウントは各行のトグル色で常時見えており集計の価値が薄いため撤去、`w.trendAt`を持つペア数で「今日どこまで見終えたか」の進捗タイルに置換 ③【バグ修正】`renderTrendSummary()`がS44で出すクラス名を`.item.hot`/`.item.stale`に変えて以降、CSS側は旧`.item.rd`（S58で撤去済みの目線3択の残骸）のままで追随しておらず、圏内・未更新タイルが無色の灰色ピルで表示されていた。`.item.hot`/`.item.stale`をCSSに追加し`.rd`を削除 ④ツールバーを「絞り込み1行目（🚩GOのみ→🎯エントリー圏のみ→⏳待ちあり→🕐未更新のみ→カテゴリ、サマリーと同順）」と「表示設定・別画面2行目（表示する足の週足/月足トグル＋🗺波マップ）」に役割分離。`trendApplyFilters()`の絞り込み適用順もツールバー表示順に揃えた（ANDなので結果は不変、🗺波マップと共有しているため波マップ側の挙動も同一）。DOM id（`#trendFilterAligned`/`#trendFilterStale`/`#trendFilterWait`/`#trendCategorySelect`/`#trendFilterGo`/`#trendMapOpen`/`#trendTfToggles`/`#trendSummary`）・データモデル・CSV・端末間マージ・統計・並び順ロジック（`pairEntryDistance()`）はすべて無変更。s42/s43/s44/s55 全159項目通過、新設`s59-test.mjs`35項目通過（説明文圧縮・折りたたみの開閉・5タイルの単位統一・配色バグ修正の確認・ツールバー2行分割・絞り込み順入替後のAND結果一致）。sw.js: v31→v32 | 2026-09-08 |
 | 57 | 🕐 **🔭一覧の巡回対象に1時間足（1H）を追加**。ユーザー要望「グランビル・ゾーン・波形の記入箇所に1Hを追加し、1H/4H/日足の順で表示」に対応。①`MV_TREND_TFS` の先頭に `{ k: 'h1', label: '1時間足', short: '1H' }` を追加し、並びを1H→4H→日足→週足（任意）→月足（任意）に変更 ②1Hは週足・月足と異なり `optional` を付けず常時表示（トグルなし）とし、`MV_TREND_DEFAULT_TFS`（並び順・🎯圏内サマリー・根拠ボタンの表示条件の主軸）にも自動的に含まれる＝ `pairEntryDistance()` は1H・4H・日足の3本の最短距離で判定するように拡張 ③`MV_TF_TO_TREND_KEY`/`MV_TREND_KEY_TO_TF` に `'1時間足': 'h1'` を追加し、上位足に1時間足を選んだ根拠パネル・ボードのグランビルが🔭一覧のh1記録と自動連動するように ④`.gv-dot.tf-h1`/`.gv-ref-btn.on.tf-h1`（色 `#c2255c`）を追加し、波マップ単一銘柄モード・グランビルピッカーの他足参考重ね表示にも1Hが自動で乗る。`mvEnsureTrend()`・端末間マージ（`mergeDoc()`）は`MV_TREND_TFS`をforEachする既存実装のままで新フィールドを自動吸収（既存ペアのマイグレーションも自動）。スキーマ変更は`w.trend.h1`が生えるのみでCSV・トレード記録・統計には無関係。**波マップの既定表示タブが「表示中の先頭の足」＝1Hに変わった**ため、s40/s42/s43/s44テストの `#trendMapOpen` 直後に `[data-map-tf="d"]` を明示クリックする箇所を追加し、🎯チップ数の期待値（2→3）を更新。s44 61項目・s43 35項目・s42 45項目・s40 60項目（既知2件の失敗はS47以前からの無関係な既知問題）通過。sw.js: v29→v30 | 2026-09-07 |
@@ -570,6 +606,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 ### Playwright テストの走らせ方（S40 で整理）
 ```bash
 npm install
+node s62-test.mjs      # S62: エントリー足の3ステップ確認フロー（48項目・file:// で完結）
 node s60-test.mjs      # S60: GO/圏内/待ち/未更新のタップ箇所重複解消（17項目・file:// で完結）
 node s59-test.mjs      # S59: 一覧タブ上部の説明文・サマリー・ツールバー整理（31項目・file:// で完結、S60でツールバー1行化に伴い一部更新）
 node s55-test.mjs      # S55: 🎯タブ廃止・🔭一覧からモーダルで記録フォーム（15項目・file:// で完結）
@@ -588,16 +625,20 @@ node s28-test.mjs      # S28: 破損検知・バックアップ・PWA・タイ�
   これらは S40/S42 の変更とは無関係（S42 着手前の HEAD でも同じ箇所で落ちることを確認済み）。直すには「現在の仕様として何が正しいか」を決める必要があるため手を付けていない
 - ⚠️ **一覧の行を指すセレクタは必ず `[data-trend-item="<id>"]` で絞ること。** `loadMarket()` がプリセット28銘柄を自動生成するので同じ属性の要素が28個あり、S44 で並び順が「エントリー圏に近い順」になって**seed したペアが先頭とは限らなくなった**（`.first()` 頼みのセレクタは S44 でここで落ちた）
 - ⚠️ **図（`IMG_GRANVILLE`）を差し替えたら `MV_GRANVILLE_ANCHORS` の8点を測り直すこと。** S41 で座標を更新した際、`s40-test.mjs` が旧座標を直書きしていて1件落ちた。現在はアプリ側の `MV_GRANVILLE_ANCHORS` を `page.evaluate` で引く形に直してあるので、次の差し替えでは落ちない
-- ⚠️ **`s44-test.mjs` / `s43-test.mjs` / `s42-test.mjs` / `s40-test.mjs` は S60 で撤去した旧ツールバーボタン id（`#trendFilterAligned`/`#trendFilterGo`/`#trendFilterWait`/`#trendFilterStale`）をクリック・参照している箇所があり、S60時点では未修正のまま**（`s44-test.mjs` の `page.click('#trendFilterAligned')` 等がタイムアウトする）。絞り込みの起点は `[data-trend-summary-filter="go|hot|wait|stale"]`（`.trend-summary` 内のボタン）に統一されたので、次にこれらのテストへ触るときはセレクタを移行すること。s59-test.mjs は S60 で既に移行済み（④⑤⑥）なので実装の参考になる
+- ✅ **旧ツールバーボタン id（`#trendFilterAligned` 等）への依存は S62 で解消済み。** 絞り込みの起点は `[data-trend-summary-filter="go|hot|wait|stale"]`（`.trend-summary` 内のボタン）に統一されている。新しくテストを書くときもこちらを使うこと
+- ⚠️ **`s40-test.mjs` は2項目（「閉じると行のチップが更新される」「文字ラベルは残る」）が S45 以前から落ちたまま**。S45 でミニ波形とラベル表示を撤去した際の期待値更新漏れで、S62 の変更とは無関係（変更前の HEAD でも同じ2件が落ちる）。直すには「現在の仕様として何が正しいか」を決める必要があるため手を付けていない
 
-### CSV列構成（S54更新）
-`id`, `tradeType`, `alertPair`, `alertTf`, `result`, `entryPattern`, `datetime`, `exitDatetime`, `pair`, `tfHigher`, `tfEntry`, `direction`, `exitResult`, `notes`, `manualAlertAt`, `manualAlertTf`, `resultTag`, `resultOtherReason`, `pnlAmount`, `beTouch`, `imgEntry`, `imgHigher`, `imgOthers`, `watchId`, `hi_*` × 8, `en_*` × 8, `createdAt`
+### CSV列構成（S62更新）
+`id`, `tradeType`, `alertPair`, `alertTf`, `result`, `entryPattern`, `datetime`, `exitDatetime`, `pair`, `tfHigher`, `tfEntry`, `direction`, `exitResult`, `notes`, `manualAlertAt`, `manualAlertTf`, `resultTag`, `resultOtherReason`, `pnlAmount`, `beTouch`, `imgEntry`, `imgHigher`, `imgOthers`, `watchId`, `hi_*` × 7, `en_*` × 4, `createdAt`
 
 ⚠️ export は**位置配列**なので、`CSV_HEADERS` と export の並びを必ず同時に直すこと（ズレると全列が破壊される）。
 
-根拠チェック列は `MV_CHECK_SNAPSHOTS`（`hi` = 上位足 / `en` = エントリー足）× `MV_TF_CHECKS` から自動生成される（`CSV_BASIS_COLUMNS`）。`MV_TF_CHECKS` に項目を1行足せばCSV列も自動で増える。
+根拠チェック列は `MV_CHECK_SNAPSHOTS`（`hi` = 上位足 / `en` = エントリー足）**× その区分の `checks`** から自動生成される（`CSV_BASIS_COLUMNS`）。S62 で区分ごとに定義が分かれたので、`MV_TF_CHECKS` / `MV_ENTRY_CHECKS` のどちらに項目を足してもCSV列が自動で増える。
 
-**セッション38追加**：グランビル/RCI短期中期長期/MACD/ラウンドナンバー/ロールリバーサル/エントリーFibo = 8項目に増加
+- `hi_*` (7): `granville` / `rciShort` / `rciMid` / `rciLong` / `macd` / `roundNumber` / `rollReversal`
+- `en_*` (4): `necklineForm` / `maBreak` / `fiboRoll` / `entryFibo`
+
+**S62変更**：エントリー足を3ステップ確認フローに置き換えたため、`en_*` 列が `en_granville`/`en_rci*`/`en_macd`/`en_roundNumber`/`en_rollReversal` から `en_necklineForm`/`en_maBreak`/`en_fiboRoll` に入れ替わった（`en_entryFibo` は据え置き ── 📚の Fibo別成績が見ているため）。上位足からは `hi_entryFibo` が外れた。旧CSVを import すると入れ替わった列は未知の列として無視される（値は空のまま＝「未選択」扱いなので集計は壊れない）。
 
 **S54変更**：`entryPrice`/`slPrice`/`slBasis`/`splitCount`/`exits` 列を撤去し、`manualAlertAt`/`manualAlertTf`/`resultTag`/`resultOtherReason`/`pnlAmount`/`beTouch`/`imgEntry`/`imgHigher`/`imgOthers` 列に置換（ユーザー確認済みの完全置換方針。旧CSVの建玉・決済データは import しても復帰しない）
 

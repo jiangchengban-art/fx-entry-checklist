@@ -114,8 +114,9 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
   ok('サマリーに GO/WAIT/NO タイルが無い  [' + summary.slice(0, 40) + ']',
      !/🟢|🟡|⚪/.test(summary));
   ok('代わりに 🎯 圏内タイルが出る', summary.includes('🎯 圏内'));
-  eq('ツールバーの絞り込みが 🎯 エントリー圏のみ になる',
-     (await page.textContent('#trendFilterAligned')).trim(), '🎯 エントリー圏のみ');
+  /* S60: 絞り込みの起点はツールバーの専用ボタンからサマリータイル自体に統合された */
+  eq('圏内タイルがそのまま絞り込みボタンになっている',
+     await page.locator('[data-trend-summary-filter="hot"]').count(), 1);
 
   /* S55: 🎯タブ自体が廃止されたので、ボードにバッジが残っていないことはタブ不在で証明される */
   eq('🎯トレードタブ自体が存在しない', await page.locator('[data-tab="trade"]').count(), 0);
@@ -142,7 +143,7 @@ console.log('\n[②] 手動GOフラグは最上位グループ・独立の絞り
   eq('GOグループが現れる', await page.locator('.trend-group-head.go').count(), 1);
   const order = await page.locator('[data-trend-item]').evaluateAll(els => els.map(e => e.dataset.trendItem));
   eq('圏外でもGOを付けたw2が圏内のw1より先頭に来る', order[0], 'w2');
-  await page.click('#trendFilterGo');
+  await page.click('[data-trend-summary-filter="go"]');
   eq('GOのみ絞り込みで圏内のw1が消える', await page.locator('[data-trend-item="w1"]').count(), 0);
   eq('GO付きのw2は残る', await page.locator('[data-trend-item="w2"]').count(), 1);
   await page.click('[data-trend-item="w2"] [data-trend-go]');
@@ -187,10 +188,10 @@ console.log('\n[③] エントリー圏に近い順に並ぶ');
   ok('記録の無いペアは圏内より後ろ  [index ' + firstNoRecord + ']', firstNoRecord >= 2);
 
   /* 絞り込み */
-  await page.click('#trendFilterAligned');
+  await page.click('[data-trend-summary-filter="hot"]');
   eq('🎯 のみで圏内の2件だけになる', await page.locator('.trend-item').count(), 2);
-  ok('ボタンに .on が付く', await page.locator('#trendFilterAligned.on').count() === 1);
-  await page.click('#trendFilterAligned');
+  ok('ボタンに .on が付く', await page.locator('[data-trend-summary-filter="hot"].on').count() === 1);
+  await page.click('[data-trend-summary-filter="hot"]');
   ok('もう一度押すと戻る', await page.locator('.trend-item').count() > 2);
   await page.context().close();
 }
@@ -267,9 +268,10 @@ console.log('\n[⑤] 根拠パネルの入口が「足」になる');
   eq('上位足が日足で確定する', (await pairOf(page, 'w1')).tfHigher, '日足');
   eq('固定表示も日足', (await page.textContent(W1 + '.tp-fixed')).trim(), '日足');
   ok('確度が出る', (await page.textContent(W1 + '.tp-conf')).includes('確度'));
-  eq('根拠の行が MV_TF_CHECKS のぶん出る',
-     await page.locator(W1 + '.tp-grid .tp-row:not(.tp-head)').count(),
-     await page.evaluate(() => MV_TF_CHECKS.length));
+  /* S62: 上位足とエントリー足で項目が別々になったので、行数は両方の合計になる */
+  eq('根拠の行が 上位足＋エントリー足 のぶん出る',
+     await page.locator(W1 + '.tp-grid .tp-row').count(),
+     await page.evaluate(() => MV_TF_CHECKS.length + MV_ENTRY_CHECKS.length));
 
   /* 別の足のボタンを押すと上位足が入れ替わる */
   await page.click(W1 + '[data-trend-panel-open][data-tf="h4"]');

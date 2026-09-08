@@ -731,17 +731,31 @@
     border: 1px solid var(--warn);
   }
 
-  /* S33: 根拠パネル。上位足とエントリー足を横並び2列にして、375pxでも縦に伸ばさない。 */
+  /* S33→S62: 根拠パネル。上位足とエントリー足で項目が別々になったので横並び2列をやめ、
+     区分ごとのセクションに積む。1項目が横幅をフルに使えるので選択肢の折り返しは減る。 */
   .trend-panel {
     border-top: 1px solid var(--border);
     background: var(--surface-2); padding: 9px 11px 11px;
   }
   .tp-grid { display: flex; flex-direction: column; gap: 4px; }
   .tp-row {
-    display: grid; grid-template-columns: 82px minmax(0, 1fr) minmax(0, 1fr);
+    display: grid; grid-template-columns: 82px minmax(0, 1fr);
     gap: 6px; align-items: center;
   }
-  .tp-head { padding-bottom: 5px; margin-bottom: 2px; border-bottom: 1px dashed var(--border); }
+  /* 区分の見出し。上位足は固定表示、エントリー足は足の選択と目線の表示を持つ。 */
+  .tp-sec {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding-bottom: 5px; margin-top: 6px; margin-bottom: 2px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .tp-grid > .tp-sec:first-child { margin-top: 0; }
+  .tp-sec-name { font-size: 11px; font-weight: 700; color: var(--ink-2); flex-shrink: 0; }
+  .tp-sec .tp-fixed, .tp-sec select.tp-cell { width: auto; min-width: 96px; }
+  .tp-side {
+    font-size: 10.5px; color: var(--good); margin-left: auto;
+    padding: 2px 7px; border-radius: 999px; background: var(--good-soft);
+  }
+  .tp-side.none { color: var(--warn); background: var(--warn-soft); }
   .tp-label {
     font-size: 11px; color: var(--ink-muted); text-align: right;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1019,12 +1033,13 @@
     .tstate-btn { width: 27px; height: 27px; }
     .tzone-btn  { width: 26px; height: 27px; }
     .tgv { height: 27px; padding: 0 6px; font-size: 11px; }
-    /* S33: 根拠パネルは 375px でも2列を維持する（縦積みにすると14行になり巡回が重くなる）。
-       ラベル列を詰め、MV_TF_CHECKS の short で文言を短くして収める。 */
+    /* S62: 根拠パネルは区分ごとのセクションに積む。ラベル列を詰め、short で文言を短くして
+       選択肢に横幅を回す（上位足8項目＋エントリー足4項目でも折り返しは2段までに収まる）。 */
     .trend-panel { padding: 8px 8px 9px; }
-    .tp-row { grid-template-columns: 62px minmax(0, 1fr) minmax(0, 1fr); gap: 5px; }
+    .tp-row { grid-template-columns: 62px minmax(0, 1fr); gap: 5px; }
     .tp-label, .tp-label.link { font-size: 10.5px; }
     select.tp-cell, .tp-fixed, .tp-synced { font-size: 11.5px; padding: 4px 4px; }
+    .tp-sec .tp-fixed, .tp-sec select.tp-cell { min-width: 84px; }
     #trendGvModal .modal-actions { flex-wrap: wrap; }
     #trendGvModal .modal-actions button { white-space: nowrap; }
     /* 375px では 🎯 だけ残す（距離と「根拠」は title で読める）。入力行を1段に保つため。 */
@@ -1583,7 +1598,16 @@ function tfIsHot(w, tfKey)   { const d = tfEntryDistance(w, tfKey); return d !==
    実アンカー座標（MV_GRANVILLE_ANCHORS）と一致しておらず、点の位置がタップ位置と
    無関係に見える紛らわしい表示だったため。タップ記録か概算かは title の文言だけで示す。 */
 
-const MV_TF_CHECKS = [
+/* opts は文字列でも { v, side } でも書けるようにし、描画側では常に後者として扱う。
+   ⚠️ 正規化を1箇所に閉じておかないと、選択肢の形を意識する場所が増えて side の考慮漏れが出る。
+   （関数宣言は巻き上げられるので、下の定数定義から呼んで問題ない。） */
+function mvNormalizeChecks(list) {
+  return list.map(c => Object.assign({}, c, {
+    opts: c.opts.map(o => (typeof o === 'string' ? { v: o } : o)),
+  }));
+}
+
+const MV_TF_CHECKS = mvNormalizeChecks([
   /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
      選択肢はトレンド一覧と同じ8パターン（買①〜④／売①〜④）＋❌を使う。
      ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
@@ -1600,11 +1624,43 @@ const MV_TF_CHECKS = [
   { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
-  /* S38: エントリー再現性向上のため、エントリー足の1波のどのフィボナッチ水準で
-     エントリーしたかを記録する。小数点は省略（23.6%→23% 等）。上位足でも記録は可能
-     （封鎖しない）が、意味を持つのは主にエントリー足での使用時。 */
-  { k: 'entryFibo',    label: 'エントリーFibo',   opts: ['23%', '38%', '50%', '61%', '78%', '❌'], short: 'Fibo' },
-];
+  /* S62: entryFibo はここ（上位足）から外し、エントリー足の❸専用にした（MV_ENTRY_CHECKS）。
+     記録するのは「1波のどのフィボ水準で入ったか」なので、上位足に置いても意味を持たなかった。 */
+]);
+
+/* S62: エントリー足で確認する根拠。上位足（MV_TF_CHECKS）とは別物で、実運用の
+   「❶ネックライン付近の反転形 → ❷5分足MA抜け（＝ここから1波）→ ❸1波のフィボとロールRvの重なり」
+   という確認の順番をそのまま項目にしてある。上位足の確度が高いことが前提の手順なので、
+   グランビル・RCI・MACD といった上位足の環境認識項目はエントリー足では使わない。
+   ⚠️ opts の要素に side を書くと、記録済みのトレンド方向に合う選択肢だけが出る（trendCheckCell）。
+      向きの無い選択肢（⏳待ち・❌・%）は side を持たせず常に出す。 */
+const MV_ENTRY_CHECKS = mvNormalizeChecks([
+  { k: 'necklineForm', label: 'ネックライン反転形', short: '❶反転形',
+    hint: '上位足のネックライン付近で、5分足に反転の形が出たか',
+    opts: [
+      { v: 'ダブルボトム', side: 'buy'  },
+      { v: '逆三尊',       side: 'buy'  },
+      { v: 'ダブルトップ', side: 'sell' },
+      { v: '三尊',         side: 'sell' },
+      { v: '⏳待ち' }, { v: '❌' },
+    ] },
+  { k: 'maBreak', label: '5分足MA抜け', short: '❷MA抜け',
+    hint: '5分足のMAを明確に抜けたか。抜けたらそこからを1波と見なす',
+    opts: [
+      { v: '上抜け', side: 'buy'  },
+      { v: '下抜け', side: 'sell' },
+      { v: '⏳待ち' }, { v: '❌' },
+    ] },
+  { k: 'fiboRoll', label: 'フィボ×ロールリバーサル', short: '❸重なり',
+    hint: '1波のフィボナッチとロールリバーサルが重なる箇所か',
+    opts: [{ v: '重なり有' }, { v: '重なり無' }, { v: '⏳待ち' }, { v: '❌' }] },
+  /* S38→S62: 実際に入ったフィボ水準。キー名は据え置き ── CSV列 en_entryFibo と
+     📚振り返りの「エントリーFibo水準別の成績」（byFibo）がこの名前を見ているため。 */
+  { k: 'entryFibo', label: 'エントリーFibo', short: '❸Fibo',
+    hint: '重なった水準＝実際にエントリーしたフィボの%',
+    opts: [{ v: '23%' }, { v: '38%' }, { v: '50%' }, { v: '61%' }, { v: '78%' }, { v: '❌' }] },
+]);
+
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
 
 /* ボードの上位足・エントリー足ラベル → トレンド一覧の時間足キー。
@@ -1616,9 +1672,12 @@ const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4', '
    ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。
    ⚠️ ここに無い足（月足）では根拠パネルを開けない ── tfHigher に入れる値が無いため。 */
 const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足', h1: '1時間足' };
-/* トレンド一覧の該当足からボードの checksHigher/checksEntry.granville へ書き込む唯一の入り口。
-   一覧が入力元・ボードは複製という向きを守るため、ボード側からここへは書き込まない。 */
+/* トレンド一覧の該当足から checksHigher.granville へ書き込む唯一の入り口。
+   一覧が入力元・スナップショットは複製という向きを守るため、逆方向には書き込まない。
+   ⚠️ S62: エントリー足はグランビルを持たなくなった（❶❷❸の3ステップに置き換え）ので上位足だけ。
+      既存データに残る w.checksEntry.granville は読み書きされないだけで無害（S58 の w.mode と同じ扱い）。 */
 function mvGranvilleSyncField(w, field) {
+  if (field !== 'tfHigher') return;
   const tfKey = MV_TF_TO_TREND_KEY[w[field]];
   if (!tfKey) return;
   const checksField = MV_CHECK_FIELDS[field];
@@ -1628,10 +1687,34 @@ function mvGranvilleSyncField(w, field) {
   w[checksField].granville = g ? g.short : '';
 }
 
-/* 記録に焼き込む根拠スナップショットの区分。CSV列の接頭辞も兼ねる */
+/* S62: エントリー足の❶❷は上位足のトレンド方向に紐づく（押し目買いなら底の形＋MA上抜け）。
+   向きが決まっていなければ '' を返し、そのときは両サイドの選択肢を出す。 */
+function mvEntrySide(w) {
+  const tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+  const state = ((w.trend && w.trend[tfKey]) || {}).state;
+  return state === 'up' ? 'buy' : (state === 'down' ? 'sell' : '');
+}
+
+/* 記録済みのエントリー足チェックのうち、今の方向と食い違う向きのものを落とす。
+   ⚠️ mvWriteTrend / mvSetTf の中から呼ぶこと。方向と上位足が変わる経路はこの2つだけなので、
+      そこに置けば「↗で記録したダブルボトムが↘に変えても残る」取りこぼしが構造的に起きない
+      （グランビルと wpos の後始末を mvWriteTrend の1箇所に寄せてあるのと同じ理由）。 */
+function mvSyncEntrySideChecks(w) {
+  const checks = w.checksEntry;
+  if (!checks) return;
+  const side = mvEntrySide(w);
+  MV_ENTRY_CHECKS.forEach(c => {
+    const opt = c.opts.find(o => o.v === checks[c.k]);
+    if (opt && opt.side && opt.side !== side) checks[c.k] = '';
+  });
+}
+
+/* 記録に焼き込む根拠スナップショットの区分。CSV列の接頭辞も兼ねる。
+   S62: 上位足とエントリー足で項目が別々になったので、どの定義を使うかを checks で持つ。
+   CSV列も履歴サマリーもここを走査して作るため、片方に項目を足せば自動で追随する。 */
 const MV_CHECK_SNAPSHOTS = [
-  { key: 'higher', prefix: 'hi', label: '上位足' },
-  { key: 'entry',  prefix: 'en', label: 'エントリー足' },
+  { key: 'higher', prefix: 'hi', label: '上位足',       checks: MV_TF_CHECKS },
+  { key: 'entry',  prefix: 'en', label: 'エントリー足', checks: MV_ENTRY_CHECKS },
 ];
 
 /* アラート発生足（複数可）。同時に複数の時間足でアラートが鳴ることがあるため、
@@ -2664,10 +2747,10 @@ function kv(k, v) {
 
 /* ---- 環境認識ボードから焼き込んだ根拠のスナップショット表示 ----
    ❌ と未選択は「根拠として採用していない」ので省き、実際に確認した項目だけを並べる。
-   MV_TF_CHECKS を走査するため、項目を増やせば表示にも自動で反映される。 */
-function basisItemsOf(checks) {
+   区分ごとの定義（MV_CHECK_SNAPSHOTS.checks）を走査するため、項目を増やせば表示にも自動で反映される。 */
+function basisItemsOf(checks, list) {
   if (!checks || typeof checks !== 'object') return [];
-  return MV_TF_CHECKS
+  return (list || MV_TF_CHECKS)
     .filter(c => checks[c.k] && checks[c.k] !== '❌')
     .map(c => ({ label: c.label, value: checks[c.k] }));
 }
@@ -2675,7 +2758,7 @@ function basisItemsOf(checks) {
 function basisSummaryHtml(mvChecks) {
   if (!mvChecks) return '';
   const parts = MV_CHECK_SNAPSHOTS.map(s => {
-    const items = basisItemsOf(mvChecks[s.key]);
+    const items = basisItemsOf(mvChecks[s.key], s.checks);
     if (!items.length) return '';
     return esc(s.label) + ': ' + items.map(i => esc(i.label) + ' ' + esc(i.value)).join(' / ');
   }).filter(Boolean);
@@ -2685,7 +2768,7 @@ function basisSummaryHtml(mvChecks) {
 function basisDetailHtml(mvChecks) {
   if (!mvChecks) return '';
   const rows = MV_CHECK_SNAPSHOTS.map(s => {
-    const items = basisItemsOf(mvChecks[s.key]);
+    const items = basisItemsOf(mvChecks[s.key], s.checks);
     if (!items.length) return '';
     return '<div class="tf"><span class="tf-name">' + esc(s.label) + '</span>' +
       items.map(i => '<span class="item">' + esc(i.label) + ' <b>' + esc(i.value) + '</b></span>').join('') +
@@ -2798,10 +2881,11 @@ cancelEditBtn.addEventListener('click', () => {
 /* ============ CSV ============ */
 /* S21: エントリーチェックリスト廃止に伴い check1〜15 列を撤廃し、
    環境認識ボードの根拠スナップショット（上位足 hi_* / エントリー足 en_*）に置き換えた。
-   列は MV_TF_CHECKS から自動生成されるため、根拠項目を足せばCSVにも自動で増える。
+   列は MV_CHECK_SNAPSHOTS の区分×その checks から自動生成されるため、
+   上位足・エントリー足のどちらに項目を足してもCSV列が自動で増える（S62で区分ごとに別定義になった）。
    旧CSV の check* 列は import 時に未知の列として無視される。 */
 const CSV_BASIS_COLUMNS = MV_CHECK_SNAPSHOTS.flatMap(s =>
-  MV_TF_CHECKS.map(c => ({ col: s.prefix + '_' + c.k, snapshot: s.key, key: c.k })));
+  s.checks.map(c => ({ col: s.prefix + '_' + c.k, snapshot: s.key, key: c.k })));
 const CSV_HEADERS = [
   'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
   'pair', 'tfHigher', 'tfEntry', 'direction', 'exitResult', 'notes',
@@ -3394,6 +3478,8 @@ function mvSetTf(watchId, field, value) {
   /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
      （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
   mvGranvilleSyncField(w, field);
+  /* S62: 上位足を別の足に変えると、その足の方向でエントリー足の向きが決まり直す。 */
+  if (field === 'tfHigher') mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3512,9 +3598,10 @@ function mvWriteTrend(watchId, tfKey, patch) {
      端末間のマージが見るのはこちら（時間足ごとに独立して新旧を判定するため）。 */
   cur.at = new Date().toISOString();
   w.trendAt = cur.at;
-  /* S29: この足を上位足・エントリー足として選んでいるボードがあれば、グランビルを自動反映する。 */
+  /* S29: この足を上位足として選んでいれば、グランビルを自動反映する。 */
   mvGranvilleSyncField(w, 'tfHigher');
-  mvGranvilleSyncField(w, 'tfEntry');
+  /* S62: 方向が変われば、その向きに紐づくエントリー足の❶❷も成立しなくなる。 */
+  mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3593,25 +3680,27 @@ let trendVisibleTfs = loadTrendTfs();
    一覧の ⏳ バッジ（pairWaitCount）側でこの2つを描き分ける。 */
 function isUnmetCheck(v) { return v === '❌' || (v || '').indexOf('⏳') === 0; }
 
-/* S38: 根拠の確度。MV_TF_CHECKS のうち未達成（isUnmetCheck）を選んだ項目数だけ減点する
-   （未選択の空欄は減点しない）。分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
-function checkConfidence(checks) {
-  const total = MV_TF_CHECKS.length;
-  const cross = MV_TF_CHECKS.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
+/* S38: 根拠の確度。未達成（isUnmetCheck）を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
+   S62: 分母は区分ごとの項目数。上位足は7項目、エントリー足は❶❷❸の4項目で別々に出す。 */
+function checkConfidence(checks, list) {
+  const items = list || MV_TF_CHECKS;
+  const total = items.length;
+  if (!total) return 100;
+  const cross = items.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
   return Math.round((total - cross) / total * 100);
 }
 function setupConfidence(w) {
-  const higher = checkConfidence(w.checksHigher || {});
-  const entry  = checkConfidence(w.checksEntry  || {});
+  const higher = checkConfidence(w.checksHigher || {}, MV_TF_CHECKS);
+  const entry  = checkConfidence(w.checksEntry  || {}, MV_ENTRY_CHECKS);
   return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
 }
 
 /* S46: 「⏳待ち」の項目数（上位足・エントリー足の合計）。w に保存しない純粋な導出関数
    （S32〜S44 の GO/WAIT 判定・エントリー圏判定と同じ原則）。行の⏳バッジと絞り込みで使う。 */
 function pairWaitCount(w) {
-  const count = checks => MV_TF_CHECKS.reduce((n, c) =>
+  const count = (checks, list) => list.reduce((n, c) =>
     n + ((checks && (checks[c.k] || '')).indexOf('⏳') === 0 ? 1 : 0), 0);
-  return count(w.checksHigher || {}) + count(w.checksEntry || {});
+  return count(w.checksHigher || {}, MV_TF_CHECKS) + count(w.checksEntry || {}, MV_ENTRY_CHECKS);
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -3698,6 +3787,11 @@ function trendCheckCell(w, field, c) {
       ' title="🔭一覧のグランビル記録から自動反映。変更は上の行で行う">' +
       (cur ? esc(cur) : '🔭未記録') + '</span>';
   }
+  /* S62: 方向が決まっているエントリー足では、逆サイドの選択肢を出さない
+     （↗の押し目狙いで「ダブルトップ」を選べても意味がなく、選んでも
+     mvSyncEntrySideChecks が消すため）。方向未記録のときは両サイド出す。 */
+  const side = field === 'tfEntry' ? mvEntrySide(w) : '';
+  const opts = c.opts.filter(o => !o.side || !side || o.side === side);
   function btn(value, label) {
     return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') +
       (value === '' ? ' tp-none' : '') + '"' +
@@ -3706,7 +3800,7 @@ function trendCheckCell(w, field, c) {
   }
   return '<div class="mv-choice wrap tp-choice">' +
     btn('', '—') +
-    c.opts.map(o => btn(o, o)).join('') +
+    opts.map(o => btn(o.v, o.v)).join('') +
   '</div>';
 }
 
@@ -3719,14 +3813,16 @@ function trendPanelHtml(w) {
   const higherTf = MV_TREND_KEY_TO_TF[tfKey];
   if (!higherTf) return '';
   const tfLabel = (MV_TREND_TFS.find(t => t.k === tfKey) || {}).label || higherTf;
-  const rows = MV_TF_CHECKS.map(c =>
+  /* S62: 上位足とエントリー足は項目そのものが別なので、1行に2列並べる形はやめて
+     区分ごとのセクションに積む。横幅をフルに使えるぶん選択肢の折り返しはむしろ減る。 */
+  const rowsOf = (field, list) => list.map(c =>
     '<div class="tp-row">' +
       (c.link
         ? '<button type="button" class="tp-label link" data-guide-link="' + c.link + '"' +
           ' title="' + esc(c.label) + ' の解説を開く">' + esc(c.short || c.label) + ' 📖</button>'
-        : '<span class="tp-label" title="' + esc(c.label) + '">' + esc(c.short || c.label) + '</span>') +
-      trendCheckCell(w, 'tfHigher', c) +
-      trendCheckCell(w, 'tfEntry', c) +
+        : '<span class="tp-label" title="' + esc(c.hint || c.label) + '">' +
+          esc(c.short || c.label) + '</span>') +
+      trendCheckCell(w, field, c) +
     '</div>').join('');
 
   /* ⚠️ この条件は marketFieldsFromBoard() の null 判定と同じ式を保つこと。
@@ -3741,19 +3837,34 @@ function trendPanelHtml(w) {
   const confHtml = '<div class="tp-conf">🎯 確度 上位足 ' + conf.higher + '% ／ エントリー足 ' +
     conf.entry + '% ／ 合算 <b>' + conf.combined + '%</b></div>';
 
+  /* エントリー足の❶❷は方向に紐づくので、どちら目線で選択肢を出しているかを明示する。 */
+  const side = mvEntrySide(w);
+  const sideNote = side === 'buy' ? '↗ 買い目線'
+    : (side === 'sell' ? '↘ 売り目線' : '⚠ 方向未記録');
+  const sideTitle = side
+    ? esc(tfLabel) + 'の方向から、この目線の選択肢だけを出しています'
+    : esc(tfLabel) + 'の方向が未記録のため、買い・売り両方の選択肢を出しています';
+
   return '<div class="trend-panel">' +
     confHtml +
     '<div class="tp-grid">' +
-      '<div class="tp-row tp-head">' +
-        '<span class="tp-label">時間足</span>' +
+      '<div class="tp-sec">' +
+        '<span class="tp-sec-name">上位足</span>' +
         '<span class="tp-fixed" title="' + esc(tfLabel) + 'の行から開いたので上位足は固定">' +
           esc(w.tfHigher || higherTf) + '</span>' +
+      '</div>' +
+      rowsOf('tfHigher', MV_TF_CHECKS) +
+      '<div class="tp-sec">' +
+        '<span class="tp-sec-name">エントリー足</span>' +
         '<select class="tp-cell" data-trend-tfentry="' + esc(w.id) + '">' +
           '<option value="">エントリー足…</option>' +
           MV_TF_ENTRY_OPTIONS.map(o =>
             '<option' + (w.tfEntry === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') +
         '</select>' +
-      '</div>' + rows +
+        '<span class="tp-side' + (side ? '' : ' none') + '" title="' + sideTitle + '">' +
+          esc(sideNote) + '</span>' +
+      '</div>' +
+      rowsOf('tfEntry', MV_ENTRY_CHECKS) +
     '</div>' +
     '<div class="tp-foot">' +
       '<div class="mv-choice">' + trendJudgeBtnsHtml(w) + '</div>' +

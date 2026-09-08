@@ -1,25 +1,26 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-08 (S60 complete)  
+**Last Updated:** 2026-09-08 (S62 complete)  
 **Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
 **Main Branch:** `master`  
-**Active Development Branch:** none — S60 merged directly to master
+**Active Development Branch:** `claude/s63-session-start-inntq7` — S62 work
 
 ## Project Health
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Core Features | ✅ Complete | 🔭一覧・📚統計・⚙設定の3タブ完成 |
-| Testing | ⚠️ Mostly Passing | s60(17)+s59(31)+s55(15) all green. s44/s43/s42/s40 have known failures from S60's toolbar-id removal (see Known Issues) |
+| Testing | ✅ Passing | s62(48)+s44(64)+s43(35)+s42(45)+s60(17)+s59(31)+s55(15) all green. s40 has 2 known pre-existing failures (see Known Issues) |
 | Data Model | ✅ Stable | localStorage `mochipoyo_*_v1` keys, Supabase JSONB sync |
 | Accessibility | ✅ OK | PWA-capable, iOS/Android responsive, dark/light theme |
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-60)
+## Recent Changes (S57-62)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S62 | エントリー足の根拠を3ステップ確認フローに全面置換 | `MV_ENTRY_CHECKS`（❶反転形／❷MA抜け／❸重なり／❸Fibo）を新設。方向で選択肢を絞り、方向反転で矛盾する記録だけ自動クリア。パネルは縦2セクションに |
 | S60 | GO/圏内/待ち/未更新のタップ箇所重複を解消 | サマリータイルを`<button>`化しフィルタを兼務、ツールバーの同名4ボタンを削除、ツールバー1行に再統合 |
 | S59 | 🔭一覧上部を巡回実運用に合わせて再整理 | 説明文圧縮・5タイルペア単位統一・ツールバー2行分割・CSS色バグ修正 |
 | S58 | 目線3択→手動GOフラグ置換 | GO主観フラグで監視優先度を明示的に制御 |
@@ -60,8 +61,7 @@ docs/
 
 | Issue | Status | Workaround |
 |-------|--------|-----------|
-| s44/s43/s42/s40-test が旧ツールバーボタンid（`#trendFilterAligned`等）をクリック/参照している | **NEW in S60** | S60で該当DOM要素を削除したため。次にこれらのテストへ触るとき、セレクタを `[data-trend-summary-filter="..."]` に移行すること（s59-test.mjsが移行済みで参考になる） |
-| s40-test チップ更新・ラベル残る (2項目) | 既知 S40以前から | s44以降のUI変更で無関連、後日修正 |
+| s40-test チップ更新・ラベル残る (2項目) | 既知 S45から | S45でミニ波形・ラベル表示を撤去した際の期待値更新漏れ。仕様として何が正しいかの判断が要るため未修正 |
 | localStorage 5-10MB上限 | 予想 | S56で容量超過リーンモード追加、今後モニタリング |
 | 波マップ過去日では「待ちあり」「GOのみ」不可 | 既知 S42- | 過去日レコードが `p/t/g/w/s`のみで`go`を持たないため設計上不可避 |
 
@@ -74,16 +74,19 @@ docs/
 **S40-44:** 波位置タップ記録→波マップ→判定全廃・エントリー圏軸  
 **S45-50:** 表示最適化・過去日訂正・参考重ね表示  
 **S51-56:** ボード廃止・決済モーダル廃止・1H追加・同期強化  
-**S57-60:** 手動GOフラグ・一覧上部整理・タップ箇所重複解消
+**S57-60:** 手動GOフラグ・一覧上部整理・タップ箇所重複解消  
+**S62:** エントリー足を3ステップ確認フローに置換（上位足とは別の項目セットへ）
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-60 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-62 統合）」テーブルを参照。
+※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
 
 - [ ] `git pull origin master` を必ず最初に実行（別環境からのプッシュがある可能性）
 - [ ] `git log --oneline -3` でローカルとリモートの一致を確認
-- [ ] s44/s43/s42/s40-test.mjs の旧ツールバーボタンid依存を修正するか判断（S60で発生、後回しでも実害なし）
-- [ ] Plan S61 work (user feature request or bug fix)
+- [ ] s40-test.mjs の既知2件（S45のミニ波形撤去に伴う期待値更新漏れ）を直すか判断
+- [ ] `GV_ENTRY_RADIUS` の実運用チューニング（S51以来の据え置き候補）
+- [ ] Plan S63 work (user feature request or bug fix)
 
 ## ⚠️ 複数環境運用時の注意（S60で発生した教訓）
 

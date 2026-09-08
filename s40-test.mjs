@@ -286,7 +286,7 @@ console.log('\n[8] マップと絞り込みの連動');
   await page.click('[data-map-tf="d"]');
   eq('絞り込みなしでは2件', await page.locator('#trendMapDots .gv-dot').count(), 2);
   await page.click('#trendMapClose');
-  await page.click('#trendFilterAligned');            /* S44: 🎯 エントリー圏のみ */
+  await page.click('[data-trend-summary-filter="hot"]');            /* S44: 🎯 エントリー圏のみ */
   await page.click('#trendMapOpen');
   await page.click('[data-map-tf="d"]');
   eq('エントリー圏のみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
