@@ -628,16 +628,37 @@
     font-size: 13.5px; font-weight: 700; color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
-  .trend-summary .item.rd   { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .trend-summary .item.rd .n { color: var(--accent); }
+  /* S59: .rd（旧・目線3択のRD逆張り）はS58で撤去済みのため削除。
+     hot/stale はS44/S28からJS側が出しているクラス名（renderTrendSummary 参照）に合わせて定義。 */
   .trend-summary .item.go   { background: var(--good-soft); border-color: var(--good); color: var(--good); }
   .trend-summary .item.go .n { color: var(--good); }
+  .trend-summary .item.hot  { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+  .trend-summary .item.hot .n { color: var(--good); }
   .trend-summary .item.wait { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
   .trend-summary .item.wait .n { color: var(--warn); }
+  .trend-summary .item.stale { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+  .trend-summary .item.stale .n { color: var(--warn); }
+
+  /* S59: 説明文の常時表示は2行に圧縮し、操作手順は折りたたみへ退避（巡回のたびに読む文章ではないため）。 */
+  .trend-help { margin: -6px 0 12px; }
+  .trend-help summary {
+    font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer;
+    list-style: none; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .trend-help summary::-webkit-details-marker { display: none; }
+  .trend-help summary::before { content: '▸'; font-size: 10px; }
+  .trend-help[open] summary::before { content: '▾'; }
+  .trend-help-body {
+    font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
+    padding: 8px 2px 0;
+  }
 
   .trend-toolbar {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
   }
+  /* S59: 2行目（表示設定・波マップ）は1行目（絞り込み）よりわずかに間隔を詰め、
+     役割が違う2グループであることを示す。 */
+  .trend-toolbar-2 { margin-top: -6px; }
   .trend-toolbar .spacer { flex: 1; }
   .trend-filter-btn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .trend-category-select {
@@ -1189,21 +1210,32 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">チャート巡回用の画面です。監視中の全ペアについて、上位足ごとに<strong>トレンド方向</strong>・<strong>EMAゾーンの色</strong>・<strong>グランビルの波</strong>をその場でタップ記録できます（行を開く操作は不要）。ペア名の右の<strong>GOボタン</strong>は、近々エントリーが近いと自分で判断したペアに立てる手動の目印です。押すと一覧の最上位「🚩 GO」にまとまり、解除するまで残ります（自動では消えません）。並び順自体はエントリー圏（買②③/売②③）までの距離の近い順です。<strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。記録した位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。</div>
+    <div class="section-note">チャート巡回用の画面です。足ごとに<strong>方向・EMAゾーン・波</strong>をその場でタップ記録します。並び順は<strong>エントリー圏（買②③/売②③）に近い順</strong>、🚩 GO を立てたペアは常に最上位です。</div>
+    <details class="trend-help">
+      <summary>📖 使い方をひらく</summary>
+      <div class="trend-help-body">
+        <strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。<br>
+        <strong>GOボタン</strong>は近々エントリーが近いと自分で判断したペアに立てる手動の目印で、解除するまで残ります（🧹巡回記録クリアでも消えません）。<br>
+        記録した波の位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。<br>
+        🕐鮮度は12時間で「1回抜けた」、36時間で「1日抜けた」の目安です。⏳待ちはRCI到達待ち・MACD発生待ちなどの根拠です。
+      </div>
+    </details>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🎯 エントリー圏のみ</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterWait"
-              title="RCI到達待ち・MACD発生待ちなど、⏳待ちの根拠があるペアだけに絞る">⏳ 待ちあり</button>
-      <select class="trend-category-select" id="trendCategorySelect"></select>
       <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterGo"
               title="自分でGOを立てたペアだけに絞る">🚩 GOのみ</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendMapOpen"
-              title="記録した波の位置を全通貨まとめて図の上で見る">🗺 波マップ</button>
-      <span class="spacer"></span>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🎯 エントリー圏のみ</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterWait"
+              title="RCI到達待ち・MACD発生待ちなど、⏳待ちの根拠があるペアだけに絞る">⏳ 待ちあり</button>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
+      <select class="trend-category-select" id="trendCategorySelect"></select>
+    </div>
+    <div class="trend-toolbar trend-toolbar-2">
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
+      <span class="spacer"></span>
+      <button class="btn-ghost trend-filter-btn" type="button" id="trendMapOpen"
+              title="記録した波の位置を全通貨まとめて図の上で見る">🗺 波マップ</button>
     </div>
     <div id="trendList"></div>
   </section>
@@ -3791,27 +3823,27 @@ function trendItemHtml(w) {
   '</div>';
 }
 
-/* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。 */
+/* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。
+   S59: 足単位の方向カウント（↗/↘/─/未記録）を撤去した。28ペア×3足＝84件の分母で
+   ペア単位のタイル（圏内・未更新など）と単位が揃っておらず誤読の元だったため
+   （方向は各行のトグルの色そのものが常時見えており、集計の価値が薄い）。
+   代わりに「巡回 n/m ペア」で今日どこまで見終えたかの進捗を出す。
+   タイルの並びはツールバー1行目のフィルタボタンと同じ順（GO→圏内→待ち→未更新）に揃える。 */
 function renderTrendSummary(pairs) {
-  const counts = { hot: 0, up: 0, down: 0, range: 0, none: 0, stale: 0 };
+  const counts = { go: 0, hot: 0, wait: 0, stale: 0, done: 0 };
   pairs.forEach(w => {
+    if (w.go) counts.go++;
     if (pairIsHot(w)) counts.hot++;
+    if (pairWaitCount(w) > 0) counts.wait++;
     if (isTrendStale(w)) counts.stale++;
-    MV_TREND_DEFAULT_TFS.forEach(t => {
-      const s = (w.trend && w.trend[t.k] || {}).state || '';
-      if (s === 'up') counts.up++;
-      else if (s === 'down') counts.down++;
-      else if (s === 'range') counts.range++;
-      else counts.none++;
-    });
+    if (w.trendAt) counts.done++;
   });
   const summaryItems = [
-    { cls: 'hot',  label: '🎯 圏内', n: counts.hot,  unit: 'ペア' },
-    { cls: '', label: '↗ 上昇',   n: counts.up,    unit: '' },
-    { cls: '', label: '↘ 下降',   n: counts.down,  unit: '' },
-    { cls: '', label: '─ レンジ', n: counts.range, unit: '' },
-    { cls: '', label: '未記録',   n: counts.none,  unit: '' },
+    { cls: 'go',    label: '🚩 GO',    n: counts.go,    unit: 'ペア' },
+    { cls: 'hot',   label: '🎯 圏内',  n: counts.hot,   unit: 'ペア' },
+    { cls: 'wait',  label: '⏳ 待ち',  n: counts.wait,  unit: 'ペア' },
     { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア' },
+    { cls: '',      label: '巡回',     n: counts.done + '/' + pairs.length, unit: 'ペア' },
   ];
   trendSummaryEl.innerHTML = pairs.length
     ? summaryItems.map(i =>
@@ -3839,16 +3871,17 @@ function renderTrendCategoryOptions() {
 }
 
 
-/* ツールバーの4つの絞り込みを AND で当てる。
+/* ツールバーの5つの絞り込みを AND で当てる。順序は AND なので結果に影響しないが、
+   S59でツールバー1行目の表示順（GO→圏内→待ち→未更新→カテゴリ）に揃えてある。
    S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。 */
 function trendApplyFilters(pairs) {
   let shown = pairs;
+  if (trendGoOnly)     shown = shown.filter(w => w.go);
   /* S44: 図の上でタップした位置が買②③/売②③の圏内にあるペアだけに絞る。 */
   if (trendEntryOnly)  shown = shown.filter(pairIsHot);
-  if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendWaitOnly)   shown = shown.filter(w => pairWaitCount(w) > 0);
+  if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
-  if (trendGoOnly)     shown = shown.filter(w => w.go);
   return shown;
 }
 
