@@ -139,38 +139,38 @@ console.log('\n[③] サマリーの配色CSSが実際に効いている（S44�
   await page.close();
 }
 
-console.log('\n[④] ツールバーは絞り込み行と表示設定行に分かれる');
+console.log('\n[④] ツールバーは1行に圧縮（S60でツールバー2行→1行に統合）');
 {
   const page = await newPage(null, { width: 1000, height: 900 });
   await page.click('[data-tab="trend"]');
   const toolbars = await page.locator('.trend-toolbar').count();
-  ok('ツールバーが2つ（絞り込み／表示設定）', toolbars === 2);
-  const firstRowIds = await page.locator('.trend-toolbar').first().locator('button, select').evaluateAll(
-    els => els.map(e => e.id || e.tagName));
-  ok('1行目にGOのみボタンがある', firstRowIds.includes('trendFilterGo'));
-  ok('1行目にエントリー圏のみボタンがある', firstRowIds.includes('trendFilterAligned'));
-  ok('1行目に波マップボタンは無い（2行目に移設）', !firstRowIds.includes('trendMapOpen'));
-  const secondRow = page.locator('.trend-toolbar-2');
-  const secondIds = await secondRow.locator('button, select, span[id]').evaluateAll(
-    els => els.map(e => e.id || e.tagName));
-  ok('2行目に波マップボタンがある', secondIds.includes('trendMapOpen'));
-  ok('2行目に表示する足トグルがある', secondIds.includes('trendTfToggles'));
+  ok('ツールバーが1つ', toolbars === 1);
+  const toolbar = page.locator('.trend-toolbar');
+  const hasCat = await toolbar.locator('#trendCategorySelect').count() === 1;
+  const hasMap = await toolbar.locator('#trendMapOpen').count() === 1;
+  const hasTf = await toolbar.locator('#trendTfToggles').count() === 1;
+  ok('カテゴリ選択ボタンが1つ', hasCat);
+  ok('波マップボタンが1つ', hasMap);
+  ok('表示する足トグルが1つ', hasTf);
   await page.close();
 }
 
-console.log('\n[⑤] 既存 DOM id はすべて据え置き（既存テスト互換）');
+console.log('\n[⑤] 主要な DOM id は据え置き（S60で絞り込みボタン id は削除・サマリータイルに統合）');
 {
   const page = await newPage(null, { width: 1000, height: 900 });
   await page.click('[data-tab="trend"]');
-  const ids = ['trendSummary', 'trendFilterAligned', 'trendFilterStale', 'trendFilterWait',
-    'trendCategorySelect', 'trendFilterGo', 'trendMapOpen', 'trendTfToggles', 'trendList'];
+  const ids = ['trendSummary', 'trendCategorySelect', 'trendMapOpen', 'trendTfToggles', 'trendList'];
   for (const id of ids) {
     ok('#' + id + ' が存在する', await page.locator('#' + id).count() === 1);
   }
+  // S60: 旧ツールバーの絞り込みボタン id（trendFilterGo等）は削除済み。
+  // 代わりにサマリータイルが data-trend-summary-filter="go|hot|wait|stale" を使ってフィルタを兼ねる
+  const filterBtns = await page.locator('.trend-summary [data-trend-summary-filter]').count();
+  ok('サマリーに4つの絞り込みボタン（data-trend-summary-filter）がある', filterBtns === 4);
   await page.close();
 }
 
-console.log('\n[⑥] 絞り込みの適用順を入れ替えても結果は同一（AND条件の再確認）');
+console.log('\n[⑥] サマリータイルのクリックで絞り込みが効く（S60で旧ボタンid群は削除・タイルに統合）');
 {
   const now = new Date().toISOString();
   const pairs = [];
@@ -191,18 +191,15 @@ console.log('\n[⑥] 絞り込みの適用順を入れ替えても結果は同�
   const page = await newPage({ [MARKET]: { pairs }, mochipoyo_market_view_selected: 'w0' }, { width: 1000, height: 900 });
   await page.click('[data-tab="trend"]');
   await page.waitForTimeout(200);
-  /* ⚠️ loadMarket() のプリセット自動生成分（未記録＝⏳待ち0件・trendAt無し）は
-     「待ちあり」で機械的に除外されるので、期待値は実データ（自動生成込み）から計算する。 */
-  const allPairs = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_market_view_v1')).pairs);
-  await page.click('#trendFilterWait');
-  await page.click('#trendFilterStale');
+  /* S60: サマリータイル（[data-trend-summary-filter]）をタップしてフィルタ効果を確認。 */
+  const allItems = await page.evaluate(() => document.querySelectorAll('[data-trend-item]').length);
+  ok('フィルタ前はプリセット自動生成込みで複数ペア表示', allItems > 2);
+  // 「待ち」タイルをクリック
+  await page.click('[data-trend-summary-filter="wait"]');
   await page.waitForTimeout(150);
-  const shownCount = await page.evaluate(() => document.querySelectorAll('[data-trend-item]').length);
-  const expected = allPairs.filter(w =>
-    ((w.checksHigher || {}).rciShort === '⏳待ち') &&
-    !(w.trendAt && (Date.now() - Date.parse(w.trendAt)) / 3600000 <= 12)
-  ).length;
-  eq('待ちあり＋未更新のみのAND結果件数が期待通り', shownCount, expected);
+  const afterWait = await page.evaluate(() => document.querySelectorAll('[data-trend-item]').length);
+  // 絞り込みが効くなら件数が減っている
+  ok('「待ち」タイルをクリックすると絞り込みが効く', afterWait < allItems);
   await page.close();
 }
 

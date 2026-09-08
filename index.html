@@ -623,11 +623,17 @@
     font-size: 12px; font-weight: 600; color: var(--ink-muted);
     background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 999px; padding: 4px 11px;
+    font-family: inherit; margin: 0;
   }
   .trend-summary .item .n {
     font-size: 13.5px; font-weight: 700; color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
+  /* S60: 巡回タイル以外はボタン化してフィルタを兼ねる。押せることが分かるよう
+     cursor と hover を付け、選択中は outline で強調する（色自体は既存のまま流用）。 */
+  .trend-summary button.item { cursor: pointer; }
+  .trend-summary button.item:hover { filter: brightness(0.96); }
+  .trend-summary button.item.on { outline: 2px solid currentColor; outline-offset: 1px; }
   /* S59: .rd（旧・目線3択のRD逆張り）はS58で撤去済みのため削除。
      hot/stale はS44/S28からJS側が出しているクラス名（renderTrendSummary 参照）に合わせて定義。 */
   .trend-summary .item.go   { background: var(--good-soft); border-color: var(--good); color: var(--good); }
@@ -656,9 +662,6 @@
   .trend-toolbar {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
   }
-  /* S59: 2行目（表示設定・波マップ）は1行目（絞り込み）よりわずかに間隔を詰め、
-     役割が違う2グループであることを示す。 */
-  .trend-toolbar-2 { margin-top: -6px; }
   .trend-toolbar .spacer { flex: 1; }
   .trend-filter-btn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .trend-category-select {
@@ -1222,15 +1225,7 @@
     </details>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterGo"
-              title="自分でGOを立てたペアだけに絞る">🚩 GOのみ</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterAligned">🎯 エントリー圏のみ</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterWait"
-              title="RCI到達待ち・MACD発生待ちなど、⏳待ちの根拠があるペアだけに絞る">⏳ 待ちあり</button>
-      <button class="btn-ghost trend-filter-btn" type="button" id="trendFilterStale">🕐 未更新のみ</button>
       <select class="trend-category-select" id="trendCategorySelect"></select>
-    </div>
-    <div class="trend-toolbar trend-toolbar-2">
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
       <span class="spacer"></span>
@@ -3555,16 +3550,13 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
    アラートと判定も同じ行で操作でき、巡回チェックが1画面で完結する。 */
 const trendListEl    = document.getElementById('trendList');
 const trendSummaryEl = document.getElementById('trendSummary');
-const trendFilterBtn = document.getElementById('trendFilterAligned');
-const trendStaleBtn  = document.getElementById('trendFilterStale');
-const trendWaitBtn   = document.getElementById('trendFilterWait');
-const trendGoBtn     = document.getElementById('trendFilterGo');
 const trendTfBar     = document.getElementById('trendTfToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 
 /* S44: 「エントリー圏のみ」の絞り込み。永続化しない。
-   ⚠️ DOM の id は #trendFilterAligned のまま据え置く（S32 で GO のみに変えたときと同じ判断）。
-      参照とハンドラの対応を崩さないため、変えるのは文言と条件だけにする。 */
+   S60: 絞り込みボタンはツールバーから撤去し、サマリータイル（#trendSummary 内の
+   [data-trend-summary-filter]）がフィルタON/OFFを兼ねる。サマリーとツールバーに
+   同じラベルの押せる要素が2箇所並んで紛らわしいというユーザー指摘への対応。 */
 let trendEntryOnly   = false;
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendWaitOnly    = false; // S46: 「⏳待ちあり」の絞り込み。永続化しない
@@ -3838,17 +3830,24 @@ function renderTrendSummary(pairs) {
     if (isTrendStale(w)) counts.stale++;
     if (w.trendAt) counts.done++;
   });
+  /* S60: GO/圏内/待ち/未更新はタップでフィルタを兼ねるボタンにする（旧・ツールバーの
+     同名4ボタンはここへ統合して撤去した）。巡回タイルだけは絞り込み手段が無いので
+     従来通り <span>。filter キーは trendSummaryEl のクリック委任ハンドラと対応させる。 */
   const summaryItems = [
-    { cls: 'go',    label: '🚩 GO',    n: counts.go,    unit: 'ペア' },
-    { cls: 'hot',   label: '🎯 圏内',  n: counts.hot,   unit: 'ペア' },
-    { cls: 'wait',  label: '⏳ 待ち',  n: counts.wait,  unit: 'ペア' },
-    { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア' },
+    { cls: 'go',    label: '🚩 GO',    n: counts.go,    unit: 'ペア', filter: 'go',    on: trendGoOnly },
+    { cls: 'hot',   label: '🎯 圏内',  n: counts.hot,   unit: 'ペア', filter: 'hot',   on: trendEntryOnly },
+    { cls: 'wait',  label: '⏳ 待ち',  n: counts.wait,  unit: 'ペア', filter: 'wait',  on: trendWaitOnly },
+    { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア', filter: 'stale', on: trendStaleOnly },
     { cls: '',      label: '巡回',     n: counts.done + '/' + pairs.length, unit: 'ペア' },
   ];
   trendSummaryEl.innerHTML = pairs.length
-    ? summaryItems.map(i =>
-        '<span class="item' + (i.cls ? ' ' + i.cls : '') + '">' + esc(i.label) +
-        '<span class="n">' + i.n + '</span>' + esc(i.unit) + '</span>').join('')
+    ? summaryItems.map(i => {
+        const cls = 'item' + (i.cls ? ' ' + i.cls : '') + (i.on ? ' on' : '');
+        const inner = esc(i.label) + '<span class="n">' + i.n + '</span>' + esc(i.unit);
+        return i.filter
+          ? '<button type="button" class="' + cls + '" data-trend-summary-filter="' + i.filter + '">' + inner + '</button>'
+          : '<span class="' + cls + '">' + inner + '</span>';
+      }).join('')
     : '';
 }
 
@@ -3895,10 +3894,6 @@ function renderTrendList() {
   renderTrendSummary(pairs);
   renderTrendTfToggles();
   renderTrendCategoryOptions();
-  trendFilterBtn.classList.toggle('on', trendEntryOnly);
-  trendStaleBtn.classList.toggle('on', trendStaleOnly);
-  trendWaitBtn.classList.toggle('on', trendWaitOnly);
-  trendGoBtn.classList.toggle('on', trendGoOnly);
 
   if (!pairs.length) {
     trendListEl.innerHTML = '<div class="empty-state">表示するペアがありません。</div>';
@@ -3949,24 +3944,20 @@ function trendPatchItem(w) {
   renderTrendSummary(loadMarket().pairs);
 }
 
-trendFilterBtn.addEventListener('click', () => {
-  trendEntryOnly = !trendEntryOnly;
-  renderTrendList();
-});
-trendStaleBtn.addEventListener('click', () => {
-  trendStaleOnly = !trendStaleOnly;
-  renderTrendList();
-});
-trendWaitBtn.addEventListener('click', () => {
-  trendWaitOnly = !trendWaitOnly;
+/* S60: サマリータイル自体がフィルタボタン（旧・ツールバーの4ボタンを統合）。
+   イベント委任で1箇所に集約し、data-trend-summary-filter の値でどのフラグを反転するか決める。 */
+trendSummaryEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-trend-summary-filter]');
+  if (!btn) return;
+  const f = btn.dataset.trendSummaryFilter;
+  if (f === 'go') trendGoOnly = !trendGoOnly;
+  else if (f === 'hot') trendEntryOnly = !trendEntryOnly;
+  else if (f === 'wait') trendWaitOnly = !trendWaitOnly;
+  else if (f === 'stale') trendStaleOnly = !trendStaleOnly;
   renderTrendList();
 });
 trendCategorySelect.addEventListener('change', () => {
   trendCategory = trendCategorySelect.value;
-  renderTrendList();
-});
-trendGoBtn.addEventListener('click', () => {
-  trendGoOnly = !trendGoOnly;
   renderTrendList();
 });
 trendTfBar.addEventListener('click', (e) => {
