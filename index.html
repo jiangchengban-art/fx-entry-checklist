@@ -767,6 +767,8 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .tp-synced.on { color: var(--ink); font-weight: 700; border-style: solid; }
+  /* S62: legs/bySide でその列に出ない項目のダッシュ（.tp-synced と違い枠は付けない＝入力欄ではない）。 */
+  .tp-na { display: inline-block; padding: 4px 6px; font-size: 12px; color: var(--ink-muted); text-align: center; }
   /* S34: 根拠14項目をボードと同じボタン群に統一（旧: select）。狭い2列に収めるため折り返す。 */
   .tp-row .tp-choice { row-gap: 4px; column-gap: 4px; min-width: 0; }
   .tp-row .tp-choice .mv-tfcheck-btn { padding: 3px 3px !important; font-size: 10px !important; min-width: 0; }
@@ -1589,20 +1591,34 @@ const MV_TF_CHECKS = [
      ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
-  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
+  /* S62: エントリー足の入力を「上位足ネックライン→5分足MA抜け→フィボ×ロールリバーサル」の
+     3ステップ確認フローに置換。上位足側の6項目（グランビル/RCI×3/MACD/ラウンドナンバー）は
+     legs: ['tfHigher'] で上位足列専用にし、エントリー足列には出さない（trendCheckCell が
+     legs を見て非対象列にはダッシュを出す）。 */
+  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville', legs: ['tfHigher'] },
   /* S46: 「待ち」＝到達/発生していないが潰えてもいない中間状態。他の条件が揃っていても
      これが崩れていなければエントリー可能性が残ることを一覧の巡回で拾えるようにする。
      項目そのものの状態なので新規チェック項目にはせず opts に足す（定義元1箇所でボード・
      根拠パネル・CSV・履歴サマリーすべてに自動反映される、S37/S38 と同じ拡張パターン）。 */
-  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd' },
-  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
+  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'], legs: ['tfHigher'] },
+  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'], legs: ['tfHigher'] },
+  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'], legs: ['tfHigher'] },
+  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd', legs: ['tfHigher'] },
+  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド', legs: ['tfHigher'] },
+  /* S62 ❶: 上位足のネックライン付近での反転形。上位足の方向と逆側の形は選択肢に出さない
+     （bySide、gvCandidates が方向と逆 side のグランビル波を除外するのと同じ規約）。
+     方向未記録・レンジの間は side が決まらないので trendCheckCell がセルごとダッシュにする。 */
+  { k: 'necklinePattern', label: 'ネックライン形', short: '形', legs: ['tfEntry'],
+    bySide: { buy: ['ダブルボトム', '逆三尊', '❌'], sell: ['ダブルトップ', '三尊', '❌'] } },
+  /* S62 ❷: 5分足MAの明確な上抜け/下抜け（1波と仮定）。同じく上位足方向で選択肢を絞る。 */
+  { k: 'maBreak', label: '5分足MA抜け', short: 'MA抜け', legs: ['tfEntry'],
+    bySide: { buy: ['上抜け', '❌'], sell: ['下抜け', '❌'] } },
   { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
   /* S38: エントリー再現性向上のため、エントリー足の1波のどのフィボナッチ水準で
      エントリーしたかを記録する。小数点は省略（23.6%→23% 等）。上位足でも記録は可能
-     （封鎖しない）が、意味を持つのは主にエントリー足での使用時。 */
+     （封鎖しない）が、意味を持つのは主にエントリー足での使用時。
+     S62 ❸: フィボ×ロールリバーサルの重なりを最終確認として使う既存2項目（新規キー化しない
+     ── fiboStats 統計タイルの作り直しを避けるため）。 */
   { k: 'entryFibo',    label: 'エントリーFibo',   opts: ['23%', '38%', '50%', '61%', '78%', '❌'], short: 'Fibo' },
 ];
 const MV_CHECK_FIELDS = { tfHigher: 'checksHigher', tfEntry: 'checksEntry' };
@@ -1626,6 +1642,23 @@ function mvGranvilleSyncField(w, field) {
   const cur = (w.trend && w.trend[tfKey]) || {};
   const g = MV_GRANVILLE_MAP[cur.granville];
   w[checksField].granville = g ? g.short : '';
+}
+
+/* S62: necklinePattern/maBreak（MV_TF_CHECKS の bySide 項目）は現在の上位足（w.tfHigher）の
+   方向で選べる値が変わる。方向が変わった・トレンドでなくなった・上位足を選び直した、いずれの
+   経路でも「もう選べない値を残さない」ため、mvSetTf(tfHigher) と mvWriteTrend の両方から
+   呼ぶ共有の後始末。自己完結（w.tfHigher から毎回引き直す）なので呼び出し側は無条件に呼べる
+   ── mvGranvilleSyncField と同じ規約。 */
+function mvSyncEntrySideChecks(w) {
+  if (!w.checksEntry) return;
+  const tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+  const cur = tfKey && w.trend && w.trend[tfKey];
+  const side = (cur && isTrendingState(cur.state)) ? (cur.state === 'down' ? 'sell' : 'buy') : null;
+  MV_TF_CHECKS.forEach(c => {
+    if (!c.bySide) return;
+    const v = w.checksEntry[c.k];
+    if (v && (!side || c.bySide[side].indexOf(v) < 0)) w.checksEntry[c.k] = '';
+  });
 }
 
 /* 記録に焼き込む根拠スナップショットの区分。CSV列の接頭辞も兼ねる */
@@ -3394,6 +3427,8 @@ function mvSetTf(watchId, field, value) {
   /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
      （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
   mvGranvilleSyncField(w, field);
+  /* S62: 上位足そのものを選び直すと necklinePattern/maBreak の判定元（方向）も変わる。 */
+  mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3515,6 +3550,8 @@ function mvWriteTrend(watchId, tfKey, patch) {
   /* S29: この足を上位足・エントリー足として選んでいるボードがあれば、グランビルを自動反映する。 */
   mvGranvilleSyncField(w, 'tfHigher');
   mvGranvilleSyncField(w, 'tfEntry');
+  /* S62: この足が現在の上位足なら、方向の変化で necklinePattern/maBreak を後始末する。 */
+  mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -3594,15 +3631,19 @@ let trendVisibleTfs = loadTrendTfs();
 function isUnmetCheck(v) { return v === '❌' || (v || '').indexOf('⏳') === 0; }
 
 /* S38: 根拠の確度。MV_TF_CHECKS のうち未達成（isUnmetCheck）を選んだ項目数だけ減点する
-   （未選択の空欄は減点しない）。分母は常に MV_TF_CHECKS.length（上位足・エントリー足で同じ7項目）。 */
-function checkConfidence(checks) {
-  const total = MV_TF_CHECKS.length;
-  const cross = MV_TF_CHECKS.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
+   （未選択の空欄は減点しない）。
+   S62: legs で列を限定した項目が増えたため、分母は MV_TF_CHECKS.length 固定ではなく
+   「その列（field）に実際に出る項目数」に変える（上位足8項目・エントリー足4項目）。 */
+function checkConfidence(checks, field) {
+  const items = field ? MV_TF_CHECKS.filter(c => !c.legs || c.legs.indexOf(field) >= 0) : MV_TF_CHECKS;
+  const total = items.length;
+  if (!total) return 0;
+  const cross = items.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
   return Math.round((total - cross) / total * 100);
 }
 function setupConfidence(w) {
-  const higher = checkConfidence(w.checksHigher || {});
-  const entry  = checkConfidence(w.checksEntry  || {});
+  const higher = checkConfidence(w.checksHigher || {}, 'tfHigher');
+  const entry  = checkConfidence(w.checksEntry  || {}, 'tfEntry');
   return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
 }
 
@@ -3690,7 +3731,9 @@ function trendEntryChipHtml(w, tfKey) {
 /* 根拠チェック1項目のセル。上位足・エントリー足で同じ形を使う。
    S29 と同じ判定式で、一覧が追跡している足（週足・日足・4時間足・1時間足）のグランビルは
    読み取り専用にする ── ここで手入力できると一覧側の記録と食い違うため。 */
-function trendCheckCell(w, field, c) {
+function trendCheckCell(w, field, c, side) {
+  /* S62: legs で列を限定した項目は、非対象列にはダッシュだけ出す（空欄だと入力漏れに見える）。 */
+  if (c.legs && c.legs.indexOf(field) < 0) return '<span class="tp-na">—</span>';
   const checks = w[MV_CHECK_FIELDS[field]] || {};
   const cur = checks[c.k] || '';
   if (c.k === 'granville' && MV_TF_TO_TREND_KEY[w[field]]) {
@@ -3698,6 +3741,10 @@ function trendCheckCell(w, field, c) {
       ' title="🔭一覧のグランビル記録から自動反映。変更は上の行で行う">' +
       (cur ? esc(cur) : '🔭未記録') + '</span>';
   }
+  /* S62: 上位足の方向で選択肢を絞る項目（gvCandidates と同じ規約）。方向未記録・レンジで
+     side が決まらない間は押せないボタンを置かない（S42-③「タップ不反応」の再演を避ける）。 */
+  if (c.bySide && !side) return '<span class="tp-na" title="上位足の方向が決まると選べます">—</span>';
+  const opts = c.bySide ? c.bySide[side] : c.opts;
   function btn(value, label) {
     return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') +
       (value === '' ? ' tp-none' : '') + '"' +
@@ -3706,7 +3753,7 @@ function trendCheckCell(w, field, c) {
   }
   return '<div class="mv-choice wrap tp-choice">' +
     btn('', '—') +
-    c.opts.map(o => btn(o, o)).join('') +
+    opts.map(o => btn(o, o)).join('') +
   '</div>';
 }
 
@@ -3719,14 +3766,18 @@ function trendPanelHtml(w) {
   const higherTf = MV_TREND_KEY_TO_TF[tfKey];
   if (!higherTf) return '';
   const tfLabel = (MV_TREND_TFS.find(t => t.k === tfKey) || {}).label || higherTf;
+  /* S62: necklinePattern/maBreak（エントリー足専用・bySide）はこのパネルの上位足＝tfKey の
+     方向で選択肢を絞る。mvWriteTrend/gvCandidates と同じ「down なら sell、それ以外は buy」規約。 */
+  const curTrend = (w.trend && w.trend[tfKey]) || {};
+  const side = isTrendingState(curTrend.state) ? (curTrend.state === 'down' ? 'sell' : 'buy') : null;
   const rows = MV_TF_CHECKS.map(c =>
     '<div class="tp-row">' +
       (c.link
         ? '<button type="button" class="tp-label link" data-guide-link="' + c.link + '"' +
           ' title="' + esc(c.label) + ' の解説を開く">' + esc(c.short || c.label) + ' 📖</button>'
         : '<span class="tp-label" title="' + esc(c.label) + '">' + esc(c.short || c.label) + '</span>') +
-      trendCheckCell(w, 'tfHigher', c) +
-      trendCheckCell(w, 'tfEntry', c) +
+      trendCheckCell(w, 'tfHigher', c, side) +
+      trendCheckCell(w, 'tfEntry', c, side) +
     '</div>').join('');
 
   /* ⚠️ この条件は marketFieldsFromBoard() の null 判定と同じ式を保つこと。
