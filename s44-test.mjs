@@ -185,7 +185,17 @@ console.log('\n[③] 並び順＝アラート発生時刻順（新しい順）�
 
   /* w2 の4時間足に一番新しいアラートを立て、カード上のバッジをタップすると
      ツールバーの基準表示も4Hに切り替わり、w2が先頭に来る（S67の要件）。 */
+  /* S71: アラートバッジのタップは直接トグルではなく、日時手入力モーダルを開くようになった。
+     モーダルに現在時刻を保存して「一番新しいアラート」を作る。 */
   await page.click('[data-trend-item="w2"] [data-mv-alert-toggle][data-tf="h4"]');
+  const nowLocal = await page.evaluate(() => {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  });
+  await page.fill('#alertTimeInput', nowLocal);
+  await page.click('#alertTimeSave');
   eq('カードのバッジタップでツールバーの基準も4Hに切り替わる',
      await page.locator('[data-trend-sort-tf="h4"].on').count(), 1);
   const order2 = await page.locator('.trend-item .pair').evaluateAll(

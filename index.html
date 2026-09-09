@@ -1377,6 +1377,24 @@
   </div>
 </div>
 
+<!-- S71: アラート発生日時の手入力。タップした瞬間の時刻ではなく、実際にアラートが鳴った
+     時刻を後から手入力できるようにする（値動きを確認してから記録する運用のため）。 -->
+<div class="modal-backdrop" id="alertTimeModal">
+  <div class="modal">
+    <h3 id="alertTimeTitle">アラート発生日時</h3>
+    <div class="field">
+      <label for="alertTimeInput">発生日時</label>
+      <input type="datetime-local" id="alertTimeInput">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger-solid" type="button" id="alertTimeOff">OFFにする</button>
+      <span class="spacer"></span>
+      <button class="btn-secondary" type="button" id="alertTimeCancel">キャンセル</button>
+      <button class="btn-primary" type="button" id="alertTimeSave">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ グランビルの波ピッカー（トレンド一覧・S24、S40でタップ記録化） ============ -->
 <!-- 巡回中に図と照合して波を選べるようにする。画像は開いたときに初めて読み込む。
      S40: 図そのものがタップ面。今のローソク足の位置を直接指すと、最寄りの公式ポジションが波番号になる。
@@ -1665,6 +1683,21 @@ const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4', '
    ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。
    ⚠️ ここに無い足（月足）では根拠パネルを開けない ── tfHigher に入れる値が無いため。 */
 const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足', h1: '1時間足' };
+
+/* S72: checksHigher の形を「ペアに1組（平坦）」から「時間足キーごとに1組（入れ子）」へ移行する。
+   MV_TF_CHECKS のキー（rciShort等）が直下にあれば旧・平坦形式とみなす（入れ子形式のキーは
+   h1/h4/d/w/mn でこれと重複しないため判定は安全）。すでに入れ子なら何もしない。 */
+const MV_TF_CHECK_KEYS = new Set(MV_TF_CHECKS.map(c => c.k));
+function mvMigrateChecksHigherToTf(w) {
+  const cur = w.checksHigher;
+  if (!cur || typeof cur !== 'object') { w.checksHigher = {}; return false; }
+  const isFlat = Object.keys(cur).some(k => MV_TF_CHECK_KEYS.has(k));
+  if (!isFlat) return false;
+  const tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+  w.checksHigher = tfKey ? { [tfKey]: cur } : {};
+  return true;
+}
+
 /* S62: エントリー足の❶❷は上位足のトレンド方向に紐づく（押し目買いなら底の形＋MA上抜け）。
    向きが決まっていなければ '' を返し、そのときは両サイドの選択肢を出す。 */
 function mvEntrySide(w) {
@@ -2273,9 +2306,11 @@ function marketFieldsFromBoard() {
     tfEntry:   w.tfEntry,
     /* 固定4択の代わりに実際の組み合わせを文字列化する（例: 「15分足×日足」） */
     entryPattern: w.tfEntry + '×' + w.tfHigher,
-    /* ボードの根拠はペア単位で上書きされるため、記録側にスナップショットとして焼き込む */
+    /* ボードの根拠はペア単位で上書きされるため、記録側にスナップショットとして焼き込む。
+       S72: checksHigher は時間足キーごとに独立しているので、w.tfHigher に対応する
+       足のぶんだけを平坦化して焼き込む（CSV・統計は従来どおり平坦な形を前提にしているため）。 */
     mvChecks: {
-      higher: Object.assign({}, w.checksHigher),
+      higher: Object.assign({}, (w.checksHigher && w.checksHigher[MV_TF_TO_TREND_KEY[w.tfHigher]]) || {}),
       entry:  Object.assign({}, w.checksEntry),
     },
   };
@@ -3380,6 +3415,14 @@ function loadMarket() {
       });
     });
 
+    /* S72移行：checksHigher を「ペアに1組だけ」の平坦な形から、時間足キー
+       （h1/h4/d/w/mn）ごとに独立して持つ入れ子形に変更。1H/4H/日足の🎯チップの確度%が
+       すべて同じ値になっていた（同じ checksHigher を共有していたため）バグの修正。
+       旧データは w.tfHigher が指す足の下にそのまま移す（記録時点でその足の根拠として
+       入力されたものなので、その足の下に置くのが最も実態に近い）。tfHigher が未設定で
+       行き先が分からないものは救えないため空にする（実運用では判定前の未記録ペアのみ）。 */
+    pairs.forEach(w => { if (mvMigrateChecksHigherToTf(w)) changed = true; });
+
     /* セッション23/24移行：上位足トレンドを追加・拡張。
        S23 = 日足・4時間足の {state, granville}、S24 = zone フィールド／週足・月足の枠／trendAt。
        mvEnsureTrend がフィールド単位で補うので、どの世代の記録でもこの1行で追いつく。
@@ -3496,11 +3539,26 @@ function mvSetTf(watchId, field, value) {
 
 /* 根拠チェック1項目の書き込み（S33でボードのハンドラから切り出し）。
    value に現在値と同じものを渡すと未選択に戻る（ボードのボタン再タップ相当）。
-   ⚠️ checksAt の複合キー形式は S28 の端末間マージ（mergePair）が見ているので変えないこと。 */
+   ⚠️ checksAt の複合キー形式は S28 の端末間マージ（mergePair）が見ているので変えないこと。
+   S72: 上位足（tfHigher）の根拠は時間足キーごとに独立して持つ（1H/4H/日足で確度%が
+   混ざらないように）。パネルは押した足で w.tfHigher を固定してから開くので、
+   MV_TF_TO_TREND_KEY[w.tfHigher] で書き込み先の時間足が一意に決まる。 */
 function mvWriteCheck(watchId, field, key, value) {
   const data = loadMarket();
   const w = data.pairs.find(p => p.id === watchId);
   if (!w) return null;
+  if (field === 'tfHigher') {
+    const tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+    if (!tfKey) return null;
+    if (!w.checksHigher) w.checksHigher = {};
+    if (!w.checksHigher[tfKey]) w.checksHigher[tfKey] = {};
+    const bucket = w.checksHigher[tfKey];
+    bucket[key] = bucket[key] === value ? '' : value;
+    if (!w.checksAt) w.checksAt = {};
+    w.checksAt['checksHigher.' + tfKey + '.' + key] = new Date().toISOString();
+    if (!saveMarket(data)) return null;
+    return w;
+  }
   const store = MV_CHECK_FIELDS[field];
   if (!store) return null;
   if (!w[store]) w[store] = {};
@@ -3511,25 +3569,67 @@ function mvWriteCheck(watchId, field, key, value) {
   return w;
 }
 
-/* 複数時間足のアラート発生トグル。ONにした瞬間の日時を記録し、OFFに戻すと日時もクリアする。 */
-function mvToggleAlert(watchId, tfKey) {
+/* S71: アラート発生日時は「タップした瞬間」ではなく手入力の値にする（アラート後の値動きを
+   見てから記録する運用のため、鳴った瞬間にすぐ入力できるとは限らない）。at には datetime-local
+   の生値（例 "2026-09-09T21:30"）をそのまま保存する。manualAlertAt と同じ流儀（new Date() で
+   ローカル時刻として解釈できるのでそのまま fmtDatetime に渡せる）。 */
+function mvSetAlertAt(watchId, tfKey, atValue) {
   const data = loadMarket();
   const w = data.pairs.find(p => p.id === watchId);
   if (!w) return;
   if (!w.alerts) w.alerts = {};
-  const cur = w.alerts[tfKey] || { on: false, at: '' };
   /* S28: chAt は「切り替えた時刻」。at は OFF にすると消える（発生日時なので当然）ため、
      OFF 操作そのものの新しさが残らず、端末間で「消したはずのONが復活する」ことになる。 */
   const chAt = new Date().toISOString();
-  w.alerts[tfKey] = cur.on ? { on: false, at: '', chAt } : { on: true, at: chAt, chAt };
+  w.alerts[tfKey] = atValue ? { on: true, at: atValue, chAt } : { on: false, at: '', chAt };
   if (!saveMarket(data)) return;
   /* S67: カード上のアラートバッジをタップした瞬間、一覧の並び順の基準もその足に切り替える
-     （ユーザー要望「通貨カードのアラート鳴った足のタップと連動」）。ON/OFFどちらのタップでも、
+     （ユーザー要望「通貨カードのアラート鳴った足のタップと連動」）。ON/OFFどちらでも、
      今その足を見ている＝その足を基準に一覧を見たい、とみなして切り替える。 */
   trendSortTf = tfKey;
   renderMarket();
   renderTrendList();
 }
+
+/* S71: アラートバッジをタップすると開く、日時手入力用のポップアップ。 */
+const alertTimeModal = document.getElementById('alertTimeModal');
+const alertTimeInput = document.getElementById('alertTimeInput');
+let alertTimeTarget = null;
+function toDatetimeLocalValue(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function openAlertTimeModal(watchId, tfKey) {
+  const data = loadMarket();
+  const w = data.pairs.find(p => p.id === watchId);
+  if (!w) return;
+  alertTimeTarget = { watchId, tfKey };
+  const cur = (w.alerts && w.alerts[tfKey]) || {};
+  document.getElementById('alertTimeTitle').textContent =
+    (w.pair || '') + ' ' + (MV_ALERT_TF_LABELS[tfKey] || tfKey) + ' のアラート発生日時';
+  const curDate = cur.at ? new Date(cur.at) : null;
+  alertTimeInput.value = curDate && !Number.isNaN(curDate.getTime())
+    ? toDatetimeLocalValue(curDate) : toDatetimeLocalValue(new Date());
+  document.getElementById('alertTimeOff').hidden = !cur.on;
+  alertTimeModal.classList.add('show');
+}
+function closeAlertTimeModal() {
+  alertTimeModal.classList.remove('show');
+  alertTimeTarget = null;
+}
+document.getElementById('alertTimeCancel').addEventListener('click', closeAlertTimeModal);
+document.getElementById('alertTimeSave').addEventListener('click', () => {
+  if (!alertTimeTarget || !alertTimeInput.value) return;
+  mvSetAlertAt(alertTimeTarget.watchId, alertTimeTarget.tfKey, alertTimeInput.value);
+  closeAlertTimeModal();
+});
+document.getElementById('alertTimeOff').addEventListener('click', () => {
+  if (!alertTimeTarget) return;
+  mvSetAlertAt(alertTimeTarget.watchId, alertTimeTarget.tfKey, '');
+  closeAlertTimeModal();
+});
+alertTimeModal.addEventListener('click', e => { if (e.target === alertTimeModal) closeAlertTimeModal(); });
 
 /* 判定（エントリー／保留／スルー）はトグル式。同じものを再度押すと未選択に戻せる。
    判定を新たに設定したタイミングで、そのときONになっていたアラート発生足と日時を
@@ -3715,9 +3815,12 @@ function checkConfidence(checks, list) {
     n + (isUnmetCheck(checks && checks[c.k]) ? (c.weight || 1) : 0), 0);
   return Math.round((totalWeight - lost) / totalWeight * 100);
 }
-/* S64: エントリー足の確度・合算表示はユーザー要望により撤去。上位足の確度だけを使う。 */
-function higherConfidence(w) {
-  return checkConfidence(w.checksHigher || {}, MV_TF_CHECKS);
+/* S64: エントリー足の確度・合算表示はユーザー要望により撤去。上位足の確度だけを使う。
+   S72: checksHigher は時間足キーごとに独立して持つため、どの足の確度かを tfKey で指定する。
+   1H/4H/日足それぞれの根拠を混ぜないための必須引数（省略すると全項目未記録扱い＝100%になる）。 */
+function higherConfidence(w, tfKey) {
+  const checks = (w.checksHigher && w.checksHigher[tfKey]) || {};
+  return checkConfidence(checks, MV_TF_CHECKS);
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -3797,9 +3900,10 @@ function trendEntryChipHtml(w, tfKey) {
   const d = tfEntryDistance(w, tfKey);
   const hot = d !== null && d <= GV_ENTRY_RADIUS;
   const open = trendPanel && trendPanel.id === w.id && trendPanel.tfKey === tfKey;
-  /* S64: 確度（上位足の根拠達成度）をチップに常時表示。checksHigher はペア単位の値なので
-     どの足の🎯チップでも同じ%になる（w.tfHigher に対応する根拠の達成度という意味）。 */
-  const conf = higherConfidence(w);
+  /* S64: 確度（上位足の根拠達成度）をチップに常時表示。
+     S72: checksHigher は時間足キーごとに独立しているため、この行が担当する tfKey 自身の
+     根拠だけを見る（1H/4H/日足で確度%が混ざっていたバグの修正）。 */
+  const conf = higherConfidence(w, tfKey);
   /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
      2要素にすると2段に折り返して巡回の縦スクロールが増える。
      幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
@@ -3821,7 +3925,11 @@ function trendEntryChipHtml(w, tfKey) {
    S63: 未選択状態を表す「—」ボタン（初期状態でデフォルト選択に見えていた）を撤去し、
    選択肢だけを並べる。解除は選択済みのボタンを再タップする（mvWriteCheck のトグル）。 */
 function trendCheckCell(w, field, c) {
-  const checks = w[MV_CHECK_FIELDS[field]] || {};
+  /* S72: 上位足の根拠は時間足キーごとに独立。パネルは押した足で w.tfHigher を固定してから
+     開くので、MV_TF_TO_TREND_KEY[w.tfHigher] で読む先が一意に決まる。 */
+  const checks = field === 'tfHigher'
+    ? (w.checksHigher && w.checksHigher[MV_TF_TO_TREND_KEY[w.tfHigher]]) || {}
+    : w[MV_CHECK_FIELDS[field]] || {};
   const cur = checks[c.k] || '';
   /* S62: 方向が決まっているエントリー足では、逆サイドの選択肢を出さない
      （↗の押し目狙いで「ダブルトップ」を選べても意味がなく、選んでも
@@ -3869,7 +3977,7 @@ function trendPanelHtml(w) {
   /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。
      S64: エントリー足・合算の表示はユーザー要望により撤去し、上位足の確度だけを出す
      （🔭一覧の行の🎯チップにも同じ値を表示するようになったため、ここは補足の位置づけ）。 */
-  const confHtml = '<div class="tp-conf">🎯 確度 <b>' + higherConfidence(w) + '%</b></div>';
+  const confHtml = '<div class="tp-conf">🎯 確度 <b>' + higherConfidence(w, tfKey) + '%</b></div>';
 
   /* エントリー足の❶❷は方向に紐づくので、どちら目線で選択肢を出しているかを明示する。 */
   const side = mvEntrySide(w);
@@ -4161,7 +4269,11 @@ trendListEl.addEventListener('click', (e) => {
     const { trendCheckBtn: id, field, key, value } = checkBtn.dataset;
     const w = mvWriteCheck(id, field, key, value);
     if (!w) { trendPatchById(id); return; }
-    const cur = (w[MV_CHECK_FIELDS[field]] || {})[key] || '';
+    /* S72: 上位足の根拠は時間足キーごとに独立しているので、書き込み直後に読み戻す先も
+       MV_TF_TO_TREND_KEY[w.tfHigher] で揃える（trendCheckCell の読み取りと同じ規約）。 */
+    const cur = field === 'tfHigher'
+      ? ((w.checksHigher && w.checksHigher[MV_TF_TO_TREND_KEY[w.tfHigher]]) || {})[key] || ''
+      : (w[MV_CHECK_FIELDS[field]] || {})[key] || '';
     const group = checkBtn.closest('.tp-choice');
     if (group) group.querySelectorAll('.mv-tfcheck-btn').forEach(b => {
       b.classList.toggle('on', b.dataset.value === cur);
@@ -4189,7 +4301,7 @@ trendListEl.addEventListener('click', (e) => {
      ⚠️ ここで w.judge を直接書かないこと（judgeLog が落ちて統計が壊れる）。 */
   const alertBadge = e.target.closest('[data-mv-alert-toggle]');
   if (alertBadge) {
-    mvToggleAlert(alertBadge.dataset.mvAlertToggle, alertBadge.dataset.tf);
+    openAlertTimeModal(alertBadge.dataset.mvAlertToggle, alertBadge.dataset.tf);
     return;
   }
   const judgeBtn = e.target.closest('[data-mv-judge]');
@@ -4482,6 +4594,7 @@ trendGvModal.addEventListener('click', (e) => { if (e.target === trendGvModal) c
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && trendGvModal.classList.contains('show')) closeTrendGv();
   if (e.key === 'Escape' && tradeModal.classList.contains('show')) closeTradeModal();
+  if (e.key === 'Escape' && alertTimeModal.classList.contains('show')) closeAlertTimeModal();
 });
 
 /* ============ S42: 波マップの日次記録 ============
@@ -5179,17 +5292,28 @@ function mergePair(a, b) {
   }, '');
 
   /* 根拠チェックはチェック項目1つずつ。値は checksHigher/checksEntry、
-     時刻は並行マップ checksAt（'checksHigher.granville' のような複合キー）。 */
+     時刻は並行マップ checksAt（複合キー）。
+     S72: checksHigher は時間足キーごとに独立したので、複合キーは
+     'checksHigher.<tfKey>.<key>'（3分割）になった。checksEntry は従来どおり
+     'checksEntry.<key>'（2分割）のまま。旧・平坦形式（'checksHigher.<key>'、2分割）は
+     読み込み側の mvMigrateChecksHigherToTf が入れ子へ移すため、ここでは新形式だけを扱う
+     （移行前の端末からの古いキーは自己修復されるまで無視されるだけで実害は無い）。 */
   out.checksAt = out.checksAt || {};
   Object.keys(b.checksAt || {}).forEach(ck => {
     if (ts(b.checksAt[ck]) <= ts(out.checksAt[ck])) return;
-    const dot = ck.indexOf('.');
-    if (dot < 0) return;
-    const store = ck.slice(0, dot), key = ck.slice(dot + 1);
-    if (store !== 'checksHigher' && store !== 'checksEntry') return;
-    if (!out[store] || typeof out[store] !== 'object') out[store] = {};
-    out[store][key] = ((b[store] || {})[key]) || '';
-    out.checksAt[ck] = b.checksAt[ck];
+    const parts = ck.split('.');
+    if (parts[0] === 'checksEntry' && parts.length === 2) {
+      const key = parts[1];
+      if (!out.checksEntry || typeof out.checksEntry !== 'object') out.checksEntry = {};
+      out.checksEntry[key] = ((b.checksEntry || {})[key]) || '';
+      out.checksAt[ck] = b.checksAt[ck];
+    } else if (parts[0] === 'checksHigher' && parts.length === 3) {
+      const tfKey = parts[1], key = parts[2];
+      if (!out.checksHigher || typeof out.checksHigher !== 'object') out.checksHigher = {};
+      if (!out.checksHigher[tfKey] || typeof out.checksHigher[tfKey] !== 'object') out.checksHigher[tfKey] = {};
+      out.checksHigher[tfKey][key] = (((b.checksHigher || {})[tfKey] || {})[key]) || '';
+      out.checksAt[ck] = b.checksAt[ck];
+    }
   });
 
   return out;
