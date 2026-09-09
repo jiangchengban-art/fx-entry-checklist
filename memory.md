@@ -1,9 +1,9 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-09 (S66 complete)  
-**Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
+**Last Updated:** 2026-09-09 (S67 complete)  
+**Current State:** ✅ Production-ready (S67で根本的な並び順再設計). s62テストは S63/S65 定義変更に対応が必要  
 **Main Branch:** `master`  
-**Active Development Branch:** `claude/s63-test-updates-deploy-v7gfwi` — S64+S65+S66 work
+**Active Development Branch:** none — S67 merged to master, ready for S68
 
 ## Project Health
 
@@ -16,10 +16,11 @@
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-66)
+## Recent Changes (S57-67)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S67 | 🔭一覧の並び順をアラート発生時刻順に置換 | S44のエントリー圏距離順（`pairEntryDistance()`昇順）を撤去し、選択した時間足のアラート発生日時（`w.alerts[tf].at`）の新しい順に置換。ツールバーの1H/4H/D/Wボタン（`trendSortTf`）で基準足を切替可能。カード上のアラートバッジをタップすると自動的にその足へ切り替わる。グループ見出し「🎯 エントリー圏」・サマリータイル「🎯 圏内 n ペア」・ツールバー「🎯 エントリー圏のみ」絞り込みを撤去。`pairEntryDistance()` 自体は波マップの圏内強調・🎯根拠ボタン色分けで使用継続 |
 | S66 | 根拠パネルの判定ボタンから絵文字マークを撤去 | `trendJudgeBtnsHtml()`が`j.label.slice(0,1)`で絵文字1文字だけ表示していたのを、文言本体（エントリー/保留/スルー）表示に変更。`MV_JUDGES.label`本体・`mvSetJudge()`・データモデルは無変更 |
 | S65 | エントリー足❸の「重なり」をロールリバーサル確認に置換 | `fiboRoll`（重なり有/重なり無/❌）を撤去し、上位足にあった`rollReversal`（確認/❌）をエントリー足❸に一本化。上位足からは`rollReversal`を削除（5分足確認と重複のため）。CSV: `hi_*`6→5列、`en_*`は`en_fiboRoll`→`en_rollReversal` |
 | S64 | 確度%を🔭一覧の🎯チップに表示、パネルのエントリー足/合算表示を撤去 | `trendEntryChipHtml()`に上位足確度%を追加。`.tp-conf`はエントリー足・合算を撤去し上位足のみに。`setupConfidence()`→`higherConfidence()` |
@@ -83,9 +84,10 @@ docs/
 **S63:** 根拠パネルの選択肢整理（granville撤去・待ち系撤去・空欄ボタン撤去）＋確度スコアの重み付け  
 **S64:** 確度%を🎯チップに表示、パネルのエントリー足/合算表示を撤去  
 **S65:** エントリー足❸の「重なり」をロールリバーサル確認に置換、上位足からロールリバーサルを撤去  
-**S66:** 根拠パネルの判定ボタンから絵文字マークを撤去、文言本体を表示
+**S66:** 根拠パネルの判定ボタンから絵文字マークを撤去、文言本体を表示  
+**S67:** 並び順をアラート発生時刻順に置換（S44のエントリー圏距離順を撤去、圏内タイル/絞り込み/グループ見出し削除）
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-66 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-67 統合）」テーブルを参照。
 ※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
