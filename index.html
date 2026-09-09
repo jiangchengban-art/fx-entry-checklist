@@ -640,8 +640,6 @@
   .trend-summary .item.go .n { color: var(--good); }
   .trend-summary .item.hot  { background: var(--good-soft); border-color: var(--good); color: var(--good); }
   .trend-summary .item.hot .n { color: var(--good); }
-  .trend-summary .item.wait { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
-  .trend-summary .item.wait .n { color: var(--warn); }
   .trend-summary .item.stale { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
   .trend-summary .item.stale .n { color: var(--warn); }
 
@@ -723,14 +721,6 @@
   .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
 
-  /* S46: ⏳待ちバッジ。RCI到達待ち・MACD発生待ちの根拠数を鮮度チップの隣に出す。 */
-  .twait {
-    font-size: 10.5px; font-weight: 700; flex: none;
-    padding: 2px 7px; border-radius: 999px;
-    background: var(--warn-soft); color: var(--warn);
-    border: 1px solid var(--warn);
-  }
-
   /* S33→S62: 根拠パネル。上位足とエントリー足で項目が別々になったので横並び2列をやめ、
      区分ごとのセクションに積む。1項目が横幅をフルに使えるので選択肢の折り返しは減る。 */
   .trend-panel {
@@ -774,17 +764,9 @@
     padding: 4px 6px; border-radius: 6px; background: var(--accent-soft);
     text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* 🔭一覧の記録から自動反映される読み取り専用セル（S29 と同じ向き：一覧が入力元）。 */
-  .tp-synced {
-    font-size: 12px; padding: 4px 6px; border-radius: 6px;
-    border: 1px dashed var(--border); color: var(--ink-muted); text-align: center;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .tp-synced.on { color: var(--ink); font-weight: 700; border-style: solid; }
   /* S34: 根拠14項目をボードと同じボタン群に統一（旧: select）。狭い2列に収めるため折り返す。 */
   .tp-row .tp-choice { row-gap: 4px; column-gap: 4px; min-width: 0; }
   .tp-row .tp-choice .mv-tfcheck-btn { padding: 3px 3px !important; font-size: 10px !important; min-width: 0; }
-  .tp-row .tp-choice .mv-tfcheck-btn.tp-none { color: var(--ink-muted); }
   .tp-foot {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border);
@@ -1038,7 +1020,7 @@
     .trend-panel { padding: 8px 8px 9px; }
     .tp-row { grid-template-columns: 62px minmax(0, 1fr); gap: 5px; }
     .tp-label, .tp-label.link { font-size: 10.5px; }
-    select.tp-cell, .tp-fixed, .tp-synced { font-size: 11.5px; padding: 4px 4px; }
+    select.tp-cell, .tp-fixed { font-size: 11.5px; padding: 4px 4px; }
     .tp-sec .tp-fixed, .tp-sec select.tp-cell { min-width: 84px; }
     #trendGvModal .modal-actions { flex-wrap: wrap; }
     #trendGvModal .modal-actions button { white-space: nowrap; }
@@ -1235,7 +1217,7 @@
         <strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。<br>
         <strong>GOボタン</strong>は近々エントリーが近いと自分で判断したペアに立てる手動の目印で、解除するまで残ります（🧹巡回記録クリアでも消えません）。<br>
         記録した波の位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。<br>
-        🕐鮮度は12時間で「1回抜けた」、36時間で「1日抜けた」の目安です。⏳待ちはRCI到達待ち・MACD発生待ちなどの根拠です。
+        🕐鮮度は12時間で「1回抜けた」、36時間で「1日抜けた」の目安です。
       </div>
     </details>
     <div class="trend-summary" id="trendSummary"></div>
@@ -1500,7 +1482,7 @@ const MV_TF_ENTRY_OPTIONS  = ['5分足', '15分足', '1時間足', '4時間足']
 /* グランビルの法則8パターン。1〜4が買い、5〜8が売り。
    文言は解説ドロワー（guide-granville）の basics の説明と用語を揃えている。
    side はトレンド一覧のピッカーで記録済みの方向に合わせて4択に絞るために使う。
-   ⚠️ MV_TF_CHECKS より前で宣言する必要がある（ボードのグランビル選択肢がこの8択を使うため）。 */
+   S63: 根拠パネル（MV_TF_CHECKS）からは撤去済み。実際の波記録・ピッカー・波マップで使用する。 */
 const MV_GRANVILLE_POSITIONS = [
   { v: '1', side: 'buy',  short: '買①', label: '買① 上抜け（EMAが上向きに転換）' },
   { v: '2', side: 'buy',  short: '買②', label: '買② 押し目（一時下抜けてもすぐ戻る）' },
@@ -1608,22 +1590,20 @@ function mvNormalizeChecks(list) {
 }
 
 const MV_TF_CHECKS = mvNormalizeChecks([
-  /* S29: グランビルはトレンド一覧（🔭）で記録した波を自動反映する連動項目になったため、
-     選択肢はトレンド一覧と同じ8パターン（買①〜④／売①〜④）＋❌を使う。
-     ボード側で手動選択できるのは対応する時間足を一覧が持たない場合のみ（mvGranvilleSyncTf参照）。 */
+  /* S63: グランビルは🔭一覧の行に🌊アイコンで常時表示されており、この根拠パネルに
+     読み取り専用で重複表示する意味が薄かったため撤去（checksHigher.granville への
+     同期処理 mvGranvilleSyncField も併せて削除）。実際の波記録は w.trend[tf].granville のまま。 */
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
-  { k: 'granville',    label: 'グランビル',       opts: MV_GRANVILLE_POSITIONS.map(g => g.short).concat(['❌']), link: 'granville' },
-  /* S46: 「待ち」＝到達/発生していないが潰えてもいない中間状態。他の条件が揃っていても
-     これが崩れていなければエントリー可能性が残ることを一覧の巡回で拾えるようにする。
-     項目そのものの状態なので新規チェック項目にはせず opts に足す（定義元1箇所でボード・
-     根拠パネル・CSV・履歴サマリーすべてに自動反映される、S37/S38 と同じ拡張パターン）。 */
-  { k: 'rciShort',     label: 'RCI 短期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         opts: ['上限', '60↑', '60↓', '下限', '⏳待ち', '❌'] },
-  { k: 'macd',         label: 'MACD',             opts: ['RD(転換)', 'HD(継続)', '⏳RD待ち', '⏳HD待ち', '❌'], link: 'macd' },
-  { k: 'roundNumber',  label: 'ラウンドナンバー', opts: ['有', '無', '❌'], short: 'ラウンド' },
-  { k: 'rollReversal', label: 'ロールリバーサル', opts: ['確認', '未確認', '❌'], short: 'ロールRv' },
+  /* S63: 確度スコアの重み（weight）。RCI・MACDは環境認識の核なので厚く、ラウンドナンバー・
+     ロールリバーサルは補助的な根拠なので薄くする（合計100）。weight を持たない項目は
+     checkConfidence 側で 1 として扱う（エントリー足は均等割りのまま）。 */
+  { k: 'rciShort',     label: 'RCI 短期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'rciMid',       label: 'RCI 中期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'rciLong',      label: 'RCI 長期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  { k: 'macd',         label: 'MACD',             weight: 35, opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
+  { k: 'roundNumber',  label: 'ラウンドナンバー', weight: 10, opts: ['有', '❌'], short: 'ラウンド' },
+  { k: 'rollReversal', label: 'ロールリバーサル', weight: 10, opts: ['確認', '❌'], short: 'ロールRv' },
   /* S62: entryFibo はここ（上位足）から外し、エントリー足の❸専用にした（MV_ENTRY_CHECKS）。
      記録するのは「1波のどのフィボ水準で入ったか」なので、上位足に置いても意味を持たなかった。 */
 ]);
@@ -1633,7 +1613,8 @@ const MV_TF_CHECKS = mvNormalizeChecks([
    という確認の順番をそのまま項目にしてある。上位足の確度が高いことが前提の手順なので、
    グランビル・RCI・MACD といった上位足の環境認識項目はエントリー足では使わない。
    ⚠️ opts の要素に side を書くと、記録済みのトレンド方向に合う選択肢だけが出る（trendCheckCell）。
-      向きの無い選択肢（⏳待ち・❌・%）は side を持たせず常に出す。 */
+      向きの無い選択肢（❌・%）は side を持たせず常に出す。
+   S63: 「⏳待ち」はエントリー足の全項目から撤去（上位足のRCI/MACDと合わせて「待ち」概念自体を廃止）。 */
 const MV_ENTRY_CHECKS = mvNormalizeChecks([
   { k: 'necklineForm', label: 'ネックライン反転形', short: '❶反転形',
     hint: '上位足のネックライン付近で、5分足に反転の形が出たか',
@@ -1642,18 +1623,18 @@ const MV_ENTRY_CHECKS = mvNormalizeChecks([
       { v: '逆三尊',       side: 'buy'  },
       { v: 'ダブルトップ', side: 'sell' },
       { v: '三尊',         side: 'sell' },
-      { v: '⏳待ち' }, { v: '❌' },
+      { v: '❌' },
     ] },
   { k: 'maBreak', label: '5分足MA抜け', short: '❷MA抜け',
     hint: '5分足のMAを明確に抜けたか。抜けたらそこからを1波と見なす',
     opts: [
       { v: '上抜け', side: 'buy'  },
       { v: '下抜け', side: 'sell' },
-      { v: '⏳待ち' }, { v: '❌' },
+      { v: '❌' },
     ] },
   { k: 'fiboRoll', label: 'フィボ×ロールリバーサル', short: '❸重なり',
     hint: '1波のフィボナッチとロールリバーサルが重なる箇所か',
-    opts: [{ v: '重なり有' }, { v: '重なり無' }, { v: '⏳待ち' }, { v: '❌' }] },
+    opts: [{ v: '重なり有' }, { v: '重なり無' }, { v: '❌' }] },
   /* S38→S62: 実際に入ったフィボ水準。キー名は据え置き ── CSV列 en_entryFibo と
      📚振り返りの「エントリーFibo水準別の成績」（byFibo）がこの名前を見ているため。 */
   { k: 'entryFibo', label: 'エントリーFibo', short: '❸Fibo',
@@ -1672,21 +1653,6 @@ const MV_TF_TO_TREND_KEY = { '週足': 'w', '日足': 'd', '4時間足': 'h4', '
    ボードの tfHigher ラベルを決めるために使う。対で持つので片方だけ増やさないこと。
    ⚠️ ここに無い足（月足）では根拠パネルを開けない ── tfHigher に入れる値が無いため。 */
 const MV_TREND_KEY_TO_TF = { w: '週足', d: '日足', h4: '4時間足', h1: '1時間足' };
-/* トレンド一覧の該当足から checksHigher.granville へ書き込む唯一の入り口。
-   一覧が入力元・スナップショットは複製という向きを守るため、逆方向には書き込まない。
-   ⚠️ S62: エントリー足はグランビルを持たなくなった（❶❷❸の3ステップに置き換え）ので上位足だけ。
-      既存データに残る w.checksEntry.granville は読み書きされないだけで無害（S58 の w.mode と同じ扱い）。 */
-function mvGranvilleSyncField(w, field) {
-  if (field !== 'tfHigher') return;
-  const tfKey = MV_TF_TO_TREND_KEY[w[field]];
-  if (!tfKey) return;
-  const checksField = MV_CHECK_FIELDS[field];
-  if (!w[checksField]) w[checksField] = {};
-  const cur = (w.trend && w.trend[tfKey]) || {};
-  const g = MV_GRANVILLE_MAP[cur.granville];
-  w[checksField].granville = g ? g.short : '';
-}
-
 /* S62: エントリー足の❶❷は上位足のトレンド方向に紐づく（押し目買いなら底の形＋MA上抜け）。
    向きが決まっていなければ '' を返し、そのときは両サイドの選択肢を出す。 */
 function mvEntrySide(w) {
@@ -3475,9 +3441,6 @@ function mvSetTf(watchId, field, value) {
   if (!w) return null;
   w[field] = value;
   w.tfAt = new Date().toISOString();   /* S28: 端末間マージ用 */
-  /* S29: 選び直した時間足がトレンド一覧の追跡対象なら、その場でグランビルを引き継ぐ
-     （逆に対象外の足に変えたときは mvGranvilleSyncField が何もしないので、直前の手動選択が残る）。 */
-  mvGranvilleSyncField(w, field);
   /* S62: 上位足を別の足に変えると、その足の方向でエントリー足の向きが決まり直す。 */
   if (field === 'tfHigher') mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
@@ -3598,8 +3561,6 @@ function mvWriteTrend(watchId, tfKey, patch) {
      端末間のマージが見るのはこちら（時間足ごとに独立して新旧を判定するため）。 */
   cur.at = new Date().toISOString();
   w.trendAt = cur.at;
-  /* S29: この足を上位足として選んでいれば、グランビルを自動反映する。 */
-  mvGranvilleSyncField(w, 'tfHigher');
   /* S62: 方向が変われば、その向きに紐づくエントリー足の❶❷も成立しなくなる。 */
   mvSyncEntrySideChecks(w);
   if (!saveMarket(data)) return null;
@@ -3646,7 +3607,6 @@ const trendCategorySelect = document.getElementById('trendCategorySelect');
    同じラベルの押せる要素が2箇所並んで紛らわしいというユーザー指摘への対応。 */
 let trendEntryOnly   = false;
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
-let trendWaitOnly    = false; // S46: 「⏳待ちあり」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 let trendGoOnly      = false; // S58: 「🚩GOのみ」の絞り込み（w.go）。永続化しない
 /* S33: 開いている根拠パネル。S44 で { id, setupKey } → { id, tfKey }（開いた足がそのまま上位足）。
@@ -3675,32 +3635,26 @@ function saveTrendTfs() {
 }
 let trendVisibleTfs = loadTrendTfs();
 
-/* S46: ❌（未達成）と ⏳（待ち＝未達成だが潰えてもいない）は確度スコアでは同じ扱いにする。
-   待ちだけを満点扱いにすると「条件がまだ揃っていない」のに確度が実態より高く出るため。
-   一覧の ⏳ バッジ（pairWaitCount）側でこの2つを描き分ける。 */
-function isUnmetCheck(v) { return v === '❌' || (v || '').indexOf('⏳') === 0; }
+/* S63: 「⏳待ち」概念は全項目から撤去したため、未達成は ❌ のみを見る。 */
+function isUnmetCheck(v) { return v === '❌'; }
 
-/* S38: 根拠の確度。未達成（isUnmetCheck）を選んだ項目数だけ減点する（未選択の空欄は減点しない）。
-   S62: 分母は区分ごとの項目数。上位足は7項目、エントリー足は❶❷❸の4項目で別々に出す。 */
+/* S38: 根拠の確度。未達成（isUnmetCheck）を選んだ項目の重み分だけ減点する（未選択の空欄は減点しない）。
+   S63: 分母は区分ごとの重み合計（上位足は6項目・重み付き合計100、エントリー足は4項目均等）で別々に出す。
+   S63: 上位足は項目ごとに weight を持たせ、RCI・MACDを厚く、ラウンドナンバー・ロールリバーサルを
+   薄くする（MV_TF_CHECKS 定義側で合計100になるよう配分）。weight を持たない項目は 1 として扱う
+   （エントリー足は従来どおり均等割り）。 */
 function checkConfidence(checks, list) {
   const items = list || MV_TF_CHECKS;
-  const total = items.length;
-  if (!total) return 100;
-  const cross = items.reduce((n, c) => n + (isUnmetCheck(checks && checks[c.k]) ? 1 : 0), 0);
-  return Math.round((total - cross) / total * 100);
+  const totalWeight = items.reduce((n, c) => n + (c.weight || 1), 0);
+  if (!totalWeight) return 100;
+  const lost = items.reduce((n, c) =>
+    n + (isUnmetCheck(checks && checks[c.k]) ? (c.weight || 1) : 0), 0);
+  return Math.round((totalWeight - lost) / totalWeight * 100);
 }
 function setupConfidence(w) {
   const higher = checkConfidence(w.checksHigher || {}, MV_TF_CHECKS);
   const entry  = checkConfidence(w.checksEntry  || {}, MV_ENTRY_CHECKS);
   return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
-}
-
-/* S46: 「⏳待ち」の項目数（上位足・エントリー足の合計）。w に保存しない純粋な導出関数
-   （S32〜S44 の GO/WAIT 判定・エントリー圏判定と同じ原則）。行の⏳バッジと絞り込みで使う。 */
-function pairWaitCount(w) {
-  const count = (checks, list) => list.reduce((n, c) =>
-    n + ((checks && (checks[c.k] || '')).indexOf('⏳') === 0 ? 1 : 0), 0);
-  return count(w.checksHigher || {}, MV_TF_CHECKS) + count(w.checksEntry || {}, MV_ENTRY_CHECKS);
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -3711,13 +3665,6 @@ function trendAgeHours(w) {
   return (Date.now() - t) / 3600000;
 }
 function isTrendStale(w) { return trendAgeHours(w) > TREND_STALE_H; }
-
-/* S46: RCI到達待ち・MACD発生待ちなど「⏳待ち」の根拠数を行ヘッダに出す。0件なら何も出さない。 */
-function trendWaitBadgeHtml(w) {
-  const n = pairWaitCount(w);
-  if (!n) return '';
-  return '<span class="twait" title="⏳待ちの根拠が' + n + '件あります（RCI到達待ち・MACD発生待ちなど）">⏳' + n + '</span>';
-}
 
 function trendFreshChip(w) {
   const h = trendAgeHours(w);
@@ -3777,29 +3724,22 @@ function trendEntryChipHtml(w, tfKey) {
 }
 
 /* 根拠チェック1項目のセル。上位足・エントリー足で同じ形を使う。
-   S29 と同じ判定式で、一覧が追跡している足（週足・日足・4時間足・1時間足）のグランビルは
-   読み取り専用にする ── ここで手入力できると一覧側の記録と食い違うため。 */
+   S63: 未選択状態を表す「—」ボタン（初期状態でデフォルト選択に見えていた）を撤去し、
+   選択肢だけを並べる。解除は選択済みのボタンを再タップする（mvWriteCheck のトグル）。 */
 function trendCheckCell(w, field, c) {
   const checks = w[MV_CHECK_FIELDS[field]] || {};
   const cur = checks[c.k] || '';
-  if (c.k === 'granville' && MV_TF_TO_TREND_KEY[w[field]]) {
-    return '<span class="tp-synced' + (cur ? ' on' : '') + '"' +
-      ' title="🔭一覧のグランビル記録から自動反映。変更は上の行で行う">' +
-      (cur ? esc(cur) : '🔭未記録') + '</span>';
-  }
   /* S62: 方向が決まっているエントリー足では、逆サイドの選択肢を出さない
      （↗の押し目狙いで「ダブルトップ」を選べても意味がなく、選んでも
      mvSyncEntrySideChecks が消すため）。方向未記録のときは両サイド出す。 */
   const side = field === 'tfEntry' ? mvEntrySide(w) : '';
   const opts = c.opts.filter(o => !o.side || !side || o.side === side);
   function btn(value, label) {
-    return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') +
-      (value === '' ? ' tp-none' : '') + '"' +
+    return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') + '"' +
       ' data-trend-check-btn="' + esc(w.id) + '" data-field="' + field + '"' +
       ' data-key="' + c.k + '" data-value="' + esc(value) + '">' + esc(label) + '</button>';
   }
   return '<div class="mv-choice wrap tp-choice">' +
-    btn('', '—') +
     opts.map(o => btn(o.v, o.v)).join('') +
   '</div>';
 }
@@ -3913,7 +3853,6 @@ function trendItemHtml(w) {
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendGoBtnHtml(w) +
       trendFreshChip(w) +
-      trendWaitBadgeHtml(w) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
@@ -3931,23 +3870,21 @@ function trendItemHtml(w) {
    ペア単位のタイル（圏内・未更新など）と単位が揃っておらず誤読の元だったため
    （方向は各行のトグルの色そのものが常時見えており、集計の価値が薄い）。
    代わりに「巡回 n/m ペア」で今日どこまで見終えたかの進捗を出す。
-   タイルの並びはツールバー1行目のフィルタボタンと同じ順（GO→圏内→待ち→未更新）に揃える。 */
+   タイルの並びはツールバー1行目のフィルタボタンと同じ順（GO→圏内→未更新）に揃える。 */
 function renderTrendSummary(pairs) {
-  const counts = { go: 0, hot: 0, wait: 0, stale: 0, done: 0 };
+  const counts = { go: 0, hot: 0, stale: 0, done: 0 };
   pairs.forEach(w => {
     if (w.go) counts.go++;
     if (pairIsHot(w)) counts.hot++;
-    if (pairWaitCount(w) > 0) counts.wait++;
     if (isTrendStale(w)) counts.stale++;
     if (w.trendAt) counts.done++;
   });
-  /* S60: GO/圏内/待ち/未更新はタップでフィルタを兼ねるボタンにする（旧・ツールバーの
-     同名4ボタンはここへ統合して撤去した）。巡回タイルだけは絞り込み手段が無いので
+  /* S60: GO/圏内/未更新はタップでフィルタを兼ねるボタンにする（旧・ツールバーの
+     同名ボタンはここへ統合して撤去した）。巡回タイルだけは絞り込み手段が無いので
      従来通り <span>。filter キーは trendSummaryEl のクリック委任ハンドラと対応させる。 */
   const summaryItems = [
     { cls: 'go',    label: '🚩 GO',    n: counts.go,    unit: 'ペア', filter: 'go',    on: trendGoOnly },
     { cls: 'hot',   label: '🎯 圏内',  n: counts.hot,   unit: 'ペア', filter: 'hot',   on: trendEntryOnly },
-    { cls: 'wait',  label: '⏳ 待ち',  n: counts.wait,  unit: 'ペア', filter: 'wait',  on: trendWaitOnly },
     { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア', filter: 'stale', on: trendStaleOnly },
     { cls: '',      label: '巡回',     n: counts.done + '/' + pairs.length, unit: 'ペア' },
   ];
@@ -3981,15 +3918,14 @@ function renderTrendCategoryOptions() {
 }
 
 
-/* ツールバーの5つの絞り込みを AND で当てる。順序は AND なので結果に影響しないが、
-   S59でツールバー1行目の表示順（GO→圏内→待ち→未更新→カテゴリ）に揃えてある。
+/* ツールバーの絞り込みを AND で当てる。順序は AND なので結果に影響しないが、
+   S59でツールバー1行目の表示順（GO→圏内→未更新→カテゴリ）に揃えてある。
    S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。 */
 function trendApplyFilters(pairs) {
   let shown = pairs;
   if (trendGoOnly)     shown = shown.filter(w => w.go);
   /* S44: 図の上でタップした位置が買②③/売②③の圏内にあるペアだけに絞る。 */
   if (trendEntryOnly)  shown = shown.filter(pairIsHot);
-  if (trendWaitOnly)   shown = shown.filter(w => pairWaitCount(w) > 0);
   if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   return shown;
@@ -4063,7 +3999,6 @@ trendSummaryEl.addEventListener('click', (e) => {
   const f = btn.dataset.trendSummaryFilter;
   if (f === 'go') trendGoOnly = !trendGoOnly;
   else if (f === 'hot') trendEntryOnly = !trendEntryOnly;
-  else if (f === 'wait') trendWaitOnly = !trendWaitOnly;
   else if (f === 'stale') trendStaleOnly = !trendStaleOnly;
   renderTrendList();
 });

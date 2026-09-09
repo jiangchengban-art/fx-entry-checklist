@@ -1,25 +1,26 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-08 (S62 complete)  
+**Last Updated:** 2026-09-09 (S63 complete)  
 **Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
 **Main Branch:** `master`  
-**Active Development Branch:** `claude/s63-session-start-inntq7` — S62 work
+**Active Development Branch:** `claude/s63-session-start-inntq7` — S62+S63 work
 
 ## Project Health
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Core Features | ✅ Complete | 🔭一覧・📚統計・⚙設定の3タブ完成 |
-| Testing | ✅ Passing | s62(48)+s44(64)+s43(35)+s42(45)+s60(17)+s59(31)+s55(15) all green. s40 has 2 known pre-existing failures (see Known Issues) |
+| Testing | ✅ Passing | s62(48, pre-S63 definitions — needs update)+s44(64)+s43(35)+s42(45)+s60(17)+s59(31)+s55(15) all green. S63 verified via ad-hoc Playwright smoke test (definitions/weights/panel HTML). s40 has 2 known pre-existing failures (see Known Issues) |
 | Data Model | ✅ Stable | localStorage `mochipoyo_*_v1` keys, Supabase JSONB sync |
 | Accessibility | ✅ OK | PWA-capable, iOS/Android responsive, dark/light theme |
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-62)
+## Recent Changes (S57-63)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S63 | 根拠パネルの選択肢整理と確度スコアの重み付け | `granville`行を根拠パネルから撤去（🔭一覧行の🌊アイコンと重複のため）。RCI/MACDの⏳待ち、ラウンドナンバーの無、ロールリバーサルの未確認、エントリー足全項目の⏳待ちを撤去（「待ち」機能一式=`pairWaitCount`等も連鎖削除）。空欄ボタン（`—`）を撤去。`checkConfidence`に`weight`導入（上位足: RCI各15/MACD35/ラウンド10/ロールRv10=計100） |
 | S62 | エントリー足の根拠を3ステップ確認フローに全面置換 | `MV_ENTRY_CHECKS`（❶反転形／❷MA抜け／❸重なり／❸Fibo）を新設。方向で選択肢を絞り、方向反転で矛盾する記録だけ自動クリア。パネルは縦2セクションに |
 | S60 | GO/圏内/待ち/未更新のタップ箇所重複を解消 | サマリータイルを`<button>`化しフィルタを兼務、ツールバーの同名4ボタンを削除、ツールバー1行に再統合 |
 | S59 | 🔭一覧上部を巡回実運用に合わせて再整理 | 説明文圧縮・5タイルペア単位統一・ツールバー2行分割・CSS色バグ修正 |
@@ -36,7 +37,7 @@ index.html (単一ファイル)
   └─ JS: localStorage (主体) ↔ Supabase (補助・複数端末同期)
 
 sw.js (キャッシュ制御、S28〜)
-  └─ v32: network-first HTML / cache-first assets / cross-origin素通し
+  └─ v34: network-first HTML / cache-first assets / cross-origin素通し
 
 manifest.webmanifest + icon-*.png (PWA)
   └─ iOS7日削除回避の唯一の方法
@@ -75,9 +76,10 @@ docs/
 **S45-50:** 表示最適化・過去日訂正・参考重ね表示  
 **S51-56:** ボード廃止・決済モーダル廃止・1H追加・同期強化  
 **S57-60:** 手動GOフラグ・一覧上部整理・タップ箇所重複解消  
-**S62:** エントリー足を3ステップ確認フローに置換（上位足とは別の項目セットへ）
+**S62:** エントリー足を3ステップ確認フローに置換（上位足とは別の項目セットへ）  
+**S63:** 根拠パネルの選択肢整理（granville撤去・待ち系撤去・空欄ボタン撤去）＋確度スコアの重み付け
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-62 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-63 統合）」テーブルを参照。
 ※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
@@ -86,7 +88,7 @@ docs/
 - [ ] `git log --oneline -3` でローカルとリモートの一致を確認
 - [ ] s40-test.mjs の既知2件（S45のミニ波形撤去に伴う期待値更新漏れ）を直すか判断
 - [ ] `GV_ENTRY_RADIUS` の実運用チューニング（S51以来の据え置き候補）
-- [ ] Plan S63 work (user feature request or bug fix)
+- [ ] s62-test.mjs を S63 の変更（granville行撤去・待ち系撤去・空欄ボタン撤去・weight導入）に合わせて更新する（現状はS62時点の定義を前提にしたまま）
 
 ## ⚠️ 複数環境運用時の注意（S60で発生した教訓）
 
