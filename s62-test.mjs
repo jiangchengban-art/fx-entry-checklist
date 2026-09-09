@@ -68,14 +68,14 @@ console.log('\n[①] 項目定義：上位足とエントリー足が別物に�
     entry: MV_ENTRY_CHECKS.map(c => c.k),
     snapshotChecks: MV_CHECK_SNAPSHOTS.map(s => s.checks.length),
   }));
-  eq('上位足は7項目（entryFibo が外れた）', defs.higher,
-    ['granville', 'rciShort', 'rciMid', 'rciLong', 'macd', 'roundNumber', 'rollReversal']);
+  eq('上位足は5項目（granville・rollReversal・entryFibo が外れた）', defs.higher,
+    ['rciShort', 'rciMid', 'rciLong', 'macd', 'roundNumber']);
   eq('エントリー足は❶❷❸の4項目', defs.entry,
-    ['necklineForm', 'maBreak', 'fiboRoll', 'entryFibo']);
+    ['necklineForm', 'maBreak', 'rollReversal', 'entryFibo']);
   ok('上位足に entryFibo は無い', !defs.higher.includes('entryFibo'));
   ok('エントリー足にグランビルは無い', !defs.entry.includes('granville'));
   ok('entryFibo のキー名は据え置き（統計・CSVが見ている）', defs.entry.includes('entryFibo'));
-  eq('スナップショット区分が各々の定義を持つ', defs.snapshotChecks, [7, 4]);
+  eq('スナップショット区分が各々の定義を持つ', defs.snapshotChecks, [5, 4]);
   await page.close();
 }
 
@@ -88,9 +88,8 @@ console.log('\n[②] 選択肢の中身が実運用の3ステップになって�
     opts.necklineForm.includes('ダブルボトム') && opts.necklineForm.includes('逆三尊'));
   ok('❶ に売り側の形（ダブルトップ・三尊）がある',
     opts.necklineForm.includes('ダブルトップ') && opts.necklineForm.includes('三尊'));
-  ok('❶ に⏳待ちがある（形の出現待ちを残せる）', opts.necklineForm.includes('⏳待ち'));
-  eq('❷ はMAの上抜け／下抜け', opts.maBreak, ['上抜け', '下抜け', '⏳待ち', '❌']);
-  eq('❸ は重なりの有無', opts.fiboRoll, ['重なり有', '重なり無', '⏳待ち', '❌']);
+  eq('❷ はMAの上抜け／下抜け', opts.maBreak, ['上抜け', '下抜け', '❌']);
+  eq('❸ はロールリバーサル確認', opts.rollReversal, ['確認', '❌']);
   eq('❸ Fibo は5水準', opts.entryFibo, ['23%', '38%', '50%', '61%', '78%', '❌']);
   await page.close();
 }
@@ -104,7 +103,7 @@ console.log('\n[③] パネルは縦2セクション（旧・横並び3列では
   const names = await panel.locator('.tp-sec-name').allTextContents();
   eq('見出しの並びは上位足→エントリー足', names, ['上位足', 'エントリー足']);
   ok('旧 .tp-head（3列ヘッダ）は無い', await panel.locator('.tp-head').count() === 0);
-  eq('行数は 上位足7 + エントリー足4 = 11', await panel.locator('.tp-row').count(), 11);
+  eq('行数は 上位足5 + エントリー足4 = 9', await panel.locator('.tp-row').count(), 9);
   /* 1行あたりのセルが「ラベル＋選択肢」の2つになっている（旧は3つ） */
   const cells = await panel.locator('.tp-row').first().evaluate(el => el.children.length);
   eq('1行は ラベル＋選択肢 の2要素', cells, 2);
@@ -122,10 +121,10 @@ console.log('\n[④] ❶❷の選択肢が上位足の方向で絞られる');
   const vals = k => panel.locator('[data-trend-check-btn][data-field="tfEntry"][data-key="' + k + '"]')
     .evaluateAll(els => els.map(e => e.dataset.value));
   eq('↗ なら❶は買い側の形だけ', await vals('necklineForm'),
-    ['', 'ダブルボトム', '逆三尊', '⏳待ち', '❌']);
-  eq('↗ なら❷は上抜けだけ', await vals('maBreak'), ['', '上抜け', '⏳待ち', '❌']);
-  eq('❸ 重なりは向きに関係なく全部出る', await vals('fiboRoll'),
-    ['', '重なり有', '重なり無', '⏳待ち', '❌']);
+    ['ダブルボトム', '逆三尊', '❌']);
+  eq('↗ なら❷は上抜けだけ', await vals('maBreak'), ['上抜け', '❌']);
+  eq('❸ ロールリバーサルは向きに関係なく全部出る', await vals('rollReversal'),
+    ['確認', '❌']);
   ok('目線バッジが買いを示す',
     (await panel.locator('.tp-side').textContent()).includes('買い'));
   await page.close();
@@ -137,8 +136,8 @@ console.log('\n[④] ❶❷の選択肢が上位足の方向で絞られる');
   const vals = k => panel.locator('[data-trend-check-btn][data-field="tfEntry"][data-key="' + k + '"]')
     .evaluateAll(els => els.map(e => e.dataset.value));
   eq('↘ なら❶は売り側の形だけ', await vals('necklineForm'),
-    ['', 'ダブルトップ', '三尊', '⏳待ち', '❌']);
-  eq('↘ なら❷は下抜けだけ', await vals('maBreak'), ['', '下抜け', '⏳待ち', '❌']);
+    ['ダブルトップ', '三尊', '❌']);
+  eq('↘ なら❷は下抜けだけ', await vals('maBreak'), ['下抜け', '❌']);
   ok('目線バッジが売りを示す',
     (await panel.locator('.tp-side').textContent()).includes('売り'));
   await page.close();
@@ -154,7 +153,7 @@ console.log('\n[④] ❶❷の選択肢が上位足の方向で絞られる');
     .locator('[data-trend-check-btn][data-field="tfEntry"][data-key="necklineForm"]')
     .evaluateAll(els => els.map(e => e.dataset.value));
   eq('レンジなら❶は両サイド出る', vals,
-    ['', 'ダブルボトム', '逆三尊', 'ダブルトップ', '三尊', '⏳待ち', '❌']);
+    ['ダブルボトム', '逆三尊', 'ダブルトップ', '三尊', '❌']);  // '⏳待ち' は S63 で撤去
   ok('目線バッジは未記録の警告色', await panel.locator('.tp-side.none').count() === 1);
   await page.close();
 }
@@ -168,12 +167,12 @@ console.log('\n[⑤] 記録できる・方向反転で向きの合わない記�
     k + '"][data-value="' + v + '"]';
   await page.click(btn('necklineForm', 'ダブルボトム'));
   await page.click(btn('maBreak', '上抜け'));
-  await page.click(btn('fiboRoll', '重なり有'));
+  await page.click(btn('rollReversal', '確認'));
   await page.click(btn('entryFibo', '38%'));
   const saved = () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('mochipoyo_market_view_v1')).pairs.find(p => p.id === 'p1').checksEntry);
   eq('4項目とも保存される', await saved(),
-    { necklineForm: 'ダブルボトム', maBreak: '上抜け', fiboRoll: '重なり有', entryFibo: '38%' });
+    { necklineForm: 'ダブルボトム', maBreak: '上抜け', rollReversal: '確認', entryFibo: '38%' });
   ok('押したボタンに .on が付く',
     await page.locator(btn('necklineForm', 'ダブルボトム')).evaluate(e => e.classList.contains('on')));
 
@@ -181,7 +180,7 @@ console.log('\n[⑤] 記録できる・方向反転で向きの合わない記�
   await page.click(item + '[data-trend-state][data-tf="d"][data-value="down"]');
   const after = await saved();
   eq('向きに紐づく❶❷は消える', [after.necklineForm, after.maBreak], ['', '']);
-  eq('向きを持たない❸は残る', [after.fiboRoll, after.entryFibo], ['重なり有', '38%']);
+  eq('向きを持たない❸は残る', [after.rollReversal, after.entryFibo], ['確認', '38%']);
   await page.close();
 }
 
@@ -189,17 +188,16 @@ console.log('\n[⑥] 確度スコアの分母が区分ごとに分かれる');
 {
   const page = await newPage({ [MARKET]: { pairs: [seedPair('up')] } });
   const conf = await page.evaluate(() => ({
-    /* 上位足は7項目：❌1つで 6/7 = 86% */
+    /* 上位足：weight合計90（RCI各15+MACD35+ラウンド10）。
+       MACD(weight:35)が❌の場合：(90-35)/90 ≈ 61% */
     higher: checkConfidence({ macd: '❌' }, MV_TF_CHECKS),
-    /* エントリー足は4項目：❌1つで 3/4 = 75% */
+    /* エントリー足は4項目（weight無し）：❌1つで 3/4 = 75% */
     entry: checkConfidence({ maBreak: '❌' }, MV_ENTRY_CHECKS),
-    /* ⏳待ちは❌と同じ減点（S46の扱いを踏襲） */
-    waiting: checkConfidence({ maBreak: '⏳待ち' }, MV_ENTRY_CHECKS),
+    /* ⏳待ちはS63で撤去済み */
     full: checkConfidence({}, MV_ENTRY_CHECKS),
   }));
-  eq('上位足は7項目が分母', conf.higher, 86);
+  eq('上位足は5項目が分母（weight 90）', conf.higher, 61);
   eq('エントリー足は4項目が分母', conf.entry, 75);
-  eq('⏳待ちも❌と同じ減点', conf.waiting, 75);
   eq('未選択だけなら減点なし', conf.full, 100);
   await page.close();
 }
@@ -208,20 +206,20 @@ console.log('\n[⑦] CSV列が入れ替わっている');
 {
   const page = await newPage(null);
   const cols = await page.evaluate(() => CSV_HEADERS.filter(h => /^(hi|en)_/.test(h)));
-  eq('hi_* は上位足7項目', cols.filter(c => c.startsWith('hi_')),
-    ['hi_granville', 'hi_rciShort', 'hi_rciMid', 'hi_rciLong', 'hi_macd',
-     'hi_roundNumber', 'hi_rollReversal']);
-  eq('en_* はエントリー足の新4項目', cols.filter(c => c.startsWith('en_')),
-    ['en_necklineForm', 'en_maBreak', 'en_fiboRoll', 'en_entryFibo']);
-  ok('hi_entryFibo は消えた', !cols.includes('hi_entryFibo'));
+  eq('hi_* は上位足5項目', cols.filter(c => c.startsWith('hi_')),
+    ['hi_rciShort', 'hi_rciMid', 'hi_rciLong', 'hi_macd', 'hi_roundNumber']);
+  eq('en_* はエントリー足の4項目', cols.filter(c => c.startsWith('en_')),
+    ['en_necklineForm', 'en_maBreak', 'en_rollReversal', 'en_entryFibo']);
+  ok('hi_granville は消えた（S63）', !cols.includes('hi_granville'));
+  ok('hi_rollReversal は消えた（S65）', !cols.includes('hi_rollReversal'));
   ok('en_entryFibo は残る（Fibo別成績が見ている）', cols.includes('en_entryFibo'));
-  /* 旧CSV（en_granville 等）を読んでも新項目は空のまま＝壊れない */
+  /* 旧CSV（hi_granville 等）を読んでも新項目は空のまま＝壊れない */
   const restored = await page.evaluate(() => {
-    const r = { hi_granville: '買②', en_granville: '買③', en_entryFibo: '50%' };
+    const r = { hi_granville: '買②', en_entryFibo: '50%' };
     return parseBasisCsv(r, (row, col) => row[col] || '');
   });
-  eq('旧 en_granville は未知列として無視される', restored.entry, { entryFibo: '50%' });
-  eq('hi_granville は従来どおり復元される', restored.higher, { granville: '買②' });
+  eq('旧 hi_granville は未知列として無視される', restored.higher, {});
+  eq('en_entryFibo は復元される', restored.entry, { entryFibo: '50%' });
   await page.close();
 }
 
@@ -229,17 +227,18 @@ console.log('\n[⑧] 履歴サマリーが区分ごとの項目名で出る');
 {
   const page = await newPage(null);
   const html = await page.evaluate(() => basisSummaryHtml({
-    higher: { granville: '買②', macd: 'RD(転換)' },
+    higher: { macd: 'RD(転換)', roundNumber: '有' },
     entry: { necklineForm: 'ダブルボトム', entryFibo: '38%' },
   }));
-  ok('上位足の項目名が出る', html.includes('グランビル 買②'));
+  ok('上位足の項目名が出る（MACD）', html.includes('MACD RD(転換)'));
+  ok('上位足の項目名が出る（ラウンドナンバー）', html.includes('ラウンドナンバー 有'));
   ok('エントリー足の項目名が出る', html.includes('ネックライン反転形 ダブルボトム'));
   ok('Fibo も出る', html.includes('エントリーFibo 38%'));
   /* エントリー足に上位足の項目が混ざらない（定義が分かれている確認） */
   const stray = await page.evaluate(() => basisSummaryHtml({
-    higher: {}, entry: { granville: '買②' },
+    higher: {}, entry: { macd: 'RD(転換)' },
   }));
-  ok('エントリー足に残った旧グランビルは表示されない', !stray.includes('買②'));
+  ok('エントリー足に上位足の MACD は表示されない', !stray.includes('RD'));
   await page.close();
 }
 
