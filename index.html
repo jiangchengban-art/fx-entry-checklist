@@ -3651,10 +3651,9 @@ function checkConfidence(checks, list) {
     n + (isUnmetCheck(checks && checks[c.k]) ? (c.weight || 1) : 0), 0);
   return Math.round((totalWeight - lost) / totalWeight * 100);
 }
-function setupConfidence(w) {
-  const higher = checkConfidence(w.checksHigher || {}, MV_TF_CHECKS);
-  const entry  = checkConfidence(w.checksEntry  || {}, MV_ENTRY_CHECKS);
-  return { higher: higher, entry: entry, combined: Math.round((higher + entry) / 2) };
+/* S64: エントリー足の確度・合算表示はユーザー要望により撤去。上位足の確度だけを使う。 */
+function higherConfidence(w) {
+  return checkConfidence(w.checksHigher || {}, MV_TF_CHECKS);
 }
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
@@ -3710,12 +3709,16 @@ function trendEntryChipHtml(w, tfKey) {
   const d = tfEntryDistance(w, tfKey);
   const hot = d !== null && d <= GV_ENTRY_RADIUS;
   const open = trendPanel && trendPanel.id === w.id && trendPanel.tfKey === tfKey;
+  /* S64: 確度（上位足の根拠達成度）をチップに常時表示。checksHigher はペア単位の値なので
+     どの足の🎯チップでも同じ%になる（w.tfHigher に対応する根拠の達成度という意味）。 */
+  const conf = higherConfidence(w);
   /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
      2要素にすると2段に折り返して巡回の縦スクロールが増える。
      幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
   const pct = d === null ? '' : '<span class="d">' + Math.round(d) + '%</span>';
-  const body = '🎯' + pct + '<span class="d">根拠</span>';
-  const title = d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%';
+  const body = '🎯' + pct + '<span class="d conf">確度' + conf + '%</span><span class="d">根拠</span>';
+  const title = (d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%') +
+    '／確度 ' + conf + '%';
   if (!MV_TREND_KEY_TO_TF[tfKey])
     return '<span class="tent' + (hot ? '' : ' muted') + '" title="' + esc(title) + '">' + body + '</span>';
   return '<button type="button" class="tent tent-btn' + (hot ? '' : ' muted') + (open ? ' open' : '') + '"' +
@@ -3772,10 +3775,10 @@ function trendPanelHtml(w) {
   if (!w.tfEntry) missing.push('エントリー足');
   if (!w.judge)   missing.push('判定');
 
-  /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。 */
-  const conf = setupConfidence(w);
-  const confHtml = '<div class="tp-conf">🎯 確度 上位足 ' + conf.higher + '% ／ エントリー足 ' +
-    conf.entry + '% ／ 合算 <b>' + conf.combined + '%</b></div>';
+  /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。
+     S64: エントリー足・合算の表示はユーザー要望により撤去し、上位足の確度だけを出す
+     （🔭一覧の行の🎯チップにも同じ値を表示するようになったため、ここは補足の位置づけ）。 */
+  const confHtml = '<div class="tp-conf">🎯 確度 <b>' + higherConfidence(w) + '%</b></div>';
 
   /* エントリー足の❶❷は方向に紐づくので、どちら目線で選択肢を出しているかを明示する。 */
   const side = mvEntrySide(w);
