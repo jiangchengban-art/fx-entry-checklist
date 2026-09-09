@@ -1595,26 +1595,30 @@ const MV_TF_CHECKS = mvNormalizeChecks([
      同期処理 mvGranvilleSyncField も併せて削除）。実際の波記録は w.trend[tf].granville のまま。 */
   /* S33: short は🔭一覧の根拠パネル用の短縮ラベル（2列を375pxでも維持するため）。
      省略した項目は label をそのまま使う。ボード表示・CSV列（k を使う）には影響しない。 */
-  /* S63: 確度スコアの重み（weight）。RCI・MACDは環境認識の核なので厚く、ラウンドナンバー・
-     ロールリバーサルは補助的な根拠なので薄くする（合計100）。weight を持たない項目は
-     checkConfidence 側で 1 として扱う（エントリー足は均等割りのまま）。 */
+  /* S63: 確度スコアの重み（weight）。RCI・MACDは環境認識の核なので厚く、ラウンドナンバーは
+     補助的な根拠なので薄くする。weight を持たない項目は checkConfidence 側で 1 として扱う
+     （エントリー足は均等割りのまま）。分母は残った項目の重み合計なので 100 ちょうどでなくてよい。
+     S65: ロールリバーサルはエントリー足の❸に移し、上位足からは撤去（重複確認だったため）。 */
   { k: 'rciShort',     label: 'RCI 短期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
   { k: 'rciMid',       label: 'RCI 中期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
   { k: 'rciLong',      label: 'RCI 長期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
   { k: 'macd',         label: 'MACD',             weight: 35, opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', weight: 10, opts: ['有', '❌'], short: 'ラウンド' },
-  { k: 'rollReversal', label: 'ロールリバーサル', weight: 10, opts: ['確認', '❌'], short: 'ロールRv' },
   /* S62: entryFibo はここ（上位足）から外し、エントリー足の❸専用にした（MV_ENTRY_CHECKS）。
      記録するのは「1波のどのフィボ水準で入ったか」なので、上位足に置いても意味を持たなかった。 */
 ]);
 
 /* S62: エントリー足で確認する根拠。上位足（MV_TF_CHECKS）とは別物で、実運用の
-   「❶ネックライン付近の反転形 → ❷5分足MA抜け（＝ここから1波）→ ❸1波のフィボとロールRvの重なり」
+   「❶ネックライン付近の反転形 → ❷5分足MA抜け（＝ここから1波）→ ❸ロールリバーサル確認・エントリーFibo」
    という確認の順番をそのまま項目にしてある。上位足の確度が高いことが前提の手順なので、
    グランビル・RCI・MACD といった上位足の環境認識項目はエントリー足では使わない。
    ⚠️ opts の要素に side を書くと、記録済みのトレンド方向に合う選択肢だけが出る（trendCheckCell）。
       向きの無い選択肢（❌・%）は side を持たせず常に出す。
-   S63: 「⏳待ち」はエントリー足の全項目から撤去（上位足のRCI/MACDと合わせて「待ち」概念自体を廃止）。 */
+   S63: 「⏳待ち」はエントリー足の全項目から撤去（上位足のRCI/MACDと合わせて「待ち」概念自体を廃止）。
+   S65: ❸は「フィボとロールRvの重なり」（fiboRoll）だったが、上位足のロールリバーサルが
+   重複確認になっていたため、上位足から削除しエントリー足のこの位置に一本化した。
+   キーは上位足と同じ rollReversal を使うが、保存先は checksHigher/checksEntry で分かれる
+   ので衝突しない。旧 fiboRoll の値（checksEntry.fiboRoll）は読み書きされないだけで無害。 */
 const MV_ENTRY_CHECKS = mvNormalizeChecks([
   { k: 'necklineForm', label: 'ネックライン反転形', short: '❶反転形',
     hint: '上位足のネックライン付近で、5分足に反転の形が出たか',
@@ -1632,9 +1636,9 @@ const MV_ENTRY_CHECKS = mvNormalizeChecks([
       { v: '下抜け', side: 'sell' },
       { v: '❌' },
     ] },
-  { k: 'fiboRoll', label: 'フィボ×ロールリバーサル', short: '❸重なり',
-    hint: '1波のフィボナッチとロールリバーサルが重なる箇所か',
-    opts: [{ v: '重なり有' }, { v: '重なり無' }, { v: '❌' }] },
+  { k: 'rollReversal', label: 'ロールリバーサル', short: '❸ロールRv',
+    hint: 'ブレイクした水準が支持線・抵抗帯として機能する兆候（ロールリバーサル）が出たか',
+    opts: [{ v: '確認' }, { v: '❌' }] },
   /* S38→S62: 実際に入ったフィボ水準。キー名は据え置き ── CSV列 en_entryFibo と
      📚振り返りの「エントリーFibo水準別の成績」（byFibo）がこの名前を見ているため。 */
   { k: 'entryFibo', label: 'エントリーFibo', short: '❸Fibo',

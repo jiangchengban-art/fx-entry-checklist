@@ -1,26 +1,28 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-09 (S63 complete)  
+**Last Updated:** 2026-09-09 (S65 complete)  
 **Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
 **Main Branch:** `master`  
-**Active Development Branch:** `claude/s63-session-start-inntq7` — S62+S63 work
+**Active Development Branch:** `claude/s63-test-updates-deploy-v7gfwi` — S64+S65 work
 
 ## Project Health
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Core Features | ✅ Complete | 🔭一覧・📚統計・⚙設定の3タブ完成 |
-| Testing | ✅ Passing | s62(48, pre-S63 definitions — needs update)+s44(64)+s43(35)+s42(45)+s60(17)+s59(31)+s55(15) all green. S63 verified via ad-hoc Playwright smoke test (definitions/weights/panel HTML). s40 has 2 known pre-existing failures (see Known Issues) |
+| Testing | ✅ Passing | s62(48, pre-S63/S65 definitions — needs update)+s44(64)+s43(35)+s42(45)+s60(17)+s59(31)+s55(15) all green. S63/S64/S65 verified via ad-hoc Playwright smoke tests only (no dedicated test files yet). s40 has 2 known pre-existing failures (see Known Issues) |
 | Data Model | ✅ Stable | localStorage `mochipoyo_*_v1` keys, Supabase JSONB sync |
 | Accessibility | ✅ OK | PWA-capable, iOS/Android responsive, dark/light theme |
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-63)
+## Recent Changes (S57-65)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
-| S63 | 根拠パネルの選択肢整理と確度スコアの重み付け | `granville`行を根拠パネルから撤去（🔭一覧行の🌊アイコンと重複のため）。RCI/MACDの⏳待ち、ラウンドナンバーの無、ロールリバーサルの未確認、エントリー足全項目の⏳待ちを撤去（「待ち」機能一式=`pairWaitCount`等も連鎖削除）。空欄ボタン（`—`）を撤去。`checkConfidence`に`weight`導入（上位足: RCI各15/MACD35/ラウンド10/ロールRv10=計100） |
+| S65 | エントリー足❸の「重なり」をロールリバーサル確認に置換 | `fiboRoll`（重なり有/重なり無/❌）を撤去し、上位足にあった`rollReversal`（確認/❌）をエントリー足❸に一本化。上位足からは`rollReversal`を削除（5分足確認と重複のため）。CSV: `hi_*`6→5列、`en_*`は`en_fiboRoll`→`en_rollReversal` |
+| S64 | 確度%を🔭一覧の🎯チップに表示、パネルのエントリー足/合算表示を撤去 | `trendEntryChipHtml()`に上位足確度%を追加。`.tp-conf`はエントリー足・合算を撤去し上位足のみに。`setupConfidence()`→`higherConfidence()` |
+| S63 | 根拠パネルの選択肢整理と確度スコアの重み付け | `granville`行を根拠パネルから撤去（🔭一覧行の🌊アイコンと重複のため）。RCI/MACDの⏳待ち、ラウンドナンバーの無、ロールリバーサルの未確認、エントリー足全項目の⏳待ちを撤去（「待ち」機能一式=`pairWaitCount`等も連鎖削除）。空欄ボタン（`—`）を撤去。`checkConfidence`に`weight`導入（上位足: RCI各15/MACD35/ラウンド10/ロールRv10=計100、S65でロールRvを外し分母90に変更） |
 | S62 | エントリー足の根拠を3ステップ確認フローに全面置換 | `MV_ENTRY_CHECKS`（❶反転形／❷MA抜け／❸重なり／❸Fibo）を新設。方向で選択肢を絞り、方向反転で矛盾する記録だけ自動クリア。パネルは縦2セクションに |
 | S60 | GO/圏内/待ち/未更新のタップ箇所重複を解消 | サマリータイルを`<button>`化しフィルタを兼務、ツールバーの同名4ボタンを削除、ツールバー1行に再統合 |
 | S59 | 🔭一覧上部を巡回実運用に合わせて再整理 | 説明文圧縮・5タイルペア単位統一・ツールバー2行分割・CSS色バグ修正 |
@@ -37,7 +39,7 @@ index.html (単一ファイル)
   └─ JS: localStorage (主体) ↔ Supabase (補助・複数端末同期)
 
 sw.js (キャッシュ制御、S28〜)
-  └─ v34: network-first HTML / cache-first assets / cross-origin素通し
+  └─ v36: network-first HTML / cache-first assets / cross-origin素通し
 
 manifest.webmanifest + icon-*.png (PWA)
   └─ iOS7日削除回避の唯一の方法
@@ -77,9 +79,11 @@ docs/
 **S51-56:** ボード廃止・決済モーダル廃止・1H追加・同期強化  
 **S57-60:** 手動GOフラグ・一覧上部整理・タップ箇所重複解消  
 **S62:** エントリー足を3ステップ確認フローに置換（上位足とは別の項目セットへ）  
-**S63:** 根拠パネルの選択肢整理（granville撤去・待ち系撤去・空欄ボタン撤去）＋確度スコアの重み付け
+**S63:** 根拠パネルの選択肢整理（granville撤去・待ち系撤去・空欄ボタン撤去）＋確度スコアの重み付け  
+**S64:** 確度%を🎯チップに表示、パネルのエントリー足/合算表示を撤去  
+**S65:** エントリー足❸の「重なり」をロールリバーサル確認に置換、上位足からロールリバーサルを撤去
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-63 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-65 統合）」テーブルを参照。
 ※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
@@ -88,7 +92,8 @@ docs/
 - [ ] `git log --oneline -3` でローカルとリモートの一致を確認
 - [ ] s40-test.mjs の既知2件（S45のミニ波形撤去に伴う期待値更新漏れ）を直すか判断
 - [ ] `GV_ENTRY_RADIUS` の実運用チューニング（S51以来の据え置き候補）
-- [ ] s62-test.mjs を S63 の変更（granville行撤去・待ち系撤去・空欄ボタン撤去・weight導入）に合わせて更新する（現状はS62時点の定義を前提にしたまま）
+- [ ] **s62-test.mjs を S63〜S65 の変更に合わせて更新する**（granville行撤去・待ち系撤去・空欄ボタン撤去・weight導入・S65の`fiboRoll`→`rollReversal`置換、`en_rollReversal`/`hi_*`×5 の期待値も含む。現状はS62時点の定義を前提にしたまま）
+- [ ] s44-test.mjs / s40-test.mjs で `pairWaitCount`/`trendWaitBadgeHtml` 参照が残っていないか確認（S63で削除済み関数）
 
 ## ⚠️ 複数環境運用時の注意（S60で発生した教訓）
 
@@ -113,4 +118,4 @@ S60セッション開始時、Windowsローカルのmasterが3セッション分
 
 ---
 
-For comprehensive details on features, data models, implementation notes, and architectural decisions, see **CLAUDE.md** (684 lines, the authoritative spec).
+For comprehensive details on features, data models, implementation notes, and architectural decisions, see **CLAUDE.md** (748 lines, the authoritative spec).
