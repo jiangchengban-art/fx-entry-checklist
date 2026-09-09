@@ -1024,9 +1024,11 @@
     .tp-sec .tp-fixed, .tp-sec select.tp-cell { min-width: 84px; }
     #trendGvModal .modal-actions { flex-wrap: wrap; }
     #trendGvModal .modal-actions button { white-space: nowrap; }
-    /* 375px では 🎯 だけ残す（距離と「根拠」は title で読める）。入力行を1段に保つため。 */
+    /* 375px では 🎯＋確度だけ残す（距離と「根拠」の文字は title で読める）。入力行を1段に保つため。
+       S70: 確度（.conf）はタップせずカードをスライドするだけで見えることが目的なので、
+       ここでは畳まない（畳むのは距離%と「根拠」の文字だけ）。 */
     .tent { padding: 3px 6px; }
-    .tent .d { display: none; }
+    .tent .d:not(.conf) { display: none; }
     /* S40: 図はタップ面なので、狭い画面ほど大きく取る（正確に指せることを優先）。 */
     .gv-fig { max-width: calc(52vh * var(--gv-ar-num, 1.773)); }
     .gv-marker { width: 30px; height: 30px; }
@@ -3801,8 +3803,11 @@ function trendEntryChipHtml(w, tfKey) {
   /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
      2要素にすると2段に折り返して巡回の縦スクロールが増える。
      幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
+  /* S70: 確度は「タップしてプルダウンを開かなくても、カードをスライドするだけで見える」
+     ことが目的（ユーザー要望）。375px 幅でも .conf だけは畳まない（CSS 側で除外）。
+     幅を取る「確度」の文字は省き、数値のみ（🎯61%）にして横幅を切り詰める。 */
   const pct = d === null ? '' : '<span class="d">' + Math.round(d) + '%</span>';
-  const body = '🎯' + pct + '<span class="d conf">確度' + conf + '%</span><span class="d">根拠</span>';
+  const body = '🎯' + pct + '<span class="d conf">' + conf + '%</span><span class="d">根拠</span>';
   const title = (d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%') +
     '／確度 ' + conf + '%';
   if (!MV_TREND_KEY_TO_TF[tfKey])
