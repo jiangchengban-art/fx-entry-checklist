@@ -1193,6 +1193,7 @@
     <div class="basis-rr" id="fiboStats"></div>
     <div class="basis-rr" id="resultTagStats"></div>
     <div class="basis-rr" id="beTouchStats"></div>
+    <div class="basis-rr" id="alertLagStats"></div>
     <div class="basis-rr" id="mvAlertStats"></div>
   </section>
 
@@ -2593,6 +2594,32 @@ function renderStats() {
           '</div>').join('')
       : '<div class="empty-state">建値タッチの記録がまだありません。</div>');
 
+  /* ---- アラート発生からエントリーまでの経過時間（S69） ----
+     手法上「鳴ったら即エントリー」ではなく、値動き・インジケーターを見て判断してからエントリーする
+     運用のため、判断にかけている時間の平均を可視化する。フォームの手入力
+     manualAlertAt（アラート発生日時）と datetime（エントリー日時）の差分。
+     ⚠️ 判定=エントリーのトレードのみ対象（見送り・保留は経過時間の概念が無い）。
+     manualAlertAt 未入力、または datetime より後（入力ミス）のものは母数から除外する。 */
+  const lagMins = trades
+    .filter(t => t.result === 'entered' && t.manualAlertAt && t.datetime)
+    .map(t => (new Date(t.datetime) - new Date(t.manualAlertAt)) / 60000)
+    .filter(m => Number.isFinite(m) && m >= 0);
+  const fmtLag = m => m < 60 ? Math.round(m) + '分' :
+    (Math.floor(m / 60) + '時間' + (Math.round(m % 60) ? Math.round(m % 60) + '分' : ''));
+  document.getElementById('alertLagStats').innerHTML =
+    '<h3>アラート〜エントリーの経過時間</h3>' + (lagMins.length
+      ? '<div class="row">' +
+          '<span class="name">平均</span>' +
+          '<span class="n">' + lagMins.length + '件</span>' +
+          '<span class="rr">' + fmtLag(mean(lagMins)) + '</span>' +
+        '</div>' +
+        '<div class="row">' +
+          '<span class="name">最短 〜 最長</span>' +
+          '<span class="n"></span>' +
+          '<span class="rr">' + fmtLag(Math.min(...lagMins)) + ' 〜 ' + fmtLag(Math.max(...lagMins)) + '</span>' +
+        '</div>'
+      : '<div class="empty-state">フォームの「アラート発生日時」を入力したエントリー記録がまだありません。</div>');
+
   renderMvAlertStats();
 }
 
@@ -2641,6 +2668,13 @@ function fmtDatetime(v) {
   const pad = n => String(n).padStart(2, '0');
   return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) +
     ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+/* 🔭一覧カードの常時表示用（S69）。年は省略し「MM/DD HH:MM」の1行に収める。 */
+function fmtDatetimeShort(v) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
 function renderList() {
@@ -3720,6 +3754,16 @@ function trendAlertBadgesHtml(w) {
     ' data-mv-alert-toggle="' + esc(w.id) + '" data-tf="' + t.k + '" title="' + t.full + 'のアラート発生">' +
     t.label + '</button>').join('');
 }
+/* S69: ONのアラートが何月何日の何時に発生したかをバッジの下に常時表示する。
+   手法上「鳴った瞬間にすぐ入る」わけではなく、その後の値動きを見て判断するため、
+   いつ鳴ったかを一目で確認できることが重要（ユーザー要望）。OFFの足・未発生の足は出さない。 */
+function trendAlertTimesHtml(w) {
+  const alerts = w.alerts || {};
+  const items = MV_ALERT_TFS
+    .filter(t => alerts[t.k] && alerts[t.k].on && alerts[t.k].at)
+    .map(t => '<span class="item">' + esc(t.label) + ' ' + esc(fmtDatetimeShort(alerts[t.k].at)) + '</span>');
+  return items.length ? '<div class="mv-alert-times">' + items.join('') + '</div>' : '';
+}
 /* S58: 手動GOフラグ。ペア名の直後に置き、巡回中いつでも1タップで印を付けられる。
    エントリー圏（pairEntryDistance）とは独立の主観判断。ONのペアは一覧の最上位「🚩 GO」にまとまる。 */
 function trendGoBtnHtml(w) {
@@ -3906,7 +3950,7 @@ function trendItemHtml(w) {
         ' title="このペアのデータを完全に削除（元に戻せません）">🗑</button>' +
       '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
         ' title="このペアを選択して記録フォームへ">→</button>' +
-    '</div>' + tfRows + panel +
+    '</div>' + trendAlertTimesHtml(w) + tfRows + panel +
   '</div>';
 }
 
