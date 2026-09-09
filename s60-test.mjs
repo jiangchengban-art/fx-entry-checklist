@@ -1,8 +1,10 @@
 /**
  * S60: サマリータイルがタップ可能なフィルタボタンになり、ツールバーの重複4ボタンを撤去
+ * S67で「圏内」タイルは撤去（並び順がエントリー圏距離順→アラート発生時刻順に置換されたため）、
+ * S63で「待ち」タイルも撤去済みなので、現行仕様（GO/未更新の2タイル）に合わせて更新。
  *
  * テスト対象:
- * ① サマリーに4つのボタン（GO/圏内/待ち/未更新）が出ている
+ * ① サマリーに2つのボタン（GO/未更新）が出ている
  * ② ツールバーに絞り込みボタン（GOのみ/エントリー圏のみ等）がない
  * ③ サマリータイルをタップするとフィルタが効く
  * ④ フィルタON状態は outline で可視化される
@@ -25,18 +27,14 @@ test('①-1: サマリータイルに「GO」ボタンが出ている', async (p
   return exists && txt.includes('🚩 GO') ? 'PASS' : `FAIL: count=${await btn.count()}, text=${txt}`;
 });
 
-test('①-2: サマリータイルに「圏内」ボタンが出ている', async (page) => {
+test('①-2: サマリータイルに「圏内」ボタンが無い（S67で撤去）', async (page) => {
   const btn = page.locator('.trend-summary [data-trend-summary-filter="hot"]');
-  const exists = await btn.count() === 1;
-  const txt = await btn.textContent();
-  return exists && txt.includes('🎯 圏内') ? 'PASS' : `FAIL: count=${await btn.count()}, text=${txt}`;
+  return await btn.count() === 0 ? 'PASS' : `FAIL: element still exists`;
 });
 
-test('①-3: サマリータイルに「待ち」ボタンが出ている', async (page) => {
+test('①-3: サマリータイルに「待ち」ボタンが無い（S63で撤去）', async (page) => {
   const btn = page.locator('.trend-summary [data-trend-summary-filter="wait"]');
-  const exists = await btn.count() === 1;
-  const txt = await btn.textContent();
-  return exists && txt.includes('⏳ 待ち') ? 'PASS' : `FAIL: count=${await btn.count()}, text=${txt}`;
+  return await btn.count() === 0 ? 'PASS' : `FAIL: element still exists`;
 });
 
 test('①-4: サマリータイルに「未更新」ボタンが出ている', async (page) => {
@@ -46,11 +44,11 @@ test('①-4: サマリータイルに「未更新」ボタンが出ている', a
   return exists && txt.includes('🕐 未更新') ? 'PASS' : `FAIL: count=${await btn.count()}, text=${txt}`;
 });
 
-test('①-5: サマリータイルの4つはすべて <button> タグである', async (page) => {
+test('①-5: サマリータイルの2つはすべて <button> タグである', async (page) => {
   const buttons = page.locator('.trend-summary [data-trend-summary-filter]');
   const count = await buttons.count();
   const tagNames = await buttons.evaluateAll(els => els.map(e => e.tagName));
-  return count === 4 && tagNames.every(t => t === 'BUTTON')
+  return count === 2 && tagNames.every(t => t === 'BUTTON')
     ? 'PASS' : `FAIL: count=${count}, tags=${tagNames}`;
 });
 
@@ -92,7 +90,7 @@ test('③-1: サマリータイルをタップするとフィルタ状態が変�
 });
 
 test('③-2: サマリータイルの outline が付く（フィルタON状態の表現）', async (page) => {
-  const btn = page.locator('.trend-summary [data-trend-summary-filter="hot"]');
+  const btn = page.locator('.trend-summary [data-trend-summary-filter="go"]');
   const hasOutlineBefore = await btn.evaluate(el => getComputedStyle(el).outlineStyle !== 'none');
   await btn.click();
   const hasOutlineAfter = await btn.evaluate(el => getComputedStyle(el).outlineStyle !== 'none');
@@ -100,7 +98,10 @@ test('③-2: サマリータイルの outline が付く（フィルタON状態�
 });
 
 test('③-3: サマリータイルをもう一度タップするとフィルタが外れる（ON/OFF トグル）', async (page) => {
-  const btn = page.locator('.trend-summary [data-trend-summary-filter="wait"]');
+  const btn = page.locator('.trend-summary [data-trend-summary-filter="go"]');
+  /* S67: 残るタイルがGO/未更新の2つだけになったため、前のテスト（③-2）と同じ「GO」を
+     再利用する。前のテストの状態（ON/OFF）に依存しないよう、まずOFFへ揃える。 */
+  if (await btn.evaluate(el => el.classList.contains('on'))) await btn.click();
   await btn.click();
   const hasOutlineAfterFirst = await btn.evaluate(el => getComputedStyle(el).outlineStyle !== 'none');
   await btn.click();
@@ -116,7 +117,7 @@ test('④-1: サマリーと新ツールバーが視覚的に別グループに�
 });
 
 test('④-2: サマリータイルの .on クラスは renderTrendSummary で再計算される', async (page) => {
-  // 前のテスト（③-3）で「待ち」がON状態なので、ここではまず全フィルタをOFFにする
+  // 前のテスト（③-3）の状態が残っている可能性があるので、ここではまず全フィルタをOFFにする
   const allBtns = page.locator('.trend-summary [data-trend-summary-filter]');
   for (let i = 0; i < await allBtns.count(); i++) {
     const btn = allBtns.nth(i);
@@ -124,12 +125,12 @@ test('④-2: サマリータイルの .on クラスは renderTrendSummary で再
     if (isOn) await btn.click();
     await page.waitForTimeout(50);
   }
-  // 「圏内」を新規でONにする
-  const hot = page.locator('.trend-summary [data-trend-summary-filter="hot"]');
-  const onBefore = await hot.evaluate(el => el.classList.contains('on'));
-  await hot.click();
+  // 「未更新」を新規でONにする
+  const stale = page.locator('.trend-summary [data-trend-summary-filter="stale"]');
+  const onBefore = await stale.evaluate(el => el.classList.contains('on'));
+  await stale.click();
   await page.waitForTimeout(100);
-  const onAfter = await hot.evaluate(el => el.classList.contains('on'));
+  const onAfter = await stale.evaluate(el => el.classList.contains('on'));
   return !onBefore && onAfter ? 'PASS' : `FAIL: before=${onBefore}, after=${onAfter}`;
 });
 
@@ -140,9 +141,10 @@ test('⑤-1: ツールバーは1行に圧縮されている（2行ではない�
 });
 
 test('⑤-2: ツールバーに「表示する足」と「波マップ」が含まれている', async (page) => {
+  /* S67: 「並び順」ラベルが増えたので .trend-tf-label は2つになる（並び順・表示する足）。 */
   const tf = page.locator('.trend-tf-label');
   const map = page.locator('#trendMapOpen');
-  return await tf.count() === 1 && await map.count() === 1
+  return await tf.count() === 2 && await map.count() === 1
     ? 'PASS' : `FAIL: tfLabel=${await tf.count()}, mapOpen=${await map.count()}`;
 });
 

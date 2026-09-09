@@ -272,7 +272,7 @@ console.log('\n[8] マップと絞り込みの連動');
   const page = await newPage({
     [MARKET]: {
       pairs: [
-        /* 買②のアンカー付近をタップ＝エントリー圏内 */
+        /* 買②のアンカー付近をタップ＝エントリー圏内（波マップの .hot 強調用） */
         mkPair('w1', 'USDJPY', { trend: { d: { state: 'up', zone: 'green', granville: '2', wpos: '36.0,70.0' } } }),
         /* 買① は SETUP_GO_WAVES 外なので圏外 */
         mkPair('w2', 'EURUSD', { trend: { d: { state: 'up', zone: 'green', granville: '1', wpos: '20.0,85.0' } } }),
@@ -286,10 +286,19 @@ console.log('\n[8] マップと絞り込みの連動');
   await page.click('[data-map-tf="d"]');
   eq('絞り込みなしでは2件', await page.locator('#trendMapDots .gv-dot').count(), 2);
   await page.click('#trendMapClose');
-  await page.click('[data-trend-summary-filter="hot"]');            /* S44: 🎯 エントリー圏のみ */
+  /* S67: 一覧の「🎯エントリー圏のみ」絞り込みはエントリー圏並び順の廃止に伴い撤去されたため、
+     共有絞り込み（trendApplyFilters）の連動確認は代わりに「🚩GOのみ」で行う。 */
+  await page.evaluate(id => {
+    const data = JSON.parse(localStorage.getItem('mochipoyo_market_view_v1'));
+    data.pairs.find(p => p.id === id).go = true;
+    localStorage.setItem('mochipoyo_market_view_v1', JSON.stringify(data));
+  }, 'w1');
+  await page.reload();
+  await page.click('[data-tab="trend"]');
+  await page.click('[data-trend-summary-filter="go"]');
   await page.click('#trendMapOpen');
   await page.click('[data-map-tf="d"]');
-  eq('エントリー圏のみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
+  eq('GOのみで1件に絞られる', await page.locator('#trendMapDots .gv-dot').count(), 1);
   ok('残るのは圏内のペア', await page.locator('#trendMapDots .gv-dot.hot').count() === 1);
   await page.context().close();
 }

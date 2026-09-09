@@ -1,9 +1,11 @@
 /* セッション44 検証：GO / WAIT / NO / RD 判定の全廃と、エントリー圏を軸にした 🔭一覧
      - 判定バッジ・グループ見出し・判定タイル・ボードのバッジがどこにも無い
-     - 並び順が「エントリー圏に近い順」になる（記録の無いペアは下）
-     - 圏内の足にだけ 🎯 と根拠パネルを開くボタンが出る
+     - 🎯 は圏内・圏外を問わず常時表示され、根拠パネルを開くボタンとして機能する
      - 根拠パネルは押した足がそのまま上位足になる
      - ピッカーから8ボタンと「売買8つすべて表示」が消え、読み取り表示が圏との距離になる
+   S67 で①③のテストを更新：一覧の並び順は「エントリー圏に近い順」から
+   「選択した時間足のアラート発生時刻順」に置き換わり、サマリーの「🎯圏内」「巡回」
+   タイルは撤去された（pairEntryDistance 自体は波マップ・🎯チップの色分けで存続）。
    s40/s42/s43-test.mjs と同じ file:// ＋ localStorage 直注入の型。 */
 import { chromium } from 'playwright';
 import path from 'path';
@@ -113,10 +115,11 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
   const summary = await page.textContent('#trendSummary');
   ok('サマリーに GO/WAIT/NO タイルが無い  [' + summary.slice(0, 40) + ']',
      !/🟢|🟡|⚪/.test(summary));
-  ok('代わりに 🎯 圏内タイルが出る', summary.includes('🎯 圏内'));
-  /* S60: 絞り込みの起点はツールバーの専用ボタンからサマリータイル自体に統合された */
-  eq('圏内タイルがそのまま絞り込みボタンになっている',
-     await page.locator('[data-trend-summary-filter="hot"]').count(), 1);
+  /* S67: 「🎯圏内」「巡回」タイルはエントリー圏並び順の廃止（アラート発生時刻順への
+     置き換え）に伴い撤去された。 */
+  ok('🎯圏内タイルは無い  [' + summary.slice(0, 40) + ']', !summary.includes('圏内'));
+  ok('巡回タイルは無い', !summary.includes('巡回'));
+  eq('圏内フィルタボタンも無い', await page.locator('[data-trend-summary-filter="hot"]').count(), 0);
 
   /* S55: 🎯タブ自体が廃止されたので、ボードにバッジが残っていないことはタブ不在で証明される */
   eq('🎯トレードタブ自体が存在しない', await page.locator('[data-tab="trade"]').count(), 0);
@@ -124,14 +127,14 @@ console.log('\n[①] GO / WAIT / NO / RD が UI から消えている');
 }
 
 /* ═════════════════════════════════════════════════════════
-   ② S58: 手動GOフラグが最上位グループに来る（エントリー圏の自動距離とは独立）
+   ② S58: 手動GOフラグが最上位グループに来る（並び順の自動基準とは独立）
    ═════════════════════════════════════════════════════════ */
 console.log('\n[②] 手動GOフラグは最上位グループ・独立の絞り込みになる');
 {
   const page = await newPage({
     [MARKET]: {
       pairs: [
-        mkPair('w1', 'USDJPY', upAt('2', pos(IN))),   // 圏内・GO無し
+        mkPair('w1', 'USDJPY', upAt('2', pos(IN))),   // GO無し
         mkPair('w2', 'EURUSD', {}),                    // 未記録・GO無し
       ],
       snapshots: [], judgeLog: [],
@@ -142,9 +145,9 @@ console.log('\n[②] 手動GOフラグは最上位グループ・独立の絞り
   await page.click('[data-trend-item="w2"] [data-trend-go]');
   eq('GOグループが現れる', await page.locator('.trend-group-head.go').count(), 1);
   const order = await page.locator('[data-trend-item]').evaluateAll(els => els.map(e => e.dataset.trendItem));
-  eq('圏外でもGOを付けたw2が圏内のw1より先頭に来る', order[0], 'w2');
+  eq('GOを付けたw2がw1より先頭に来る', order[0], 'w2');
   await page.click('[data-trend-summary-filter="go"]');
-  eq('GOのみ絞り込みで圏内のw1が消える', await page.locator('[data-trend-item="w1"]').count(), 0);
+  eq('GOのみ絞り込みでw1が消える', await page.locator('[data-trend-item="w1"]').count(), 0);
   eq('GO付きのw2は残る', await page.locator('[data-trend-item="w2"]').count(), 1);
   await page.click('[data-trend-item="w2"] [data-trend-go]');
   eq('再タップで解除するとGOのみ絞り込みで0件になる', await page.locator('[data-trend-item]').count(), 0);
@@ -152,47 +155,46 @@ console.log('\n[②] 手動GOフラグは最上位グループ・独立の絞り
 }
 
 /* ═════════════════════════════════════════════════════════
-   ③ 並び順＝エントリー圏に近い順
+   ③ S67: 並び順＝選択した時間足のアラート発生時刻順（エントリー圏距離順を置換）
    ═════════════════════════════════════════════════════════ */
-console.log('\n[③] エントリー圏に近い順に並ぶ');
+console.log('\n[③] 並び順＝アラート発生時刻順（新しい順）、カード連動で基準足を切替');
 {
-  /* 買②のアンカーからそれぞれ 0 / 5 / 圏外 の距離に置く */
-  const near = pos(IN);
-  const mid = (IN[0] + 5).toFixed(1) + ',' + IN[1].toFixed(1);
+  const older = new Date(Date.now() - 3600000).toISOString();
+  const newer = new Date().toISOString();
   const page = await newPage({
     [MARKET]: {
       pairs: [
-        /* 名前順なら ZZZ が最後だが、距離0なので先頭に来なければならない */
-        mkPair('w1', 'ZZZTEST', upAt('2', near)),
-        mkPair('w2', 'AAATEST', upAt('2', mid)),
-        mkPair('w3', 'MMMTEST', upAt('1', pos(OUT))),   /* 圏外 */
+        /* 名前順なら ZZZ が最後だが、1H アラートが一番新しいので先頭に来なければならない */
+        mkPair('w1', 'ZZZTEST', { alerts: { h1: { on: true, at: newer, chAt: newer } } }),
+        mkPair('w2', 'AAATEST', { alerts: { h1: { on: true, at: older, chAt: older } } }),
+        mkPair('w3', 'MMMTEST', {}),   /* アラート無し＝末尾 */
       ],
       snapshots: [], judgeLog: [],
     },
   }, { width: 900, height: 950 });
   await page.click('[data-tab="trend"]');
-  const order = await page.locator('.trend-item .pair').evaluateAll(
+  eq('1H既定でアラートが新しい順（名前順ではない）',
+     (await page.locator('.trend-item .pair').evaluateAll(
+       els => els.map(e => e.textContent).filter(t => t.endsWith('TEST')))),
+     ['ZZZTEST', 'AAATEST', 'MMMTEST']);
+
+  eq('旧「🎯 エントリー圏」の見出しはもう出ない', await page.locator('.trend-group-head').count(), 0);
+  eq('ツールバーに並び順ボタン（1H/4H/D/W）が出る',
+     await page.locator('[data-trend-sort-tf]').count(), 4);
+  eq('既定は1Hが選択されている', await page.locator('[data-trend-sort-tf="h1"].on').count(), 1);
+
+  /* w2 の4時間足に一番新しいアラートを立て、カード上のバッジをタップすると
+     ツールバーの基準表示も4Hに切り替わり、w2が先頭に来る（S67の要件）。 */
+  await page.click('[data-trend-item="w2"] [data-mv-alert-toggle][data-tf="h4"]');
+  eq('カードのバッジタップでツールバーの基準も4Hに切り替わる',
+     await page.locator('[data-trend-sort-tf="h4"].on').count(), 1);
+  const order2 = await page.locator('.trend-item .pair').evaluateAll(
     els => els.map(e => e.textContent).filter(t => t.endsWith('TEST')));
-  eq('距離の近い順（名前順ではない）', order, ['ZZZTEST', 'AAATEST', 'MMMTEST']);
+  eq('4H基準でAAATESTが先頭に来る', order2[0], 'AAATEST');
 
-  const heads = await page.locator('.trend-group-head').evaluateAll(els => els.map(e => e.textContent));
-  ok('🎯 エントリー圏の見出しが先頭に出る  [' + heads[0] + ']', heads[0].includes('🎯 エントリー圏'));
-  ok('圏内の件数が見出しに入る', heads[0].includes('2'));
-  ok('圏外は「その他」でまとまる', heads.some(h => h.includes('その他')));
-
-  /* 記録の無いプリセット28銘柄は必ず圏内グループより後ろ。
-     S48: 🎯 は常時表示になったので「.tent の有無」では判別できない。
-     グランビル未記録＝波を一度もタップ/選択していない行で判定する。 */
-  const firstNoRecord = await page.locator('.trend-item').evaluateAll(els =>
-    els.findIndex(e => !e.querySelector('.tgv.on')));
-  ok('記録の無いペアは圏内より後ろ  [index ' + firstNoRecord + ']', firstNoRecord >= 2);
-
-  /* 絞り込み */
-  await page.click('[data-trend-summary-filter="hot"]');
-  eq('🎯 のみで圏内の2件だけになる', await page.locator('.trend-item').count(), 2);
-  ok('ボタンに .on が付く', await page.locator('[data-trend-summary-filter="hot"].on').count() === 1);
-  await page.click('[data-trend-summary-filter="hot"]');
-  ok('もう一度押すと戻る', await page.locator('.trend-item').count() > 2);
+  /* ツールバーのボタンからも直接切り替えられる */
+  await page.click('[data-trend-sort-tf="h1"]');
+  eq('ツールバーのボタンで1Hに戻せる', await page.locator('[data-trend-sort-tf="h1"].on').count(), 1);
   await page.context().close();
 }
 

@@ -1210,18 +1210,21 @@
   <!-- ============ 🔭 トレンド一覧（監視ペア横断） ============ -->
   <section class="card tab-panel" id="tabPanel-trend">
     <h2>🔭 トレンド一覧</h2>
-    <div class="section-note">チャート巡回用の画面です。足ごとに<strong>方向・EMAゾーン・波</strong>をその場でタップ記録します。並び順は<strong>エントリー圏（買②③/売②③）に近い順</strong>、🚩 GO を立てたペアは常に最上位です。</div>
+    <div class="section-note">チャート巡回用の画面です。足ごとに<strong>方向・EMAゾーン・波</strong>をその場でタップ記録します。並び順は<strong>選んだ足でアラートが発生した日時が新しい順</strong>、🚩 GO を立てたペアは常に最上位です。</div>
     <details class="trend-help">
       <summary>📖 使い方をひらく</summary>
       <div class="trend-help-body">
         <strong>波のチップ</strong>を押すとグランビルの図が開くので、<strong>今のローソク足の位置を図の上で直接タップ</strong>してください（最寄りの波が自動で決まり、位置そのものも残ります）。<br>
         <strong>GOボタン</strong>は近々エントリーが近いと自分で判断したペアに立てる手動の目印で、解除するまで残ります（🧹巡回記録クリアでも消えません）。<br>
+        <strong>並び順</strong>はツールバーの1H/4H/D/Wボタン、またはカード上のアラートバッジをタップして切り替えられます（タップした足のアラート発生時刻が新しい順になります）。<br>
         記録した波の位置は <strong>🗺 波マップ</strong>で全通貨まとめて見られます。<br>
         🕐鮮度は12時間で「1回抜けた」、36時間で「1日抜けた」の目安です。
       </div>
     </details>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
+      <span class="trend-tf-label">並び順</span>
+      <span class="trend-tf-toggles" id="trendSortToggles"></span>
       <select class="trend-category-select" id="trendCategorySelect"></select>
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
@@ -1550,10 +1553,12 @@ function gvEntryDistance(x, y) {
   return best;
 }
 
-/* S44: ペアが「チャンスにどれだけ近いか」。小さいほど上に並ぶ（記録が無ければ Infinity）。
-   GO / WAIT / NO の3段階ラベルを置き換える連続量で、S32 と同じく w には一切保存しない導出。
+/* S44: ペアが「チャンスにどれだけ近いか」。小さいほど圏内に近い（記録が無ければ Infinity）。
+   GO / WAIT / NO の3段階ラベルを置き換えた連続量で、S32 と同じく w には一切保存しない導出。
+   S67: 一覧の並び順そのものはアラート発生時刻順（trendSortTf）に置き換わったが、
+   この関数自体は波マップの色分けと🎯根拠ボタンの圏内強調（trendEntryChipHtml）で使い続ける。
    ⚠️ 見るのは MV_TREND_DEFAULT_TFS（1時間足・4時間足・日足、S57で1H追加）だけ。週足・月足は表示トグルで
-      出入りするので、混ぜると「表示を切り替えただけで並び順が飛ぶ」。
+      出入りするので、混ぜると「表示を切り替えただけで圏内判定が飛ぶ」。
    ⚠️ 概算（ボタンで選んだだけ＝wpos が空）は数えない。概算の座標はアンカーそのもので距離0になり、
       買②③/売②③を選んだ全件が無条件で最上位に来てしまう（S43 の圏内判定と同じ理由）。
    方向と逆 side の波は mvWriteTrend() が自動で消すので、ここで side を見る必要はない。 */
@@ -1723,10 +1728,12 @@ const MV_TREND_TFS = [
   { k: 'w',  label: '週足',    short: '週', optional: true },
   { k: 'mn', label: '月足',    short: '月', optional: true },
 ];
-/* ⚠️ 並び順・サマリーの主軸はこの3足（S57で1時間足を追加）。週足・月足は表示トグルで出入りするため、
-   主軸に入れると「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
+/* ⚠️ 波マップ・🎯根拠ボタンの色分け（pairEntryDistance()）が主軸にするのはこの3足
+   （S57で1時間足を追加）。週足・月足は表示トグルで出入りするため、主軸に入れると
+   「表示を切り替えただけでペアがグループ間を飛ぶ」ことになる。
    また記録済み全足を必須にすると、月足が未記録なだけで全ペアが最上位から落ちる（初日は必ずそうなる）。
-   S44: pairEntryDistance()（並び順とサマリーの 🎯 圏内）が見るのもこの3足だけ。行に出る
+   S67: 一覧の並び順自体はアラート発生時刻順（trendSortTf）に置き換わったが、
+   pairEntryDistance() 自体は波マップ・🎯チップの圏内判定で使い続けるので見るのはこの3足だけ。行に出る
    🎯 チップは足ごとなので週足・月足でも出るが、ペアの順位は動かさない。 */
 const MV_TREND_DEFAULT_TFS = MV_TREND_TFS.filter(t => !t.optional);
 
@@ -3480,6 +3487,10 @@ function mvToggleAlert(watchId, tfKey) {
   const chAt = new Date().toISOString();
   w.alerts[tfKey] = cur.on ? { on: false, at: '', chAt } : { on: true, at: chAt, chAt };
   if (!saveMarket(data)) return;
+  /* S67: カード上のアラートバッジをタップした瞬間、一覧の並び順の基準もその足に切り替える
+     （ユーザー要望「通貨カードのアラート鳴った足のタップと連動」）。ON/OFFどちらのタップでも、
+     今その足を見ている＝その足を基準に一覧を見たい、とみなして切り替える。 */
+  trendSortTf = tfKey;
   renderMarket();
   renderTrendList();
 }
@@ -3603,16 +3614,22 @@ document.getElementById('mvDeleteConfirm').addEventListener('click', () => {
 const trendListEl    = document.getElementById('trendList');
 const trendSummaryEl = document.getElementById('trendSummary');
 const trendTfBar     = document.getElementById('trendTfToggles');
+const trendSortToggles = document.getElementById('trendSortToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 
-/* S44: 「エントリー圏のみ」の絞り込み。永続化しない。
-   S60: 絞り込みボタンはツールバーから撤去し、サマリータイル（#trendSummary 内の
+/* S60: 絞り込みボタンはツールバーから撤去し、サマリータイル（#trendSummary 内の
    [data-trend-summary-filter]）がフィルタON/OFFを兼ねる。サマリーとツールバーに
-   同じラベルの押せる要素が2箇所並んで紛らわしいというユーザー指摘への対応。 */
-let trendEntryOnly   = false;
+   同じラベルの押せる要素が2箇所並んで紛らわしいというユーザー指摘への対応。
+   S67: 「🎯エントリー圏のみ」絞り込み（trendEntryOnly）はエントリー圏並び順の廃止に伴い撤去。 */
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 let trendGoOnly      = false; // S58: 「🚩GOのみ」の絞り込み（w.go）。永続化しない
+/* S67: 並び順の基準時間足。GO/WAIT/NO→S44でエントリー圏距離順→S67でアラート発生時刻順、
+   と実運用フローの変化に合わせて置き換えた。選んだ足でアラートが発生した日時の新しい順に
+   並べる（アラート＝チャンス到来のシグナルなので、直近で鳴ったものを最優先で見る）。
+   カード上のアラートバッジをタップした瞬間にもこの値へ切り替わる（mvToggleAlert 内）。
+   永続化しない（巡回中の一時的な視点切り替えのため）。 */
+let trendSortTf      = 'h1';
 /* S33: 開いている根拠パネル。S44 で { id, setupKey } → { id, tfKey }（開いた足がそのまま上位足）。
    一度に1つだけ。巡回中の一時状態なので永続化しない。
    ⚠️ trendEntryChipHtml / trendItemHtml より前に宣言すること（描画時に参照する）。 */
@@ -3668,6 +3685,15 @@ function trendAgeHours(w) {
   return (Date.now() - t) / 3600000;
 }
 function isTrendStale(w) { return trendAgeHours(w) > TREND_STALE_H; }
+
+/* S67: 並び順の基準。指定した時間足でアラートが発生した日時（新しい順）で一覧を並べる。
+   アラートが立っていない／発生日時が無いペアは -Infinity で末尾に沈み、同値は名前順で安定する。 */
+function alertSortValue(w, tfKey) {
+  const a = w.alerts && w.alerts[tfKey];
+  if (!a || !a.on || !a.at) return -Infinity;
+  const t = Date.parse(a.at);
+  return isNaN(t) ? -Infinity : t;
+}
 
 function trendFreshChip(w) {
   const h = trendAgeHours(w);
@@ -3879,34 +3905,28 @@ function trendItemHtml(w) {
 
 /* 上部サマリー：今どの状態が何件かを一目で把握する。行の差し替え時も更新する。
    S59: 足単位の方向カウント（↗/↘/─/未記録）を撤去した。28ペア×3足＝84件の分母で
-   ペア単位のタイル（圏内・未更新など）と単位が揃っておらず誤読の元だったため
-   （方向は各行のトグルの色そのものが常時見えており、集計の価値が薄い）。
-   代わりに「巡回 n/m ペア」で今日どこまで見終えたかの進捗を出す。
-   タイルの並びはツールバー1行目のフィルタボタンと同じ順（GO→圏内→未更新）に揃える。 */
+   ペア単位のタイルと単位が揃っておらず誤読の元だったため（方向は各行のトグルの色そのものが
+   常時見えており、集計の価値が薄い）。
+   S67: 「🎯 圏内」（エントリー圏の並び順廃止に伴い）と「巡回 n/m ペア」（進捗表示、
+   アラート発生時刻順への置き換えで見る意味が薄れた）の2タイルを撤去。
+   タイルの並びはツールバーのフィルタボタンと同じ順（GO→未更新）に揃える。 */
 function renderTrendSummary(pairs) {
-  const counts = { go: 0, hot: 0, stale: 0, done: 0 };
+  const counts = { go: 0, stale: 0 };
   pairs.forEach(w => {
     if (w.go) counts.go++;
-    if (pairIsHot(w)) counts.hot++;
     if (isTrendStale(w)) counts.stale++;
-    if (w.trendAt) counts.done++;
   });
-  /* S60: GO/圏内/未更新はタップでフィルタを兼ねるボタンにする（旧・ツールバーの
-     同名ボタンはここへ統合して撤去した）。巡回タイルだけは絞り込み手段が無いので
-     従来通り <span>。filter キーは trendSummaryEl のクリック委任ハンドラと対応させる。 */
+  /* S60: GO/未更新はタップでフィルタを兼ねるボタン。filter キーは trendSummaryEl の
+     クリック委任ハンドラと対応させる。 */
   const summaryItems = [
     { cls: 'go',    label: '🚩 GO',    n: counts.go,    unit: 'ペア', filter: 'go',    on: trendGoOnly },
-    { cls: 'hot',   label: '🎯 圏内',  n: counts.hot,   unit: 'ペア', filter: 'hot',   on: trendEntryOnly },
     { cls: 'stale', label: '🕐 未更新', n: counts.stale, unit: 'ペア', filter: 'stale', on: trendStaleOnly },
-    { cls: '',      label: '巡回',     n: counts.done + '/' + pairs.length, unit: 'ペア' },
   ];
   trendSummaryEl.innerHTML = pairs.length
     ? summaryItems.map(i => {
         const cls = 'item' + (i.cls ? ' ' + i.cls : '') + (i.on ? ' on' : '');
         const inner = esc(i.label) + '<span class="n">' + i.n + '</span>' + esc(i.unit);
-        return i.filter
-          ? '<button type="button" class="' + cls + '" data-trend-summary-filter="' + i.filter + '">' + inner + '</button>'
-          : '<span class="' + cls + '">' + inner + '</span>';
+        return '<button type="button" class="' + cls + '" data-trend-summary-filter="' + i.filter + '">' + inner + '</button>';
       }).join('')
     : '';
 }
@@ -3917,6 +3937,16 @@ function renderTrendTfToggles() {
     '<button type="button" class="btn-ghost trend-filter-btn' +
     (trendVisibleTfs.some(v => v.k === t.k) ? ' on' : '') + '"' +
     ' data-trend-tf-toggle="' + t.k + '">' + esc(t.label) + '</button>').join('');
+}
+
+/* S67: 並び順の基準時間足（1H/4H/D/W）の切替。MV_ALERT_TFS をそのまま流用し、
+   カード上のアラートバッジと同じキー・ラベルで揃える（タップ連動と一貫させるため）。 */
+function renderTrendSortToggles() {
+  trendSortToggles.innerHTML = MV_ALERT_TFS.map(t =>
+    '<button type="button" class="btn-ghost trend-filter-btn' +
+    (trendSortTf === t.k ? ' on' : '') + '"' +
+    ' data-trend-sort-tf="' + t.k + '" title="' + esc(t.full) + 'のアラート発生が新しい順に並べる">' +
+    esc(t.label) + '</button>').join('');
 }
 
 /* ボードの通貨ペア選択と同じ MV_PAIR_GROUPS を流用し、カテゴリ絞り込み用プルダウンを描画する。 */
@@ -3931,13 +3961,12 @@ function renderTrendCategoryOptions() {
 
 
 /* ツールバーの絞り込みを AND で当てる。順序は AND なので結果に影響しないが、
-   S59でツールバー1行目の表示順（GO→圏内→未更新→カテゴリ）に揃えてある。
-   S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。 */
+   表示順（GO→未更新→カテゴリ）に揃えてある。
+   S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。
+   S67: 「🎯エントリー圏のみ」（trendEntryOnly）はエントリー圏並び順の廃止に伴い撤去。 */
 function trendApplyFilters(pairs) {
   let shown = pairs;
   if (trendGoOnly)     shown = shown.filter(w => w.go);
-  /* S44: 図の上でタップした位置が買②③/売②③の圏内にあるペアだけに絞る。 */
-  if (trendEntryOnly)  shown = shown.filter(pairIsHot);
   if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
   return shown;
@@ -3945,12 +3974,16 @@ function trendApplyFilters(pairs) {
 
 function renderTrendList() {
   const data = loadMarket();
-  /* S44: エントリー圏に近い順。記録が無いペアは Infinity で下に沈み、同値は名前順で安定する。 */
+  /* S67: 選択した時間足（trendSortTf）でアラートが発生した日時の新しい順。
+     アラートが無いペアは末尾に沈み、同値は名前順で安定する。
+     旧・エントリー圏距離順（pairEntryDistance）は実運用フローの変化により撤去。
+     ただし pairEntryDistance / pairIsHot 自体は波マップ・🎯根拠ボタンの色分けで使うため残す。 */
   const pairs = data.pairs.slice().sort((a, b) =>
-    pairEntryDistance(a) - pairEntryDistance(b) ||
+    alertSortValue(b, trendSortTf) - alertSortValue(a, trendSortTf) ||
     String(a.pair).localeCompare(String(b.pair)));
 
   renderTrendSummary(pairs);
+  renderTrendSortToggles();
   renderTrendTfToggles();
   renderTrendCategoryOptions();
 
@@ -3966,24 +3999,20 @@ function renderTrendList() {
   }
 
   /* S58: 手動GOを最上位グループに独立させる。GOは自分で立てた優先度なので、
-     エントリー圏（自動距離）より上に来る。GO内部もこれまで通り距離順のまま
+     アラート発生時刻順（自動並び）より上に来る。GO内部もこれまで通り並び順のまま
      （pairs の並びをそのままフィルタしているだけなので順序は保たれる）。
-     S44: 続くグループはエントリー圏の1本だけ。圏外は見出しを付けずにそのまま続ける
-     （距離順に並んでいるので、上から見ていけば「次に近いもの」が自然に読める）。 */
+     S67: エントリー圏グループ（旧「🎯 エントリー圏」見出し）を撤去したため、
+     GO以外は見出し無しで続ける（アラート時刻順に並んでいるので、上から見れば
+     「直近で鳴ったもの」が自然に読める）。 */
   const go = shown.filter(w => w.go);
   let html = '';
   if (go.length) {
     html += '<div class="trend-group-head go">🚩 GO（' + go.length + '）</div>';
     html += go.map(trendItemHtml).join('');
   }
-  const hot = shown.filter(w => !w.go && pairIsHot(w));
-  if (hot.length) {
-    html += '<div class="trend-group-head">🎯 エントリー圏（' + hot.length + '）</div>';
-    html += hot.map(trendItemHtml).join('');
-  }
-  const rest = shown.filter(w => !w.go && !pairIsHot(w));
+  const rest = shown.filter(w => !w.go);
   if (rest.length) {
-    if (go.length || hot.length) html += '<div class="trend-group-head sub">─ その他（' + rest.length + '）</div>';
+    if (go.length) html += '<div class="trend-group-head sub">─ その他（' + rest.length + '）</div>';
     html += rest.map(trendItemHtml).join('');
   }
   trendListEl.innerHTML = html;
@@ -4003,15 +4032,23 @@ function trendPatchItem(w) {
   renderTrendSummary(loadMarket().pairs);
 }
 
-/* S60: サマリータイル自体がフィルタボタン（旧・ツールバーの4ボタンを統合）。
-   イベント委任で1箇所に集約し、data-trend-summary-filter の値でどのフラグを反転するか決める。 */
+/* S60: サマリータイル自体がフィルタボタン。イベント委任で1箇所に集約し、
+   data-trend-summary-filter の値でどのフラグを反転するか決める。
+   S67: 'hot'（🎯圏内）は撤去済みのタイルなので分岐も削除。 */
 trendSummaryEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-trend-summary-filter]');
   if (!btn) return;
   const f = btn.dataset.trendSummaryFilter;
   if (f === 'go') trendGoOnly = !trendGoOnly;
-  else if (f === 'hot') trendEntryOnly = !trendEntryOnly;
   else if (f === 'stale') trendStaleOnly = !trendStaleOnly;
+  renderTrendList();
+});
+/* S67: 並び順の基準時間足（1H/4H/D/W）切替。カード上のアラートバッジタップ（mvToggleAlert）
+   と同じ trendSortTf を共有するので、ツールバーとカードのどちらから触っても一覧に反映される。 */
+trendSortToggles.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-trend-sort-tf]');
+  if (!btn) return;
+  trendSortTf = btn.dataset.trendSortTf;
   renderTrendList();
 });
 trendCategorySelect.addEventListener('change', () => {
