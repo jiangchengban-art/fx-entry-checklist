@@ -3695,11 +3695,16 @@ function trendGoBtnHtml(w) {
     ' title="' + (w.go ? 'GOを解除' : '近々のエントリー候補としてGOを立てる') + '">GO</button>';
 }
 
+/* S66: 根拠パネル footer の判定ボタンは「📝 記録フォームへ」の左に並ぶため、
+   以前は j.label の絵文字1文字だけ（✅/⏸/⏭）を表示していた。ユーザー要望により
+   マーク（絵文字）を消し、代わりに文言本体（エントリー/保留/スルー）を表示する。
+   MV_JUDGES.label 自体は履歴カードのバッジ・フォームの判定表示など他の場所で
+   絵文字付きのまま使うので変更しない。ここでだけ先頭の絵文字＋空白を取り除く。 */
 function trendJudgeBtnsHtml(w) {
   return MV_JUDGES.map(j =>
     '<button type="button" class="mv-judge-btn trend-state-btn ' + j.v + (w.judge === j.v ? ' on' : '') + '"' +
-    ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '" title="' + esc(j.label) + '">' +
-    esc(j.label.slice(0, 1)) + '</button>').join('');
+    ' data-mv-judge="' + esc(w.id) + '" data-value="' + j.v + '">' +
+    esc(j.label.replace(/^\S+\s*/, '')) + '</button>').join('');
 }
 
 /* S48: 足1本ぶんのエントリー圏チップと、根拠パネルを開くボタン。

@@ -1,9 +1,9 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-09 (S65 complete)  
+**Last Updated:** 2026-09-09 (S66 complete)  
 **Current State:** ✅ Production-ready, all tests passing (known pre-existing gaps documented below)  
 **Main Branch:** `master`  
-**Active Development Branch:** `claude/s63-test-updates-deploy-v7gfwi` — S64+S65 work
+**Active Development Branch:** `claude/s63-test-updates-deploy-v7gfwi` — S64+S65+S66 work
 
 ## Project Health
 
@@ -16,10 +16,11 @@
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-65)
+## Recent Changes (S57-66)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S66 | 根拠パネルの判定ボタンから絵文字マークを撤去 | `trendJudgeBtnsHtml()`が`j.label.slice(0,1)`で絵文字1文字だけ表示していたのを、文言本体（エントリー/保留/スルー）表示に変更。`MV_JUDGES.label`本体・`mvSetJudge()`・データモデルは無変更 |
 | S65 | エントリー足❸の「重なり」をロールリバーサル確認に置換 | `fiboRoll`（重なり有/重なり無/❌）を撤去し、上位足にあった`rollReversal`（確認/❌）をエントリー足❸に一本化。上位足からは`rollReversal`を削除（5分足確認と重複のため）。CSV: `hi_*`6→5列、`en_*`は`en_fiboRoll`→`en_rollReversal` |
 | S64 | 確度%を🔭一覧の🎯チップに表示、パネルのエントリー足/合算表示を撤去 | `trendEntryChipHtml()`に上位足確度%を追加。`.tp-conf`はエントリー足・合算を撤去し上位足のみに。`setupConfidence()`→`higherConfidence()` |
 | S63 | 根拠パネルの選択肢整理と確度スコアの重み付け | `granville`行を根拠パネルから撤去（🔭一覧行の🌊アイコンと重複のため）。RCI/MACDの⏳待ち、ラウンドナンバーの無、ロールリバーサルの未確認、エントリー足全項目の⏳待ちを撤去（「待ち」機能一式=`pairWaitCount`等も連鎖削除）。空欄ボタン（`—`）を撤去。`checkConfidence`に`weight`導入（上位足: RCI各15/MACD35/ラウンド10/ロールRv10=計100、S65でロールRvを外し分母90に変更） |
@@ -39,7 +40,7 @@ index.html (単一ファイル)
   └─ JS: localStorage (主体) ↔ Supabase (補助・複数端末同期)
 
 sw.js (キャッシュ制御、S28〜)
-  └─ v36: network-first HTML / cache-first assets / cross-origin素通し
+  └─ v37: network-first HTML / cache-first assets / cross-origin素通し
 
 manifest.webmanifest + icon-*.png (PWA)
   └─ iOS7日削除回避の唯一の方法
@@ -81,9 +82,10 @@ docs/
 **S62:** エントリー足を3ステップ確認フローに置換（上位足とは別の項目セットへ）  
 **S63:** 根拠パネルの選択肢整理（granville撤去・待ち系撤去・空欄ボタン撤去）＋確度スコアの重み付け  
 **S64:** 確度%を🎯チップに表示、パネルのエントリー足/合算表示を撤去  
-**S65:** エントリー足❸の「重なり」をロールリバーサル確認に置換、上位足からロールリバーサルを撤去
+**S65:** エントリー足❸の「重なり」をロールリバーサル確認に置換、上位足からロールリバーサルを撤去  
+**S66:** 根拠パネルの判定ボタンから絵文字マークを撤去、文言本体を表示
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-65 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-66 統合）」テーブルを参照。
 ※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
