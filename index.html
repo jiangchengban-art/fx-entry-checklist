@@ -3642,11 +3642,18 @@ function trendCategoryOf(pairName) {
 }
 
 /* 表示する時間足。1時間足・4時間足・日足が既定で、週足・月足は希望時だけ出す。
-   端末ごとの表示設定にすぎないので、市場データ（saveMarket）ではなく専用キーに持つ。 */
+   端末ごとの表示設定にすぎないので、市場データ（saveMarket）ではなく専用キーに持つ。
+   ⚠️ S60バグ修正: 保存された配列で MV_TREND_TFS 全体をフィルタしていたため、S57で
+      1H を追加する前に保存された古い配列（h1 を含まない）が残っている端末では、
+      常時表示のはずの1Hまで消えてしまっていた。保存値は「週足・月足を出すかどうか」
+      のトグルにだけ使い、常時表示足（MV_TREND_DEFAULT_TFS）は無条件で含める。 */
 function loadTrendTfs() {
   try {
     const a = JSON.parse(localStorage.getItem(TREND_TFS_KEY) || 'null');
-    if (Array.isArray(a)) return MV_TREND_TFS.filter(t => a.includes(t.k));
+    if (Array.isArray(a)) {
+      const optionalOn = MV_TREND_TFS.filter(t => t.optional && a.includes(t.k));
+      return MV_TREND_DEFAULT_TFS.concat(optionalOn);
+    }
   } catch (e) { /* 壊れていたら既定に戻す */ }
   return MV_TREND_DEFAULT_TFS.slice();
 }
