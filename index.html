@@ -1629,9 +1629,21 @@ const MV_TF_CHECKS = mvNormalizeChecks([
      補助的な根拠なので薄くする。weight を持たない項目は checkConfidence 側で 1 として扱う
      （エントリー足は均等割りのまま）。分母は残った項目の重み合計なので 100 ちょうどでなくてよい。
      S65: ロールリバーサルはエントリー足の❸に移し、上位足からは撤去（重複確認だったため）。 */
-  { k: 'rciShort',     label: 'RCI 短期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
-  { k: 'rciMid',       label: 'RCI 中期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
-  { k: 'rciLong',      label: 'RCI 長期',         weight: 15, opts: ['上限', '60↑', '60↓', '下限', '❌'] },
+  /* S75: 上位足の方向が決まっているとき、RCIは押し目/戻り目線でしか使わないため
+     逆サイドの選択肢（上昇トレンドなら上限・60↑、下降トレンドなら下限・60↓）を隠す。
+     side は mvEntrySide(w) と同じ up→buy/down→sell の対応（trendCheckCell）。 */
+  { k: 'rciShort',     label: 'RCI 短期',         weight: 15, opts: [
+    { v: '上限', side: 'sell' }, { v: '60↑', side: 'sell' },
+    { v: '60↓', side: 'buy'  }, { v: '下限', side: 'buy'  }, { v: '❌' },
+  ] },
+  { k: 'rciMid',       label: 'RCI 中期',         weight: 15, opts: [
+    { v: '上限', side: 'sell' }, { v: '60↑', side: 'sell' },
+    { v: '60↓', side: 'buy'  }, { v: '下限', side: 'buy'  }, { v: '❌' },
+  ] },
+  { k: 'rciLong',      label: 'RCI 長期',         weight: 15, opts: [
+    { v: '上限', side: 'sell' }, { v: '60↑', side: 'sell' },
+    { v: '60↓', side: 'buy'  }, { v: '下限', side: 'buy'  }, { v: '❌' },
+  ] },
   { k: 'macd',         label: 'MACD',             weight: 35, opts: ['RD(転換)', 'HD(継続)', '❌'], link: 'macd' },
   { k: 'roundNumber',  label: 'ラウンドナンバー', weight: 10, opts: ['有', '❌'], short: 'ラウンド' },
   /* S62: entryFibo はここ（上位足）から外し、エントリー足の❸専用にした（MV_ENTRY_CHECKS）。
@@ -1710,18 +1722,29 @@ function mvEntrySide(w) {
   return state === 'up' ? 'buy' : (state === 'down' ? 'sell' : '');
 }
 
-/* 記録済みのエントリー足チェックのうち、今の方向と食い違う向きのものを落とす。
+/* 記録済みのエントリー足チェック・上位足RCIのうち、今の方向と食い違う向きのものを落とす。
    ⚠️ mvWriteTrend / mvSetTf の中から呼ぶこと。方向と上位足が変わる経路はこの2つだけなので、
       そこに置けば「↗で記録したダブルボトムが↘に変えても残る」取りこぼしが構造的に起きない
-      （グランビルと wpos の後始末を mvWriteTrend の1箇所に寄せてあるのと同じ理由）。 */
+      （グランビルと wpos の後始末を mvWriteTrend の1箇所に寄せてあるのと同じ理由）。
+   S75: 上位足RCI（S75で side 付与）も同じ規約で拾う。checksHigher は時間足キーごとに
+   独立しているので、今の tfHigher に対応する tfKey の枠だけを見る。 */
 function mvSyncEntrySideChecks(w) {
-  const checks = w.checksEntry;
-  if (!checks) return;
   const side = mvEntrySide(w);
-  MV_ENTRY_CHECKS.forEach(c => {
-    const opt = c.opts.find(o => o.v === checks[c.k]);
-    if (opt && opt.side && opt.side !== side) checks[c.k] = '';
-  });
+  const entryChecks = w.checksEntry;
+  if (entryChecks) {
+    MV_ENTRY_CHECKS.forEach(c => {
+      const opt = c.opts.find(o => o.v === entryChecks[c.k]);
+      if (opt && opt.side && opt.side !== side) entryChecks[c.k] = '';
+    });
+  }
+  const tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+  const higherChecks = tfKey && w.checksHigher && w.checksHigher[tfKey];
+  if (higherChecks) {
+    MV_TF_CHECKS.forEach(c => {
+      const opt = c.opts.find(o => o.v === higherChecks[c.k]);
+      if (opt && opt.side && opt.side !== side) higherChecks[c.k] = '';
+    });
+  }
 }
 
 /* 記録に焼き込む根拠スナップショットの区分。CSV列の接頭辞も兼ねる。
@@ -3981,8 +4004,10 @@ function trendCheckCell(w, field, c) {
   const cur = checks[c.k] || '';
   /* S62: 方向が決まっているエントリー足では、逆サイドの選択肢を出さない
      （↗の押し目狙いで「ダブルトップ」を選べても意味がなく、選んでも
-     mvSyncEntrySideChecks が消すため）。方向未記録のときは両サイド出す。 */
-  const side = field === 'tfEntry' ? mvEntrySide(w) : '';
+     mvSyncEntrySideChecks が消すため）。方向未記録のときは両サイド出す。
+     S75: 上位足のRCIも同じ規約で絞る（mvEntrySide は tfHigher の方向を見て
+     up→buy/down→sell を返すのでそのまま使い回せる）。 */
+  const side = (field === 'tfEntry' || field === 'tfHigher') ? mvEntrySide(w) : '';
   const opts = c.opts.filter(o => !o.side || !side || o.side === side);
   function btn(value, label) {
     return '<button type="button" class="mv-tfcheck-btn' + (cur === value ? ' on' : '') + '"' +
