@@ -720,6 +720,9 @@
   }
   .fresh.stale { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .fresh.cold  { color: var(--ink-muted); border-style: dashed; opacity: 0.75; }
+  /* S73: GO の右横は「手入力したアラート発生時刻からの経過時間」。ON の足だけ横に並ぶ。 */
+  .fresh.alert { color: var(--accent); border-color: var(--accent); }
+  .fresh.alert .tf { opacity: 0.75; margin-right: 3px; }
 
   /* S33→S62: 根拠パネル。上位足とエントリー足で項目が別々になったので横並び2列をやめ、
      区分ごとのセクションに積む。1項目が横幅をフルに使えるので選択肢の折り返しは減る。 */
@@ -776,6 +779,7 @@
   .tp-hint { margin-top: 6px; font-size: 11px; color: var(--warn); text-align: right; }
   .tp-conf { font-size: 11px; color: var(--good); margin-bottom: 6px; }
   .tp-conf b { font-size: 12px; }
+  .tp-conf.muted { color: var(--ink-muted); }
 
   /* バンドB：可視時間足ごとの入力行。足／方向3つ／ゾーン3つ／グランビル／🎯圏内＋根拠。
      ⚠️ S44 で grid から flex にした。末尾の 🎯 と「根拠」は圏内のときだけ出る＝子要素の数が
@@ -3822,6 +3826,13 @@ function higherConfidence(w, tfKey) {
   const checks = (w.checksHigher && w.checksHigher[tfKey]) || {};
   return checkConfidence(checks, MV_TF_CHECKS);
 }
+/* S74: 未記録（根拠を1項目も押していない）足は checkConfidence が 100% を返してしまう
+   （減点対象が無いだけで「揃っている」わけではない）。チップでの誤読を避けるため、
+   この足の checksHigher に値が1つでも入っているかを別に判定する。 */
+function hasAnyHigherCheck(w, tfKey) {
+  const checks = (w.checksHigher && w.checksHigher[tfKey]) || {};
+  return MV_TF_CHECKS.some(c => checks[c.k]);
+}
 
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
 function trendAgeHours(w) {
@@ -3869,6 +3880,39 @@ function trendAlertTimesHtml(w) {
     .map(t => '<span class="item">' + esc(t.label) + ' ' + esc(fmtDatetimeShort(alerts[t.k].at)) + '</span>');
   return items.length ? '<div class="mv-alert-times">' + items.join('') + '</div>' : '';
 }
+/* S73: GO ボタンの右横に出す「アラート発生からの経過時間」。
+   基準は #alertTimeModal で手入力して保存した時刻（w.alerts[tf].at）であって、
+   バッジをタップした操作時刻ではない。手法上アラートが鳴ってから値動きを見て入るため、
+   「鳴ってから今どれだけ経ったか」が巡回中に一目で要る（ユーザー要望）。
+   ⚠️ ON の足すべてを並べる。1H と 4H で鳴った時刻は別物で、片方に丸めると判断材料が落ちる。
+   経過時間は毎回 Date.now() から導出するだけで w には保存しない（trendAt と同じ規約）。 */
+function elapsedShort(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'たった今';
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h' + (m % 60 ? (m % 60) + 'm' : '');
+  const d = Math.floor(h / 24);
+  return d + 'd' + (h % 24 ? (h % 24) + 'h' : '');
+}
+function trendAlertAgeChipsHtml(w) {
+  const alerts = w.alerts || {};
+  const now = Date.now();
+  const items = MV_ALERT_TFS.filter(t => {
+    const a = alerts[t.k];
+    return a && a.on && a.at && !isNaN(Date.parse(a.at));
+  }).map(t => {
+    const at = Date.parse(alerts[t.k].at);
+    /* 未来の時刻を入力した場合は負値になるので 0 に丸める（「-3h」は読めない）。 */
+    const text = elapsedShort(Math.max(0, now - at));
+    return '<span class="fresh alert" title="' + esc(t.full) + 'のアラート発生 ' +
+      esc(fmtDatetime(alerts[t.k].at)) + ' からの経過時間">' +
+      '<span class="tf">' + esc(t.label) + '</span>' + esc(text) + '</span>';
+  });
+  if (items.length) return items.join('');
+  /* アラート未発生でも巡回の鮮度は見たいので、従来の最終更新チップに落とす。 */
+  return trendFreshChip(w);
+}
 /* S58: 手動GOフラグ。ペア名の直後に置き、巡回中いつでも1タップで印を付けられる。
    エントリー圏（pairEntryDistance）とは独立の主観判断。ONのペアは一覧の最上位「🚩 GO」にまとまる。 */
 function trendGoBtnHtml(w) {
@@ -3903,17 +3947,21 @@ function trendEntryChipHtml(w, tfKey) {
   /* S64: 確度（上位足の根拠達成度）をチップに常時表示。
      S72: checksHigher は時間足キーごとに独立しているため、この行が担当する tfKey 自身の
      根拠だけを見る（1H/4H/日足で確度%が混ざっていたバグの修正）。 */
-  const conf = higherConfidence(w, tfKey);
+  const recorded = hasAnyHigherCheck(w, tfKey);
+  const conf = recorded ? higherConfidence(w, tfKey) : null;
   /* ⚠️ チップとボタンを1つにまとめてある。375px の入力行に残っている余白は 40px 弱しかなく、
      2要素にすると2段に折り返して巡回の縦スクロールが増える。
      幅を食う「％」と「根拠」は狭い画面では CSS で畳み、title と 🎯 だけ残す。 */
   /* S70: 確度は「タップしてプルダウンを開かなくても、カードをスライドするだけで見える」
      ことが目的（ユーザー要望）。375px 幅でも .conf だけは畳まない（CSS 側で除外）。
      幅を取る「確度」の文字は省き、数値のみ（🎯61%）にして横幅を切り詰める。 */
+  /* S74: 根拠を1項目も押していない足は checkConfidence が 100%（減点なし＝満点）を返すが、
+     これは「揃っている」のではなく「未記録」。視覚的に記録済みだけを見分けたいので非表示にする。 */
   const pct = d === null ? '' : '<span class="d">' + Math.round(d) + '%</span>';
-  const body = '🎯' + pct + '<span class="d conf">' + conf + '%</span><span class="d">根拠</span>';
+  const confHtml = conf === null ? '' : '<span class="d conf">' + conf + '%</span>';
+  const body = '🎯' + pct + confHtml + '<span class="d">根拠</span>';
   const title = (d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%') +
-    '／確度 ' + conf + '%';
+    (conf === null ? '' : '／確度 ' + conf + '%');
   if (!MV_TREND_KEY_TO_TF[tfKey])
     return '<span class="tent' + (hot ? '' : ' muted') + '" title="' + esc(title) + '">' + body + '</span>';
   return '<button type="button" class="tent tent-btn' + (hot ? '' : ' muted') + (open ? ' open' : '') + '"' +
@@ -3977,7 +4025,9 @@ function trendPanelHtml(w) {
   /* S38: 根拠の確度（❌の数だけ減点）。S44 以降は判定に関係なく常に出す。
      S64: エントリー足・合算の表示はユーザー要望により撤去し、上位足の確度だけを出す
      （🔭一覧の行の🎯チップにも同じ値を表示するようになったため、ここは補足の位置づけ）。 */
-  const confHtml = '<div class="tp-conf">🎯 確度 <b>' + higherConfidence(w, tfKey) + '%</b></div>';
+  const confHtml = hasAnyHigherCheck(w, tfKey)
+    ? '<div class="tp-conf">🎯 確度 <b>' + higherConfidence(w, tfKey) + '%</b></div>'
+    : '<div class="tp-conf muted">🎯 確度 未記録</div>';
 
   /* エントリー足の❶❷は方向に紐づくので、どちら目線で選択肢を出しているかを明示する。 */
   const side = mvEntrySide(w);
@@ -4054,7 +4104,7 @@ function trendItemHtml(w) {
     '<div class="trend-head">' +
       '<span class="pair">' + esc(w.pair) + '</span>' +
       trendGoBtnHtml(w) +
-      trendFreshChip(w) +
+      trendAlertAgeChipsHtml(w) +
       '<span class="spacer"></span>' +
       '<span class="mv-alert-badges">' + trendAlertBadgesHtml(w) + '</span>' +
       '<button type="button" class="tclear" data-trend-clear="' + esc(w.id) + '"' +
