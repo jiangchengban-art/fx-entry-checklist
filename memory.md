@@ -1,9 +1,9 @@
 # FX Entry Checklist — Project Memory & Session Log
 
-**Last Updated:** 2026-09-13 (S75 complete)  
-**Current State:** ✅ Production-ready (S75: 上位足RCIの選択肢をトレンド方向で自動絞り込み完了). s62テストは S63/S65 定義変更に対応済み  
+**Last Updated:** 2026-09-13 (S76 complete)  
+**Current State:** ✅ Production-ready (S76: 🔭一覧ツールバーに通貨名検索機能を追加完了). s76-test.mjs 11項目全通過、既存テスト205項目全通過  
 **Main Branch:** `master`  
-**Active Development Branch:** none — S75 merged to master, ready for S76
+**Active Development Branch:** `claude/multi-env-sync-s75-v1fqzj` — S76 merged locally, pending master push
 
 ## Project Health
 
@@ -16,10 +16,11 @@
 | Performance | ✅ OK | Single HTML file (~50KB gzip), zero CDN deps for app logic |
 | File Size | ✅ Optimized | 0.41MB (80% reduction since S26, images WebP) |
 
-## Recent Changes (S57-75)
+## Recent Changes (S57-76)
 
 | Session | Focus | Impact |
 |---------|-------|--------|
+| S76 | 🔍 **🔭一覧ツールバーに通貨名検索機能を追加** | ユーザー要望「通貨の頭文字を入力したらその通貨だけ検索できる検索機能を設けて」に対応。①カテゴリ選択（`#trendCategorySelect`）の隣に検索入力欄（`#trendSearchInput`, placeholder「🔍 通貨名で検索（例: JPY）」）を新設 ②`input`イベントで`trendSearchQuery`を更新し即時絞り込み（大文字小文字は区別しない） ③`trendApplyFilters()`（一覧・波マップ共有の絞り込み合流点）に1行追加するだけで実装。GO/未更新/カテゴリと同じAND条件、🗺波マップのライブ表示（`trendMapLiveEntries()`）にもコード変更なしで自動反映 ④波マップの過去日表示（`trendMapDayEntries()`）は`items`が`p`（ペア名）のみ保持するため、カテゴリと同様に個別で検索条件を追加 ⑤`renderTrendList()`は`trendListEl`のみ再構築し検索`<input>`要素自体は作り直さないため、連続入力中もフォーカス・カーソル位置を保持 ⑥GO/未更新/カテゴリと同じく永続化しない（巡回中の一時的な絞り込み）。データモデル・CSV・端末間マージ・統計・並び順ロジック・根拠パネルは無変更。新設s76-test.mjs 11項目通過、既存s42/s43/s44/s55/s59/s60全通過（205項目）。sw.js: v45→v46 |
 | S75 | 🎯 上位足RCIの選択肢をトレンド方向で自動絞り込み | ユーザー指摘「上昇トレンドの場合は下限か↓60か❌しか選択しない…自動で絞り込んでほしい」に対応。①`MV_TF_CHECKS`のRCI短期/中期/長期に`side`プロパティを付与（上限・60↑→`sell`、60↓・下限→`buy`）②`trendCheckCell()`で`side`を看収し、上位足の方向（`w.trend[tfKey].state`）に合わない選択肢を隠す③方向反転時は逆サイドのRCI値を自動クリア（`mvSyncEntrySideChecks()`で拡張）。エントリー足の❶❷（S62で既に`side`対応済み）と同じ規約で一本化。s75-test.mjs 8項目通過、既存テスト全通過。sw.js: v44→v45 |
 | S74 | 🎯 未記録足は確度%を表示しない | ユーザー指摘「未記録時間足の確度が100%で表示されるのは誤解を招く」に対応。`hasAnyHigherCheck(w, tfKey)`で記録有無を判定し、未記録時は確度%を HTML から除外。パネルでは「確度 未記録」（グレー）表示に。s74-test.mjs 7項目通過。sw.js: v43→v44 |
 | S73 | ⏱️ GO右横にアラート発生時刻からの経過時間表示 | ユーザー要望「手入力アラート時刻から現在までの経過時間を表示したい」に対応。`elapsedShort()`で経過を「3h15m」「2d2h」のように表示。🔭カードのアラートバッジ下に ON の足の経歴時間を常時表示。s73-test.mjs 9項目通過。sw.js: v42→v43 |
@@ -79,7 +80,7 @@ docs/
 | localStorage 5-10MB上限 | 予想 | S56で容量超過リーンモード追加。S72で per-tf checksHigher に一本化したため逆に容量効率化の可能性 |
 | 波マップ過去日では「待ちあり」不可 | 既知 S63削除 | S63で待ち系選択肢を完全撤去したため問題消滅。過去日「GOのみ」も同じ理由で不可（設計上不可避） |
 
-## Session Progression (S1-60 Summary)
+## Session Progression (S1-76 Summary)
 
 **S1-13:** 初期実装 → トレード記録フォーム・統計・CSV対応  
 **S14-21:** 環境認識ボード刷新 → ボード廃止に向けた布石  
@@ -94,9 +95,18 @@ docs/
 **S64:** 確度%を🎯チップに表示、パネルのエントリー足/合算表示を撤去  
 **S65:** エントリー足❸の「重なり」をロールリバーサル確認に置換、上位足からロールリバーサルを撤去  
 **S66:** 根拠パネルの判定ボタンから絵文字マークを撤去、文言本体を表示  
-**S67:** 並び順をアラート発生時刻順に置換（S44のエントリー圏距離順を撤去、圏内タイル/絞り込み/グループ見出し削除）
+**S67:** 並び順をアラート発生時刻順に置換（S44のエントリー圏距離順を撤去、圏内タイル/絞り込み/グループ見出し削除）  
+**S68:** テスト準備: s62-test.mjs を S63-S65 定義変更に対応（granville撤去・待ち系撤去・weight導入）  
+**S69:** アラート発生日時を常時表示、アラート〜エントリー経過時間の統計追加  
+**S70:** 🎯チップの確度%を375px幅でも常時表示、スマホレイアウト最適化  
+**S71:** アラート発生日時の手入力モーダル化、後から時刻入力対応  
+**S72:** checksHigher を時間足キーごとに独立化、per-tf確度%バグ修正  
+**S73:** GO右横にアラート発生時刻からの経過時間表示  
+**S74:** 未記録足は確度%を表示しない（誤解防止）  
+**S75:** 上位足RCIの選択肢をトレンド方向で自動絞り込み（S62の方向フィルタをRCIに拡張）  
+**S76:** 🔭一覧ツールバーに通貨名検索機能を追加（カテゴリ選択の隣に部分一致検索欄、GO/未更新/カテゴリとAND条件）
 
-詳細は CLAUDE.md 内の「セッション履歴（S1-67 統合）」テーブルを参照。
+詳細は CLAUDE.md 内の「セッション履歴（S1-76 統合）」テーブルを参照。
 ※ S61 は欠番（着手されずに終わったセッション番号）。
 
 ## Next Session Checklist
