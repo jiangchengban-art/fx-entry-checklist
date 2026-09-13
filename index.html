@@ -666,6 +666,12 @@
     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
   }
+  .trend-search-input {
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink); font-size: 13px;
+    width: 150px; max-width: 100%;
+  }
+  .trend-search-input:focus { border-color: var(--accent); outline: none; }
 
   .trend-group-head {
     font-size: 12px; font-weight: 700; color: var(--ink-2);
@@ -1230,6 +1236,8 @@
     </details>
     <div class="trend-summary" id="trendSummary"></div>
     <div class="trend-toolbar">
+      <input type="text" class="trend-search-input" id="trendSearchInput"
+             placeholder="🔍 通貨名で検索（例: USD）" autocomplete="off" spellcheck="false">
       <span class="trend-tf-label">並び順</span>
       <span class="trend-tf-toggles" id="trendSortToggles"></span>
       <select class="trend-category-select" id="trendCategorySelect"></select>
@@ -3779,6 +3787,7 @@ const trendSummaryEl = document.getElementById('trendSummary');
 const trendTfBar     = document.getElementById('trendTfToggles');
 const trendSortToggles = document.getElementById('trendSortToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
+const trendSearchInput = document.getElementById('trendSearchInput');
 
 /* S60: 絞り込みボタンはツールバーから撤去し、サマリータイル（#trendSummary 内の
    [data-trend-summary-filter]）がフィルタON/OFFを兼ねる。サマリーとツールバーに
@@ -3787,6 +3796,9 @@ const trendCategorySelect = document.getElementById('trendCategorySelect');
 let trendStaleOnly   = false; // 「未更新のみ」の絞り込み。永続化しない
 let trendCategory    = '';    // カテゴリ絞り込み（MV_PAIR_GROUPS の label、空文字=すべて）。永続化しない
 let trendGoOnly      = false; // S58: 「🚩GOのみ」の絞り込み（w.go）。永続化しない
+/* S76: 通貨ペア名の部分一致検索（例: 'USD' で USDJPY・EURUSD 等がヒット）。
+   大文字化して持つのでフィルタ側は毎回 toUpperCase() しなくてよい。永続化しない。 */
+let trendSearch      = '';
 /* S67: 並び順の基準時間足。GO/WAIT/NO→S44でエントリー圏距離順→S67でアラート発生時刻順、
    と実運用フローの変化に合わせて置き換えた。選んだ足でアラートが発生した日時の新しい順に
    並べる（アラート＝チャンス到来のシグナルなので、直近で鳴ったものを最優先で見る）。
@@ -4200,14 +4212,17 @@ function renderTrendCategoryOptions() {
 
 
 /* ツールバーの絞り込みを AND で当てる。順序は AND なので結果に影響しないが、
-   表示順（GO→未更新→カテゴリ）に揃えてある。
+   表示順（GO→未更新→カテゴリ→検索）に揃えてある。
    S40: 🗺 波マップも同じ条件で描くため、一覧の中に埋めずに切り出してある。
-   S67: 「🎯エントリー圏のみ」（trendEntryOnly）はエントリー圏並び順の廃止に伴い撤去。 */
+   S67: 「🎯エントリー圏のみ」（trendEntryOnly）はエントリー圏並び順の廃止に伴い撤去。
+   S76: 通貨名の部分一致検索を追加。ペア名（w.pair、常に英字大文字）に対する単純な
+   includes() なので "USD" で USDJPY・EURUSD 等どちらも拾える。 */
 function trendApplyFilters(pairs) {
   let shown = pairs;
   if (trendGoOnly)     shown = shown.filter(w => w.go);
   if (trendStaleOnly)  shown = shown.filter(isTrendStale);
   if (trendCategory)   shown = shown.filter(w => trendCategoryOf(w.pair) === trendCategory);
+  if (trendSearch)     shown = shown.filter(w => String(w.pair).toUpperCase().includes(trendSearch));
   return shown;
 }
 
@@ -4292,6 +4307,12 @@ trendSortToggles.addEventListener('click', (e) => {
 });
 trendCategorySelect.addEventListener('change', () => {
   trendCategory = trendCategorySelect.value;
+  renderTrendList();
+});
+/* S76: 通貨名検索。renderTrendList() はツールバー内の <select> だけを innerHTML で
+   作り直すので、この <input> は再生成されずフォーカス・入力途中の文字列も保たれる。 */
+trendSearchInput.addEventListener('input', () => {
+  trendSearch = trendSearchInput.value.trim().toUpperCase();
   renderTrendList();
 });
 trendTfBar.addEventListener('click', (e) => {
@@ -4885,6 +4906,7 @@ function trendMapDayEntries(rec) {
     if (!tfOk[it.t]) return;
     if (trendMapPair && it.p !== trendMapPair) return;
     if (trendCategory && trendCategoryOf(it.p) !== trendCategory) return;
+    if (trendSearch && !String(it.p).toUpperCase().includes(trendSearch)) return;
     const en = trendMapEntryOf({ pair: it.p, tfKey: it.t, granville: it.g, wpos: it.w });
     if (en) out.push(en);
   });
