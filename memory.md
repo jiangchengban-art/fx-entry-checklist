@@ -111,8 +111,16 @@ docs/
 
 ## Next Session Checklist
 
+### 必須確認項目（毎回実行）
 - [ ] `git pull origin master` を必ず最初に実行（別環境からのプッシュがある可能性）
 - [ ] `git log --oneline -3` でローカルとリモートの一致を確認
+- [ ] **GitHub Pages が正しく反映されているか確認**: https://jiangchengban-art.github.io/fx-entry-checklist/ にアクセスして S76 の検索機能が表示されていることを確認
+  - もし反映されていなければ、GitHub リポジトリの Settings → Pages で以下を確認：
+    - Source が「Deploy from a branch」に設定
+    - Branch が「master」、Folder が「/docs」に選択されているか
+    - 必要に応じて再度選択して Save
+
+### オプション確認項目
 - [ ] s40-test.mjs の既知2件（S45のミニ波形撤去に伴う期待値更新漏れ）を直すか判断
 - [ ] `GV_ENTRY_RADIUS` の実運用チューニング（S51以来の据え置き候補）
 - [ ] **s62-test.mjs を S63〜S65 の変更に合わせて更新する**（granville行撤去・待ち系撤去・空欄ボタン撤去・weight導入・S65の`fiboRoll`→`rollReversal`置換、`en_rollReversal`/`hi_*`×5 の期待値も含む。現状はS62時点の定義を前提にしたまま）
@@ -138,6 +146,33 @@ S60セッション開始時、Windowsローカルのmasterが3セッション分
 **Commit attribution:** `Co-Authored-By: Claude <noreply@anthropic.com>`  
 **Branch strategy:** feature → `claude/fx-entry-checklist-s{n}-*` → PR/merge to master  
 **CSV round-trip:** All 23 columns tested, backward-compatible with S1 format  
+
+### GitHub Pages デプロイ（S76で確立した方法）
+⚠️ **毎回確認**: master に commit/push したら、以下の操作で GitHub Pages を確実に反映させること
+
+**ワンショットコマンド（セッション内で一度だけ実行）:**
+```bash
+# /docs フォルダに最新のファイルをコピー
+mkdir -p docs
+cp index.html manifest.webmanifest sw.js docs/
+cp -r assets docs/
+git add docs/ && git commit -m "GitHub Pages: sync from master" && git push origin master
+```
+
+**GitHub UI での設定（初回のみ、以後は不要）:**
+1. リポジトリの Settings → Pages
+2. Source: "Deploy from a branch" に設定
+3. Branch: "master" / Folder: "/docs" を選択
+4. Save
+
+**確認:**
+- https://jiangchengban-art.github.io/fx-entry-checklist/ で最新のコードが表示されるか確認
+- キャッシュ反映に数分かかることあり、F5 リロード or Ctrl+Shift+R で強制更新
+
+**失敗時の トラブルシューティング:**
+- リポジトリが public になっているか確認
+- /docs フォルダに index.html が存在するか確認（`git ls-files docs/`）
+- GitHub ストレージ容量に余裕があるか確認  
 
 ---
 
