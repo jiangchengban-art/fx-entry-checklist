@@ -237,7 +237,15 @@ w.trendAt = ISO文字列   // ← S24追加。ペア単位の最終更新時刻�
 - 送信前に**必ず先にローカルへ確定**させる（順序が逆だと送信成功・手元未反映の食い違いが残る）
 - `rev` の楽観ロック。0件更新なら他端末の割り込みとみなし最大3回リトライ
 
-#### Supabase 側
+#### Supabase 側（S78で全面置換 — 下の旧記述より優先）
+- **ログインなし**。fx-trade-tracker と同じ Supabase プロジェクトを共用し、`SUPABASE_URL`/`SUPABASE_KEY`（anon）を定数で持つ。設定タブの接続先入力・マジックリンク・`syncValidToken` は撤去
+- 表は **`trades_checklist`**（`id text pk, data jsonb, updated_at`、RLS無効）。⚠️ **表 `trades` は fx-trade-tracker 用なので絶対に触らない**
+- **1記録1行**。行 id の接頭辞：`t:<tradeId>` / `p:<ペア名>`（ペアの `id` は送らない）/ `j:<judgeLogId>` / `s:<snapshotId>` / `tomb`（墓標マップ1行）
+- ⚠️ **運ぶ形だけ行に分け、マージは従来の `mergeDoc()`（要素キー単位）のまま**。ペア行を丸ごと後勝ちにすると足単位の記録が消える
+- `runSync()`：`GET ?updated_at=gt.<前回取得−10分>`（**差分取得**。起動時・⟳ボタンは全件）→ 受信墓標をローカル墓標に合わせて `mergeDoc` → 変化があればローカル確定・`renderAll()` → `mochipoyo_sync_pushed_v1`（行id→ハッシュ）と比べて**変わった行だけ** `POST Prefer: resolution=merge-duplicates`。受信行のハッシュも記録してエコー送信を防ぐ
+- ⚠️ **読み込み間隔は30秒未満にしない**（移植元で6秒間隔→月19.4GBで停止。共用なので fx-trade-tracker も止まる）
+- ⚠️ `file://` で開いたときは同期しない（テストが本番の共用表に書き込むのを防ぐ）。テストは `window.__SYNC_ALLOW_FILE = true` で許可し Supabase を route モック（`s78-sync-test.mjs`）
+- 以下は S28〜S77 の旧方式（`app_state`）の記述:
 - テーブルは **1ユーザー1行の JSONB ドキュメント**（`app_state`）。マージはクライアント側で行うので Postgres 関数不要＝単一HTML方針を守れる
 - 認証は**メールのマジックリンク**。anon key は HTML/localStorage に載る前提だが、**RLS があれば anon key 単体では何も読めない**（`auth.uid()` が null でポリシー不成立）
 - 接続先（URL・anon key）は**設定タブから入力**して localStorage に保存する。リポジトリに鍵を置かない
@@ -567,6 +575,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
 | セッション | 主な変更 | 日付 |
+| 78 | ☁ **端末間同期を fx-trade-tracker 方式（ログインなし・1記録1行）に置換**。マジックリンクの送信回数制限で実用にならなかったため。表 `trades_checklist` に `t:/p:/j:/s:/tomb` 行で保存、マージは既存 `mergeDoc()` を流用、差分取得＋変更行のみ送信で通信量を抑制。認証・接続先入力UI・`app_state` コードを削除。新設 `s78-sync-test.mjs` 17項目（2端末モック：足単位マージ・差分送受信・墓標削除・安全弁・`trades` 表非接触）、s44/s55/s60 通過。同セッションの Firebase 画像保存の実運用化（`s78-test.mjs`）も含む。sw.js: v47→v49 | 2026-09-14 |
 | 77 | ✕ **🔭一覧の通貨名検索欄に✕クリアボタンを追加**。ユーザー要望「検索バーに入力した文字を消す際にバーの右側に小さな❌マークを設けてそこをタップすれば、入力していた文字をすぐ消せるようにしたい」に対応。①`#trendSearchInput`を`.trend-search-wrap`（`position:relative`）で包み、右端に`#trendSearchClear`ボタン（✕、`hidden`属性で既定非表示）を配置。入力欄の`padding-right`を広げてボタンと文字が重ならないようにした ②`input`イベントで値の有無に応じて`trendSearchClear.hidden`を切替 ③クリアボタンのクリックで入力値と`trendSearchQuery`をリセットし絞り込みを解除、フォーカスを入力欄へ戻す。`renderTrendList()`は`trendListEl`のみ再構築なので他のUI状態に影響しない。データモデル・CSV・端末間マージ・統計・並び順ロジック・波マップ・根拠パネル・S76の検索ロジック自体は無変更。新設s77-test.mjs 7項目通過（初期非表示・入力後表示・クリア後の値/表示/フォーカス/絞り込み解除、コンソールエラー無し）。sw.js: v46→v47。gitコミット: （未実施） | 2026-09-13 |
 | 76 | 🔍 **🔭一覧ツールバーに通貨名検索機能を追加**。ユーザー要望「並び順や全てのカテゴリの箇所に、通貨の頭文字を入力したらその通貨だけ検索できる検索機能を設けて」に対応。①カテゴリ選択（`#trendCategorySelect`）の隣に検索入力欄（`#trendSearchInput`）を新設、`input`イベントで`trendSearchQuery`を更新し即時絞り込み（大文字小文字は区別しない）②`trendApplyFilters()`（一覧・波マップ共有の絞り込み合流点）に1行追加するだけで実装。GO/未更新/カテゴリと同じAND条件、🗺波マップのライブ表示（`trendMapLiveEntries()`）にもコード変更なしで自動反映 ③波マップの過去日表示（`trendMapDayEntries()`）は`items`が`p`（ペア名）のみ保持するため、カテゴリと同様に個別で検索条件を追加 ④`renderTrendList()`は`trendListEl`のみ再構築し検索`<input>`要素自体は作り直さないため、連続入力中もフォーカス・カーソル位置を保持 ⑤GO/未更新/カテゴリと同じく永続化しない（巡回中の一時的な絞り込み）。データモデル・CSV・端末間マージ・統計・並び順ロジック・根拠パネルは無変更。新設s76-test.mjs 11項目通過（検索欄存在・大小文字無視・AND条件・空該当表示・フォーカス保持・波マップ連動・コンソールエラー無し）、既存s42/s43/s44/s55/s59/s60全通過（205項目）。sw.js: v45→v46。gitコミット: （未実施） | 2026-09-13 |
 | 75 | 🎯 **上位足RCIの選択肢をトレンド方向で自動絞り込み**。ユーザー指摘「上位足のRCIの選択の際、上昇トレンドの場合は下限か↓60か❌しか選択しないから記録した情報から反映して自動で選択項目を省略してほしい。下降トレンドならその逆」に対応。①`MV_TF_CHECKS`のRCI短期/中期/長期の`opts`に`side`を付与（上限・60↑→`sell`、60↓・下限→`buy`、❌は無指定）。押し目狙い（↗）ならRCIが下がっている場面しか意味を持たないため、逆サイドの選択肢は隠す方針は既存のエントリー足❶❷（S62 `MV_ENTRY_CHECKS`の`side`絞り込み）と同じ規約 ②`trendCheckCell()`の`side`算出を`field === 'tfEntry'`限定から`tfEntry || tfHigher`に拡張。`mvEntrySide(w)`は元々`w.tfHigher`が指す足の`w.trend[tfKey].state`を見て`up→buy`/`down→sell`を返す関数なので、上位足のRCIにもそのまま使い回せる ③`mvSyncEntrySideChecks()`（S62新設、`mvWriteTrend`/`mvSetTf`から呼ばれる書き込み後始末の唯一の入口）を拡張し、エントリー足に加えて上位足の`checksHigher[tfKey]`も走査。方向を反転・レンジ化したときに逆サイドで選んでいたRCI値を自動クリアする（❌・MACD・ラウンドナンバーはside無しなので影響なし）。方向未記録・レンジでは従来通り5択とも表示。新設s75-test.mjs 8項目通過、既存s42/s43/s44/s55/s59/s60/s62/s73/s74全通過（254項目）。sw.js: v44→v45。gitコミット: （未実施） | 2026-09-11 |

@@ -368,6 +368,11 @@
     background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0;
   }
   .img-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .img-thumbs a.img-pic { padding: 2px; flex-direction: column; }
+  .img-thumbs a.img-pic img {
+    width: 88px; height: 56px; object-fit: cover; border-radius: 4px; display: block; background: var(--surface);
+  }
+  .img-uploading { font-size: 12px; color: var(--ink-muted); }
   .badge.result-tag { background: var(--accent-soft); color: var(--accent); }
   @media (max-width: 480px) {
     .images-grid { grid-template-columns: 1fr; }
@@ -1215,6 +1220,10 @@
     <div class="basis-rr" id="beTouchStats"></div>
     <div class="basis-rr" id="alertLagStats"></div>
     <div class="basis-rr" id="mvAlertStats"></div>
+    <div class="basis-rr" id="hourStats"></div>
+    <div class="basis-rr" id="weekdayStats"></div>
+    <div class="basis-rr" id="pairStats"></div>
+    <div class="basis-rr" id="alertTfPnlStats"></div>
   </section>
 
   <section class="card">
@@ -1270,35 +1279,11 @@
     <h3 class="settings-head">☁ 複数端末で同期</h3>
     <div class="section-note">iPhone・PC・Android で同じ記録を見られるようにします。設定するとクラウドに複製が保存され、どの端末で記録しても他の端末に反映されます。オフラインでもこれまで通り記録でき、通信が戻ったときにまとめて反映されます。</div>
 
-    <div id="syncSetup">
-      <div class="sync-form">
-        <label for="syncUrl">Supabase の Project URL（https://xxxx.supabase.co）</label>
-        <input type="url" id="syncUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
-        <label for="syncKey">Supabase の anon public key</label>
-        <input type="text" id="syncKey" placeholder="eyJhbGci..." autocomplete="off">
-      </div>
-      <div class="list-toolbar">
-        <button class="btn-ghost" type="button" id="syncSaveConfig">接続先を保存</button>
-      </div>
-    </div>
-
-    <div id="syncLogin" class="hidden">
-      <div class="sync-form">
-        <label for="syncEmail">メールアドレス（3端末とも同じものを使ってください）</label>
-        <input type="email" id="syncEmail" placeholder="you@example.com" autocomplete="email">
-      </div>
-      <div class="list-toolbar">
-        <button class="btn-accent-solid" type="button" id="syncSendLink">📧 ログインリンクを送る</button>
-        <button class="btn-ghost" type="button" id="syncResetConfig">接続先を変更</button>
-      </div>
-      <div class="section-note">⚠️ iPhone の場合、届いたリンクは<strong>必ず Safari で開いてください</strong>。メールアプリの中で開くと別扱いになり、ログインが引き継がれません。</div>
-    </div>
-
-    <div id="syncActive" class="hidden">
+    <div id="syncActive">
+      <div class="section-note">ログインは不要です。起動時・画面に戻ったとき・表示中は30秒ごとに自動で取り込み、記録すると数秒後に自動で送信します。</div>
       <div id="syncAccount"></div>
       <div class="list-toolbar">
         <button class="btn-accent-solid" type="button" id="syncNow">⟳ 今すぐ同期</button>
-        <button class="btn-ghost" type="button" id="syncLogout">ログアウト</button>
       </div>
       <div class="sync-log" id="syncLog"></div>
     </div>
@@ -1307,14 +1292,16 @@
     <div class="section-note">トレード記録フォームで添付するチャート画像の保存先です。未設定でも画像なしで記録の保存は可能です。</div>
     <div id="fbSetup">
       <div class="sync-form">
-        <label for="fbBucket">Firebase Storage の bucket（例: your-app.appspot.com）</label>
-        <input type="text" id="fbBucket" placeholder="your-app.appspot.com" autocomplete="off">
-        <label for="fbApiKey">Firebase API Key（任意）</label>
+        <label for="fbBucket">Firebase Storage の bucket（例: your-app.firebasestorage.app）</label>
+        <input type="text" id="fbBucket" placeholder="your-app.firebasestorage.app" autocomplete="off">
+        <label for="fbApiKey">Firebase Web API Key（匿名ログインに使用）</label>
         <input type="text" id="fbApiKey" placeholder="AIza..." autocomplete="off">
       </div>
       <div class="list-toolbar">
         <button class="btn-ghost" type="button" id="fbSaveConfig">接続先を保存</button>
+        <button class="btn-ghost" type="button" id="fbTestUpload">テストアップロード</button>
       </div>
+      <div class="section-note" id="fbStatus"></div>
     </div>
 
     <h3 class="settings-head">💾 全データのバックアップ</h3>
@@ -2255,13 +2242,125 @@ function renderFbUi() {
 document.getElementById('fbSaveConfig').addEventListener('click', () => {
   const bucket = document.getElementById('fbBucket').value.trim();
   const apiKey = document.getElementById('fbApiKey').value.trim();
+  const prev = fbCfg();
   fbSaveCfg({ bucket, apiKey });
+  /* 接続先が変わったら別プロジェクトの匿名トークンは使えないので捨てる */
+  if (!prev || prev.apiKey !== apiKey) fbClearAuth();
   showToast('接続先を保存しました');
 });
 renderFbUi();
 
+/* ---- Firebase 匿名認証（S78: fetchのみ。Storageルールで auth.uid を要求するため） ----
+   トークンは端末ごと。3端末で uid が別々になるが、ダウンロードURLは token 付きで誰でも読めるので共有に支障はない。
+   ⚠ キーは BACKUP_SKIP で JSON バックアップから除外している（ログイン情報を持ち出さない）。 */
+const FB_AUTH_KEY = 'mochipoyo_firebase_auth_v1';
+function fbAuth() {
+  try { return JSON.parse(localStorage.getItem(FB_AUTH_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+function fbClearAuth() {
+  try { localStorage.removeItem(FB_AUTH_KEY); } catch (e) { /* noop */ }
+}
+function fbStoreAuth(uid, idToken, refreshToken, expiresIn) {
+  const a = { uid, idToken, refreshToken, exp: Date.now() + (Number(expiresIn) || 3600) * 1000 };
+  try { localStorage.setItem(FB_AUTH_KEY, JSON.stringify(a)); } catch (e) { /* noop */ }
+  return a;
+}
+/* 有効な idToken を返す。期限5分前を切ったら refresh、refresh も失敗したら匿名で作り直す */
+async function fbEnsureAuth(cfg) {
+  if (!cfg.apiKey) throw fbError('noKey');
+  const key = encodeURIComponent(cfg.apiKey);
+  const cur = fbAuth();
+  if (cur && cur.idToken && cur.exp - Date.now() > 5 * 60 * 1000) return cur;
+  if (cur && cur.refreshToken) {
+    const r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + key, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(cur.refreshToken),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      return fbStoreAuth(d.user_id, d.id_token, d.refresh_token, d.expires_in);
+    }
+  }
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + key, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }),
+  });
+  if (!r.ok) throw fbError('auth', r.status);
+  const d = await r.json();
+  return fbStoreAuth(d.localId, d.idToken, d.refreshToken, d.expiresIn);
+}
+function fbError(kind, status) {
+  const e = new Error(kind + (status ? ':' + status : ''));
+  e.kind = kind; e.status = status || 0;
+  return e;
+}
+/* 失敗理由を人が直せる言葉にする（テストアップロードとトーストで共用） */
+function fbErrorMessage(err) {
+  if (err.kind === 'noKey') return 'Web API Key が未入力です';
+  if (err.kind === 'auth') return '匿名ログインに失敗しました（API Key の誤り、または Authentication で「匿名」が無効）';
+  if (err.kind === 'upload') {
+    if (err.status === 401 || err.status === 403) return 'アップロードが拒否されました（Storage ルールを確認）';
+    if (err.status === 404) return 'bucket が見つかりません（bucket 名を確認）';
+    return 'アップロードに失敗しました（HTTP ' + err.status + '）';
+  }
+  return '通信に失敗しました（オフライン？）';
+}
+
+/* ---- アップロード前の圧縮（S78） ----
+   スクショは1枚1〜3MBあり、無料枠をすぐ食うので長辺1600px・WebP(非対応ならJPEG)に落とす。
+   デコードできない形式・縮めても大きくならないものは元ファイルのまま送る。 */
+const IMG_MAX_EDGE = 1600;
+const IMG_QUALITY = 0.8;
+async function compressImage(file) {
+  if (!file.type || !file.type.startsWith('image/') || file.type === 'image/gif') return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, IMG_MAX_EDGE / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    if (bmp.close) bmp.close();
+    const toBlob = (type) => new Promise(res => canvas.toBlob(res, type, IMG_QUALITY));
+    let blob = await toBlob('image/webp');
+    /* Safari の古い版は webp を書けず png を返す */
+    if (!blob || blob.type !== 'image/webp') blob = await toBlob('image/jpeg');
+    if (!blob || blob.size >= file.size) return file;
+    return blob;
+  } catch (e) {
+    return file;
+  }
+}
+
 /* Firebase Storage の REST API に直接 fetch でアップロードし、ダウンロードURLを組み立てる。
-   単一ファイル・CDN依存なしの原則を守るため Firebase JS SDK は使わない。 */
+   単一ファイル・CDN依存なしの原則を守るため Firebase JS SDK は使わない。
+   S78: 匿名認証の idToken を付け、パスを chart-images/{uid}/ 配下にする（ルールで本人以外の書き込みを拒否）。
+   失敗時は例外を投げる（呼び出し側がトースト or テスト結果表示を選ぶ）。 */
+async function uploadChartImageOrThrow(file) {
+  const cfg = fbCfg();
+  if (!cfg || !cfg.bucket) throw fbError('noBucket');
+  const auth = await fbEnsureAuth(cfg);
+  const body = await compressImage(file);
+  const ext = body.type === 'image/webp' ? 'webp' : body.type === 'image/jpeg' ? 'jpg'
+    : ((file.name || '').split('.').pop() || 'img');
+  const path = 'chart-images/' + auth.uid + '/' + Date.now().toString(36) + '-' +
+    Math.random().toString(36).slice(2, 8) + '.' + ext.toLowerCase();
+  const base = 'https://firebasestorage.googleapis.com/v0/b/' + encodeURIComponent(cfg.bucket) + '/o';
+  const res = await fetch(base + '?uploadType=media&name=' + encodeURIComponent(path), {
+    method: 'POST',
+    headers: { 'Content-Type': body.type || 'application/octet-stream', 'Authorization': 'Firebase ' + auth.idToken },
+    body,
+  });
+  if (!res.ok) {
+    /* トークンが失効扱いされたら次回は取り直す */
+    if (res.status === 401) fbClearAuth();
+    throw fbError('upload', res.status);
+  }
+  const data = await res.json();
+  const token = data.downloadTokens ? String(data.downloadTokens).split(',')[0] : '';
+  return base + '/' + encodeURIComponent(path) + '?alt=media' + (token ? '&token=' + encodeURIComponent(token) : '');
+}
 async function uploadChartImage(file) {
   const cfg = fbCfg();
   if (!cfg || !cfg.bucket) {
@@ -2269,24 +2368,29 @@ async function uploadChartImage(file) {
     return '';
   }
   try {
-    const path = 'chart-images/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) +
-      '-' + encodeURIComponent(file.name || 'image');
-    const url = 'https://firebasestorage.googleapis.com/v0/b/' + encodeURIComponent(cfg.bucket) +
-      '/o?uploadType=media&name=' + encodeURIComponent(path) +
-      (cfg.apiKey ? '&key=' + encodeURIComponent(cfg.apiKey) : '');
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
-    if (!res.ok) throw new Error('upload failed: ' + res.status);
-    const data = await res.json();
-    const token = data.downloadTokens;
-    const downloadUrl = 'https://firebasestorage.googleapis.com/v0/b/' + encodeURIComponent(cfg.bucket) +
-      '/o/' + encodeURIComponent(path) + '?alt=media' + (token ? '&token=' + token : '');
-    return downloadUrl;
+    return await uploadChartImageOrThrow(file);
   } catch (err) {
     console.error(err);
-    showToast('⚠ 画像のアップロードに失敗しました');
+    showToast('⚠ ' + fbErrorMessage(err));
     return '';
   }
 }
+
+/* ⚙設定の「テストアップロード」: 1×1 の PNG を実際に送って、設定ミスをその場で分かるようにする */
+document.getElementById('fbTestUpload').addEventListener('click', async () => {
+  const st = document.getElementById('fbStatus');
+  const cfg = fbCfg();
+  if (!cfg || !cfg.bucket) { st.textContent = '⚠ 先に bucket を入力して「接続先を保存」してください'; return; }
+  st.textContent = '⏳ テスト中…';
+  try {
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), c => c.charCodeAt(0));
+    const url = await uploadChartImageOrThrow(new File([png], 'test.png', { type: 'image/png' }));
+    st.textContent = '✅ アップロード成功（' + url.slice(0, 60) + '…）';
+  } catch (err) {
+    console.error(err);
+    st.textContent = '❌ ' + (err.kind === 'noBucket' ? 'bucket が未設定です' : fbErrorMessage(err));
+  }
+});
 
 /* ---- チャート画像（Firebase Storageへアップロード） ---- */
 const imagesField = document.getElementById('imagesField');
@@ -2318,16 +2422,27 @@ imagesField.addEventListener('click', (e) => {
   }
   renderImagePreview(key);
 });
+/* アップロード中の件数。0 になるまで保存させない（URL が入る前に保存すると画像が記録から抜ける） */
+let imgUploading = 0;
 async function handleImageInput(inputEl, key) {
   const files = Array.from(inputEl.files || []);
   inputEl.value = '';
-  for (const file of files) {
-    const url = await uploadChartImage(file);
-    if (!url) continue;
-    if (key === 'others') formImages.others.push(url);
-    else formImages[key] = url;
+  if (!files.length) return;
+  const el = document.getElementById(
+    key === 'entry' ? 'fImgEntryPreview' : key === 'higher' ? 'fImgHigherPreview' : 'fImgOthersPreview');
+  imgUploading++;
+  if (el) el.insertAdjacentHTML('beforeend', '<span class="img-uploading">⏳ アップロード中…</span>');
+  try {
+    for (const file of files) {
+      const url = await uploadChartImage(file);
+      if (!url) continue;
+      if (key === 'others') formImages.others.push(url);
+      else formImages[key] = url;
+    }
+  } finally {
+    imgUploading--;
+    renderImagePreview(key);
   }
-  renderImagePreview(key);
 }
 document.getElementById('fImgEntry').addEventListener('change', (e) => handleImageInput(e.target, 'entry'));
 document.getElementById('fImgHigher').addEventListener('change', (e) => handleImageInput(e.target, 'higher'));
@@ -2480,6 +2595,10 @@ document.getElementById('tradeForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!tradeTypeState) {
     showToast('⚠ 「検証／リアル」を選択してください');
+    return;
+  }
+  if (imgUploading > 0) {
+    showToast('⏳ 画像のアップロード中です。完了してから保存してください');
     return;
   }
   doSave();
@@ -2828,10 +2947,12 @@ function renderList() {
 }
 function imageThumbsHtml(images) {
   const parts = [];
-  if (images.entry) parts.push('<a href="' + esc(images.entry) + '" target="_blank" rel="noopener" class="img-thumb">エントリー足</a>');
-  if (images.higher) parts.push('<a href="' + esc(images.higher) + '" target="_blank" rel="noopener" class="img-thumb">上位足</a>');
-  (images.others || []).forEach((url, i) =>
-    parts.push('<a href="' + esc(url) + '" target="_blank" rel="noopener" class="img-thumb">その他' + (i + 1) + '</a>'));
+  /* S78: 文字リンクから実画像のサムネイルに。loading=lazy なので履歴が長くても初回描画で全件は取りに行かない */
+  const pic = (url, label) => '<a href="' + esc(url) + '" target="_blank" rel="noopener" class="img-thumb img-pic" title="' + label + '">' +
+    '<img src="' + esc(url) + '" alt="' + label + '" loading="lazy">' + label + '</a>';
+  if (images.entry) parts.push(pic(images.entry, 'エントリー足'));
+  if (images.higher) parts.push(pic(images.higher, '上位足'));
+  (images.others || []).forEach((url, i) => parts.push(pic(url, 'その他' + (i + 1))));
   return '<span class="img-thumbs">' + parts.join(' ') + '</span>';
 }
 function kv(k, v) {
@@ -3019,7 +3140,7 @@ function csvField(v) {
 const BACKUP_PREFIX = 'mochipoyo_';
 /* 退避用の派生キーに加え、ログイン情報（他人に渡してはいけない）と
    同期の巻き戻し用スナップショット（重いだけで復元に要らない）を除く。 */
-const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$|^mochipoyo_sync_(auth|lastpush)_v1$/;
+const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$|^mochipoyo_sync_(auth|lastpush|pushed)_v1$|^mochipoyo_firebase_auth_v1$/;
 const BACKUP_SCHEMA = 1;
 
 function backupKeys() {
@@ -5326,8 +5447,6 @@ renderAll();
    まるごと上書きすると片方の巡回記録が丸ごと消える。要素キー単位でマージする。
    ============================================================ */
 
-const SYNC_CFG_KEY   = 'mochipoyo_sync_config_v1';
-const SYNC_AUTH_KEY  = 'mochipoyo_sync_auth_v1';
 const SYNC_STATE_KEY = 'mochipoyo_sync_state_v1';
 
 function syncReadJson(key, fallback) {
@@ -5337,8 +5456,6 @@ function syncReadJson(key, fallback) {
 function syncWriteJson(key, v) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* noop */ }
 }
-const syncCfg   = () => syncReadJson(SYNC_CFG_KEY, null);
-const syncAuth  = () => syncReadJson(SYNC_AUTH_KEY, null);
 const syncState = () => syncReadJson(SYNC_STATE_KEY, { lastAt: '', dirty: false });
 
 /* ---- マージ ----
@@ -5496,123 +5613,157 @@ function localDoc() {
   };
 }
 
-/* ---- Supabase REST ----
-   SDK は使わない（単一HTMLを保つため）。必要なのは認証3本とテーブル3操作だけ。 */
-async function sbFetch(path, opts, useAuth) {
-  const cfg = syncCfg();
-  if (!cfg) throw new Error('接続先が未設定です');
-  const headers = Object.assign({ apikey: cfg.key, 'Content-Type': 'application/json' },
-                                (opts && opts.headers) || {});
-  if (useAuth !== false) {
-    const a = await syncValidToken();
-    headers.Authorization = 'Bearer ' + a.access_token;
-  }
-  const res = await fetch(cfg.url.replace(/\/+$/, '') + path, Object.assign({}, opts, { headers }));
+/* ---- Supabase REST（S78: fx-trade-tracker 方式・ログインなし） ----
+   SDK は使わない。表 trades_checklist は「1記録1行」{ id, data, updated_at }。
+   ⚠️ 表 trades は fx-trade-tracker 用。絶対に触らない（Supabase プロジェクトを共用している）。
+   行 id は種別の接頭辞で区別する：
+     t:<tradeId> トレード / p:<ペア名> 監視ペア / j:<id> 判定ログ / s:<id> スナップショット / tomb 墓標
+   運ぶ形だけを行に分け、マージは従来どおり mergeDoc()（要素キー単位）で行う。
+   ペアを行ごと後勝ちにすると「PCで日足・iPhoneで4H」の片方が消えるため。 */
+const SUPABASE_URL = 'https://vktnrrrfeeicfewtllfx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZrdG5ycnJmZWVpY2Zld3RsbGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDMxNjAsImV4cCI6MjA5NTk3OTE2MH0.lS6BPaU1TK8yGOvhghXj3wuSh3YR3Idasai473u90gw';
+const SYNC_TABLE = 'trades_checklist';
+const SYNC_PUSHED_KEY = 'mochipoyo_sync_pushed_v1';   // 行id → 最後に送った/受けた内容のハッシュ
+/* 差分取得の余裕。端末の時計のずれで取りこぼさないよう、前回取得時刻からこの分だけ遡る。 */
+const SYNC_PULL_MARGIN_MS = 10 * 60 * 1000;
+
+async function sbFetch(path, opts) {
+  const headers = Object.assign({
+    apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json',
+  }, (opts && opts.headers) || {});
+  const res = await fetch(SUPABASE_URL + path, Object.assign({}, opts, { headers }));
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error('HTTP ' + res.status + ' ' + body.slice(0, 200));
   }
-  return res.status === 204 ? null : res.json().catch(() => null);
+  /* POST(upsert) の本文は空なので json() は失敗してよい */
+  const text = await res.text().catch(() => '');
+  return text ? JSON.parse(text) : null;
 }
 
-/* 期限が近ければ更新してから返す。期限切れのまま投げると同期がまるごと失敗する。 */
-async function syncValidToken() {
-  const a = syncAuth();
-  if (!a) throw new Error('ログインしていません');
-  if (a.expires_at && a.expires_at - Date.now() > 60000) return a;
-  const cfg = syncCfg();
-  const res = await fetch(cfg.url.replace(/\/+$/, '') + '/auth/v1/token?grant_type=refresh_token', {
-    method: 'POST',
-    headers: { apikey: cfg.key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: a.refresh_token }),
+function syncHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36) + '.' + str.length;
+}
+
+/* ローカル doc → 行の配列。ペアの id は端末ごとの採番なので送らない。 */
+function docToRows(doc, tomb) {
+  const rows = [];
+  (doc.trades || []).forEach(t => { if (t && t.id) rows.push({ id: 't:' + t.id, data: t }); });
+  (doc.market.pairs || []).forEach(p => {
+    if (!p || !p.pair) return;
+    const { id, ...rest } = p;
+    rows.push({ id: 'p:' + p.pair, data: rest });
   });
-  if (!res.ok) {
-    localStorage.removeItem(SYNC_AUTH_KEY);
-    renderSyncUi();
-    throw new Error('ログインの有効期限が切れました。もう一度ログインしてください');
-  }
-  const j = await res.json();
-  const next = {
-    access_token: j.access_token, refresh_token: j.refresh_token,
-    expires_at: Date.now() + (j.expires_in || 3600) * 1000,
-    email: (j.user && j.user.email) || a.email,
-    user_id: (j.user && j.user.id) || a.user_id,
-  };
-  syncWriteJson(SYNC_AUTH_KEY, next);
-  return next;
+  (doc.market.judgeLog || []).forEach(x => { if (x && x.id) rows.push({ id: 'j:' + x.id, data: x }); });
+  (doc.market.snapshots || []).forEach(x => { if (x && x.id) rows.push({ id: 's:' + x.id, data: x }); });
+  rows.push({ id: 'tomb', data: { trades: (tomb && tomb.trades) || {}, pairs: (tomb && tomb.pairs) || {} } });
+  return rows;
 }
 
-/* ---- 同期1サイクル ---- */
+/* 受信した行 → mergeDoc が読む形の remote doc。 */
+function rowsToDoc(rows) {
+  const doc = { trades: [], market: { pairs: [], snapshots: [], judgeLog: [] }, tombstones: {} };
+  (rows || []).forEach(r => {
+    if (!r || !r.id || !r.data) return;
+    const k = r.id.slice(0, 2);
+    if (k === 't:') doc.trades.push(r.data);
+    else if (k === 'p:') doc.market.pairs.push(r.data);
+    else if (k === 'j:') doc.market.judgeLog.push(r.data);
+    else if (k === 's:') doc.market.snapshots.push(r.data);
+    else if (r.id === 'tomb') doc.tombstones = r.data;
+  });
+  return doc;
+}
+
+/* ---- 同期1サイクル：取り込み（差分）→ マージ → ローカル確定 → 変わった行だけ送信 ---- */
 let syncRunning = false;
 
 async function runSync(opts) {
+  const full = !!(opts && opts.full);
   const dryRun = !!(opts && opts.dryRun);
   if (syncRunning) return;
-  if (!syncCfg() || !syncAuth()) return;
-  /* ⚠️ ここが最重要の安全弁。ローカルの読み込みに失敗している状態で同期すると、
-     空になったローカルでクラウドの本物を潰す。段階0のフラグをそのまま効かせる。 */
+  /* file:// で開いたとき（Playwright テスト等）は本番の共用表へ書き込まない。テストは window.__SYNC_ALLOW_FILE で許可する */
+  if (location.protocol === 'file:' && !window.__SYNC_ALLOW_FILE) return;
+  /* ⚠️ 最重要の安全弁。ローカルの読み込みに失敗している状態で同期すると、
+     空になったローカルでクラウドの本物を潰す。 */
   if (STORAGE_FAILED.market || STORAGE_FAILED.trades) {
     setSyncChip('bad', '⛔ 停止中');
     return;
   }
+  if (!navigator.onLine) { refreshSyncChip(); return; }
   syncRunning = true;
   setSyncChip('busy', '⟳ 同期中');
   try {
-    const a = await syncValidToken();
-    const q = '?user_id=eq.' + encodeURIComponent(a.user_id);
-    const rows = await sbFetch('/rest/v1/app_state' + q + '&select=doc,rev');
-    const row = rows && rows[0];
+    const st = syncState();
+    const startedAt = new Date().toISOString();
+    let q = '?select=id,data,updated_at';
+    if (!full && st.lastPullAt) {
+      const since = new Date(ts(st.lastPullAt) - SYNC_PULL_MARGIN_MS).toISOString();
+      q += '&updated_at=gt.' + encodeURIComponent(since);
+    }
+    const rows = (await sbFetch('/rest/v1/' + SYNC_TABLE + q)) || [];
+
+    const pushed = syncReadJson(SYNC_PUSHED_KEY, {});
+    /* 受け取った内容は「相手が既に持っている」ので送り返さない（エコー防止） */
+    rows.forEach(r => { if (r && r.id && r.data) pushed[r.id] = syncHash(JSON.stringify(r.data)); });
 
     const local = localDoc();
-    const tomb = loadTombstones();
-    const { merged, stats } = mergeDoc(local, row ? row.doc : null, tomb);
+    const remote = rowsToDoc(rows);
+    /* mergeTrades/mergePairs は渡した墓標だけを見るので、他端末の削除を先に合わせておく
+       （合わせないと、他端末で消した記録がこの端末では消えない） */
+    const lt = loadTombstones(), rt = remote.tombstones || {};
+    const tomb = {
+      trades: Object.assign({}, rt.trades, lt.trades),
+      pairs:  Object.assign({}, rt.pairs,  lt.pairs),
+    };
+    const { merged, stats } = mergeDoc(local, remote, tomb);
 
     if (dryRun) {
-      syncLog('【確認のみ】マージ結果 … トレード ' + merged.trades.length + '件' +
-              '／ペア ' + merged.market.pairs.length + '件' +
-              '／判定ログ ' + merged.market.judgeLog.length + '件' +
-              '（保存はしていません）');
+      syncLog('【確認のみ】受信 ' + rows.length + '行 … トレード ' + merged.trades.length + '件' +
+              '／ペア ' + merged.market.pairs.length + '件（保存はしていません）');
       setSyncChip('ok', '✔ 確認のみ');
       return;
     }
 
-    /* ⚠️ 先にローカルを確定させてから送る。順序を逆にすると、送信は成功したのに
-       手元に反映されていない、という食い違いが残る。 */
-    saveMarket({ pairs: merged.market.pairs, snapshots: merged.market.snapshots,
-                 judgeLog: merged.market.judgeLog });
-    saveTrades(merged.trades);
-    syncWriteJson(TOMBSTONE_KEY, merged.tombstones);
-    /* マージ結果は1世代だけ控える（マージに不具合があったときの巻き戻し用）。 */
-    syncWriteJson('mochipoyo_sync_lastpush_v1', { at: new Date().toISOString(), doc: merged });
-
-    const body = JSON.stringify({ doc: merged, rev: (row ? row.rev : 0) + 1,
-                                  updated_at: new Date().toISOString() });
-    if (!row) {
-      await sbFetch('/rest/v1/app_state', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ user_id: a.user_id, doc: merged, rev: 1 }),
-      });
-    } else {
-      /* rev を条件に入れることで、他端末が割り込んだ場合に 0 件更新として検出できる。 */
-      const upd = await sbFetch('/rest/v1/app_state' + q + '&rev=eq.' + row.rev, {
-        method: 'PATCH', headers: { Prefer: 'return=representation' }, body,
-      });
-      if (!upd || upd.length === 0) {
-        syncRunning = false;
-        const n = (opts && opts.retry) || 0;
-        if (n < 3) return runSync(Object.assign({}, opts, { retry: n + 1 }));
-        throw new Error('他の端末と同時に更新されました。もう一度お試しください');
-      }
+    /* ⚠️ 先にローカルを確定させてから送る。 */
+    const changedLocal = JSON.stringify(merged.trades) !== JSON.stringify(local.trades) ||
+      JSON.stringify(merged.market) !== JSON.stringify(local.market);
+    if (changedLocal) {
+      saveMarket({ pairs: merged.market.pairs, snapshots: merged.market.snapshots,
+                   judgeLog: merged.market.judgeLog });
+      saveTrades(merged.trades);
     }
+    syncWriteJson(TOMBSTONE_KEY, merged.tombstones);
 
-    syncWriteJson(SYNC_STATE_KEY, { lastAt: new Date().toISOString(), dirty: false });
+    /* 変わった行だけ送る（全行を毎回送ると共用の通信量枠を食い潰す） */
+    const now = new Date().toISOString();
+    const out = [];
+    const nextPushed = {};
+    docToRows(localDoc(), loadTombstones()).forEach(r => {
+      const h = syncHash(JSON.stringify(r.data));
+      nextPushed[r.id] = h;
+      if (pushed[r.id] !== h) out.push({ id: r.id, data: r.data, updated_at: now });
+    });
+    /* 大量の初回送信でも1リクエストが大きくなりすぎないよう分割 */
+    for (let i = 0; i < out.length; i += 200) {
+      await sbFetch('/rest/v1/' + SYNC_TABLE, {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(out.slice(i, i + 200)),
+      });
+    }
+    /* ローカルから消えた行（プルーン済みスナップショット等）のハッシュも残すと無限に膨らむので、今ある行だけ保持 */
+    syncWriteJson(SYNC_PUSHED_KEY, nextPushed);
+    syncWriteJson(SYNC_STATE_KEY, { lastAt: now, lastPullAt: startedAt, dirty: false });
+
     const delta = [];
-    if (stats.trades)   delta.push('トレード +' + stats.trades);
+    if (stats.trades)   delta.push('トレード ' + (stats.trades > 0 ? '+' : '') + stats.trades);
     if (stats.pairs)    delta.push('ペア +' + stats.pairs);
     if (stats.judgeLog) delta.push('判定ログ +' + stats.judgeLog);
-    syncLog('最終同期 ' + new Date().toLocaleString('ja-JP') +
-            (delta.length ? '　（受信：' + delta.join(' / ') + '）' : '　（変更なし）'));
-    if (delta.length) { renderAll(); showToast('☁ 他の端末の記録を取り込みました'); }
+    syncLog('最終同期 ' + new Date().toLocaleString('ja-JP') + '　受信 ' + rows.length + '行／送信 ' + out.length + '行' +
+            (changedLocal ? '　（他の端末の記録を反映）' : ''));
+    if (changedLocal) { renderAll(); showToast('☁ 他の端末の記録を取り込みました'); }
     setSyncChip('ok', '✔ ' + new Date().toTimeString().slice(0, 5));
   } catch (e) {
     console.warn('[sync]', e);
@@ -5624,39 +5775,13 @@ async function runSync(opts) {
   }
 }
 
-/* ---- 端末間の食い違いが直らないときの最終手段（コンソール専用・UIには出さない） ----
-   通常の同期は要素キー単位でマージするので、マージ結果自体が壊れているような
-   異常時（例：クラウド側の doc が壊れて runSync が毎回エラーになる）は
-   マージでは直らない。この端末のローカルを正としてクラウド側を丸ごと作り直す。
-   ⚠️ 他端末の未同期分は消える。実行前に必ずその端末側で同期を済ませておくこと。 */
+/* ---- 最終手段（コンソール専用）：この端末の全行をクラウドへ送り直す ----
+   upsert なので他端末の行は消さない。ハッシュ記録を捨てて全行を再送するだけ。 */
 async function resetCloudToLocal() {
-  if (!syncCfg() || !syncAuth()) { console.error('[resetCloudToLocal] 未ログインです'); return; }
-  if (!confirm('クラウド側のデータを、この端末のローカル内容で丸ごと上書きします。\n' +
-               '他の端末にまだ同期していない変更があれば消えます。よろしいですか？')) return;
-  try {
-    const a = await syncValidToken();
-    const q = '?user_id=eq.' + encodeURIComponent(a.user_id);
-    const doc = localDoc();
-    const rows = await sbFetch('/rest/v1/app_state' + q + '&select=rev', undefined);
-    const row = rows && rows[0];
-    if (!row) {
-      await sbFetch('/rest/v1/app_state', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ user_id: a.user_id, doc, rev: 1 }),
-      });
-    } else {
-      await sbFetch('/rest/v1/app_state' + q, {
-        method: 'PATCH', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ doc, rev: row.rev + 1, updated_at: new Date().toISOString() }),
-      });
-    }
-    syncWriteJson(SYNC_STATE_KEY, { lastAt: new Date().toISOString(), dirty: false });
-    console.log('[resetCloudToLocal] 完了。トレード ' + doc.trades.length + '件／ペア ' +
-                doc.market.pairs.length + '件をクラウドへ書き込みました。');
-    showToast('☁ クラウド側をこの端末の内容で上書きしました');
-  } catch (e) {
-    console.error('[resetCloudToLocal] 失敗:', e);
-  }
+  if (!confirm('この端末の全記録をクラウドへ送り直します。よろしいですか？')) return;
+  localStorage.removeItem(SYNC_PUSHED_KEY);
+  await runSync({ full: true });
+  console.log('[resetCloudToLocal] 完了');
 }
 
 /* ---- 表示 ---- */
@@ -5671,99 +5796,27 @@ function syncLog(msg) {
 }
 function refreshSyncChip() {
   if (STORAGE_FAILED.market || STORAGE_FAILED.trades) { setSyncChip('bad', '⛔ 停止中'); return; }
-  if (!syncCfg()) { setSyncChip('', '☁ 未設定'); return; }
-  if (!syncAuth()) { setSyncChip('warn', '☁ 未ログイン'); return; }
   const s = syncState();
   if (!navigator.onLine) { setSyncChip('warn', '⚠ オフライン'); return; }
   setSyncChip(s.lastAt ? 'ok' : 'warn', s.lastAt ? '✔ ' + new Date(s.lastAt).toTimeString().slice(0, 5) : '☁ 未同期');
 }
 function renderSyncUi() {
-  const cfg = syncCfg(), auth = syncAuth();
-  document.getElementById('syncSetup').classList.toggle('hidden', !!cfg);
-  document.getElementById('syncLogin').classList.toggle('hidden', !cfg || !!auth);
-  document.getElementById('syncActive').classList.toggle('hidden', !cfg || !auth);
-  if (cfg) {
-    document.getElementById('syncUrl').value = cfg.url;
-    document.getElementById('syncKey').value = cfg.key;
-  }
-  if (auth) {
-    const s = syncState();
-    document.getElementById('syncAccount').innerHTML =
-      '<span class="em">' + esc(auth.email || '') + '</span> でログイン中<br>' +
-      '最終同期：' + (s.lastAt ? new Date(s.lastAt).toLocaleString('ja-JP') : 'まだ同期していません');
-  }
+  const s = syncState();
+  const el = document.getElementById('syncAccount');
+  if (el) el.textContent = '最終同期：' + (s.lastAt ? new Date(s.lastAt).toLocaleString('ja-JP') : 'まだ同期していません');
   refreshSyncChip();
 }
 
 /* ---- 操作 ---- */
 syncChipEl.addEventListener('click', () => setActiveTab('settings'));
-
-document.getElementById('syncSaveConfig').addEventListener('click', () => {
-  const url = document.getElementById('syncUrl').value.trim().replace(/\/+$/, '');
-  const key = document.getElementById('syncKey').value.trim();
-  if (!/^https:\/\/.+/.test(url)) { showToast('⚠ Project URL は https:// から始まります'); return; }
-  if (key.length < 20) { showToast('⚠ anon key を貼り付けてください'); return; }
-  syncWriteJson(SYNC_CFG_KEY, { url, key });
-  renderSyncUi();
-  showToast('接続先を保存しました');
-});
-document.getElementById('syncResetConfig').addEventListener('click', () => {
-  localStorage.removeItem(SYNC_CFG_KEY);
-  renderSyncUi();
-});
-
-document.getElementById('syncSendLink').addEventListener('click', async () => {
-  const email = document.getElementById('syncEmail').value.trim();
-  if (!email) { showToast('⚠ メールアドレスを入力してください'); return; }
-  const cfg = syncCfg();
-  const redirect = location.href.split('#')[0];
-  try {
-    await sbFetch('/auth/v1/otp?redirect_to=' + encodeURIComponent(redirect), {
-      method: 'POST', body: JSON.stringify({ email, create_user: true }),
-    }, false);
-    alert('ログインリンクを送りました。\n\nメールを開いて「Log In」を押してください。\n' +
-          '※ iPhone の場合は必ず Safari で開いてください。');
-  } catch (e) {
-    alert('送信に失敗しました。\n' + e.message);
-  }
-});
-
-document.getElementById('syncLogout').addEventListener('click', () => {
-  if (!confirm('ログアウトします。この端末の記録は消えません。よろしいですか？')) return;
-  localStorage.removeItem(SYNC_AUTH_KEY);
-  localStorage.removeItem(SYNC_STATE_KEY);
-  renderSyncUi();
-});
-
-document.getElementById('syncNow').addEventListener('click', () => runSync());
-
-/* ---- ログイン後の戻り（#access_token=... で返ってくる） ---- */
-function syncCaptureAuthHash() {
-  if (!location.hash || location.hash.indexOf('access_token') < 0) return false;
-  const p = new URLSearchParams(location.hash.slice(1));
-  const access = p.get('access_token');
-  if (!access) return false;
-  /* JWT の中身からユーザーIDとメールを取る。1往復減らすためだけの用途。 */
-  let payload = {};
-  try { payload = JSON.parse(atob(access.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); }
-  catch (e) { /* noop */ }
-  syncWriteJson(SYNC_AUTH_KEY, {
-    access_token: access,
-    refresh_token: p.get('refresh_token') || '',
-    expires_at: Date.now() + Number(p.get('expires_in') || 3600) * 1000,
-    email: payload.email || '', user_id: payload.sub || '',
-  });
-  /* トークンが URL に残ったままだと、履歴や共有から漏れる。すぐ消す。 */
-  history.replaceState(null, '', location.pathname + location.search);
-  return true;
-}
+document.getElementById('syncNow').addEventListener('click', () => runSync({ full: true }));
 
 /* ---- 自動同期のきっかけ ----
    書き込みのたびに送ると通信が増えるので、少し待ってからまとめて送る。 */
 let syncDebounce = null;
 function syncMarkDirty() {
   const s = syncState();
-  syncWriteJson(SYNC_STATE_KEY, { lastAt: s.lastAt, dirty: true });
+  syncWriteJson(SYNC_STATE_KEY, Object.assign({}, s, { dirty: true }));
   refreshSyncChip();
   clearTimeout(syncDebounce);
   syncDebounce = setTimeout(() => runSync(), 3000);
@@ -5771,16 +5824,14 @@ function syncMarkDirty() {
 
 window.addEventListener('online', () => { refreshSyncChip(); runSync(); });
 window.addEventListener('offline', refreshSyncChip);
+/* ⚠️ 読み込み間隔は30秒より短くしない。共用プロジェクトの通信量上限を超えると fx-trade-tracker まで止まる
+   （移植元で6秒間隔にして月19.4GBになった実例あり）。復帰系イベントも前回から30秒未満なら通信しない。 */
 function syncPullIfVisible() {
   if (document.visibilityState !== 'visible') return;
   const s = syncState();
-  /* 戻ってくるたびに通信すると無駄なので、前回から1分あいたときだけ。 */
-  if (s.dirty || !s.lastAt || Date.now() - ts(s.lastAt) > 60000) runSync();
+  if (s.dirty || !s.lastAt || Date.now() - ts(s.lastAt) >= 30000) runSync();
 }
 document.addEventListener('visibilitychange', syncPullIfVisible);
-/* ⚠️ iOS Safari はバックグラウンドタブの setInterval を止める・タブ自体を kill することがあるので、
-   visibilitychange 単体では「開きっぱなしの iPhone に PC の更新が届かない」まま起こる。
-   復帰・再表示・操作系のイベントを総動員して拾う（S28拡張）。 */
 window.addEventListener('pageshow', syncPullIfVisible);
 window.addEventListener('focus', syncPullIfVisible);
 let syncTouchLast = 0;
@@ -5790,12 +5841,9 @@ document.addEventListener('touchstart', () => {
   syncTouchLast = now;
   syncPullIfVisible();
 }, { passive: true });
-/* 前面にいる間だけの定期ポーリング。個人利用の巡回ツールなので30秒で十分、
-   短くしすぎると同期の課金枠を無駄に消費する（移植元プロジェクトで実際に踏んだ）。 */
 setInterval(syncPullIfVisible, 30000);
 
-/* 保存が起きたことを検知して同期予約する。全書き込み経路が saveMarket / saveTrades を
-   通る規約になっているので、この2つを包むだけで漏れなく拾える。 */
+/* 保存が起きたことを検知して同期予約する。全書き込み経路が saveMarket / saveTrades を通る規約。 */
 ['saveMarket', 'saveTrades'].forEach(name => {
   const orig = window[name];
   window[name] = function () {
@@ -5805,10 +5853,13 @@ setInterval(syncPullIfVisible, 30000);
   };
 });
 
-const syncJustLoggedIn = syncCaptureAuthHash();
+/* 旧方式（マジックリンク）の残骸を片付ける */
+['mochipoyo_sync_config_v1', 'mochipoyo_sync_auth_v1', 'mochipoyo_sync_lastpush_v1']
+  .forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* noop */ } });
 renderSyncUi();
-if (syncJustLoggedIn) showToast('☁ ログインしました');
-if (syncCfg() && syncAuth()) runSync();
+/* 起動時は全件取得（差分の基準時刻が古い・端末が初めての場合も取りこぼさない） */
+runSync({ full: true });
+
 
 /* ============ PWA 登録・ストレージ保護（S28） ============ */
 
