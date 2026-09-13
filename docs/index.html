@@ -666,12 +666,20 @@
     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
   }
+  .trend-search-wrap { position: relative; display: inline-flex; align-items: center; width: 150px; max-width: 100%; }
   .trend-search-input {
-    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+    padding: 7px 26px 7px 10px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600;
-    width: 150px; max-width: 100%;
+    width: 100%; max-width: 100%;
   }
   .trend-search-input::placeholder { color: var(--ink-muted); font-weight: 400; }
+  .trend-search-clear {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+    background: var(--ink-muted); color: var(--surface); font-size: 11px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .trend-search-clear:active { opacity: 0.7; }
 
   .trend-group-head {
     font-size: 12px; font-weight: 700; color: var(--ink-2);
@@ -1239,7 +1247,10 @@
       <span class="trend-tf-label">並び順</span>
       <span class="trend-tf-toggles" id="trendSortToggles"></span>
       <select class="trend-category-select" id="trendCategorySelect"></select>
-      <input type="text" class="trend-search-input" id="trendSearchInput" placeholder="🔍 通貨名で検索（例: JPY）" maxlength="20" autocomplete="off">
+      <span class="trend-search-wrap">
+        <input type="text" class="trend-search-input" id="trendSearchInput" placeholder="🔍 通貨名で検索（例: JPY）" maxlength="20" autocomplete="off">
+        <button class="trend-search-clear" id="trendSearchClear" type="button" title="検索をクリア" hidden>✕</button>
+      </span>
       <span class="trend-tf-label">表示する足</span>
       <span class="trend-tf-toggles" id="trendTfToggles"></span>
       <span class="spacer"></span>
@@ -3787,6 +3798,7 @@ const trendTfBar     = document.getElementById('trendTfToggles');
 const trendSortToggles = document.getElementById('trendSortToggles');
 const trendCategorySelect = document.getElementById('trendCategorySelect');
 const trendSearchInput = document.getElementById('trendSearchInput');
+const trendSearchClear = document.getElementById('trendSearchClear');
 
 /* S60: 絞り込みボタンはツールバーから撤去し、サマリータイル（#trendSummary 内の
    [data-trend-summary-filter]）がフィルタON/OFFを兼ねる。サマリーとツールバーに
@@ -4310,6 +4322,15 @@ trendCategorySelect.addEventListener('change', () => {
    input要素自体を作り直さないため、入力中に呼んでもフォーカス・カーソル位置は保たれる。 */
 trendSearchInput.addEventListener('input', () => {
   trendSearchQuery = trendSearchInput.value.trim().toUpperCase();
+  trendSearchClear.hidden = !trendSearchInput.value;
+  renderTrendList();
+});
+/* S77: 検索欄右側の✕ボタンで即クリア。フォーカスも入力欄へ戻し、続けて別の語句を打てるようにする。 */
+trendSearchClear.addEventListener('click', () => {
+  trendSearchInput.value = '';
+  trendSearchQuery = '';
+  trendSearchClear.hidden = true;
+  trendSearchInput.focus();
   renderTrendList();
 });
 trendTfBar.addEventListener('click', (e) => {
