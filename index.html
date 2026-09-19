@@ -4122,9 +4122,8 @@ function trendEntryChipHtml(w, tfKey) {
      幅を取る「確度」の文字は省き、数値のみ（🎯61%）にして横幅を切り詰める。 */
   /* S74: 根拠を1項目も押していない足は checkConfidence が 100%（減点なし＝満点）を返すが、
      これは「揃っている」のではなく「未記録」。視覚的に記録済みだけを見分けたいので非表示にする。 */
-  const pct = d === null ? '' : '<span class="d">' + Math.round(d) + '%</span>';
   const confHtml = conf === null ? '' : '<span class="d conf">' + conf + '%</span>';
-  const body = '🎯' + pct + confHtml + '<span class="d">根拠</span>';
+  const body = '🎯' + confHtml + '<span class="d">根拠</span>';
   const title = (d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%') +
     (conf === null ? '' : '／確度 ' + conf + '%');
   if (!MV_TREND_KEY_TO_TF[tfKey])
