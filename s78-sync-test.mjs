@@ -22,7 +22,10 @@ async function device() {
   await page.addInitScript(() => { window.__SYNC_ALLOW_FILE = true; });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.route('https://vktnrrrfeeicfewtllfx.supabase.co/**', async route => {
+  /* S80: index.html の SUPABASE_URL が d6ac473（プロジェクトIDの修正）で inqvrsfzskjusmbwlimx に
+     変わって以降、このモックのURLが古いままだったため実際には何もインターセプトしておらず、
+     __SYNC_ALLOW_FILE=true と合わさって本番の共用テーブルへ生の fetch が飛んでいた（発見・修正）。 */
+  await page.route('https://inqvrsfzskjusmbwlimx.supabase.co/**', async route => {
     const req = route.request();
     const url = new URL(req.url());
     if (!url.pathname.endsWith('/rest/v1/trades_checklist')) { log.otherTable++; return route.fulfill({ status: 404, body: '' }); }

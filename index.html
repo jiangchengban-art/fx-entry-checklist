@@ -393,6 +393,19 @@
   }
   .basis-rr .row .rr.pos { color: var(--good); }
   .basis-rr .row .rr.neg { color: var(--bad); }
+  /* S80: 根拠項目別の成績はグループ（例「上位足・MACD」）ごとに小見出し＋値別の行が並ぶ */
+  .basis-rr .check-item-group { margin-top: 10px; }
+  .basis-rr .check-item-group .sub-h {
+    font-size: 11.5px; font-weight: 700; color: var(--ink-muted); margin-bottom: 2px;
+  }
+  /* S80: 保留・スルーの振り返り（獲れた/妥当だった）ボタン */
+  .retro-toggle { display: flex; gap: 6px; margin-top: 6px; }
+  .retro-btn {
+    font-size: 11.5px; padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--hairline); background: var(--surface); color: var(--ink-muted); cursor: pointer;
+  }
+  .retro-btn.active.missed { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+  .retro-btn.active.valid  { background: var(--good-soft); color: var(--good); border-color: var(--good); }
 
   /* ============ トースト ============ */
   #toast {
@@ -1162,6 +1175,10 @@
             <button type="button" class="btn-ghost" id="pnlSignPlus">＋</button>
           </div>
         </div>
+        <div class="form-field full hidden" id="riskField">
+          <label for="fRisk">リスク額（円）</label>
+          <input type="text" inputmode="decimal" id="fRisk" placeholder="例: 10000（損切りが約定したときの想定損失額）">
+        </div>
         <div class="form-field full hidden" id="beTouchField">
           <label>建値タッチ</label>
           <div class="result-toggle" id="beTouchToggle">
@@ -1215,9 +1232,12 @@
       <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
     </div>
     <div class="stats-grid" id="statsGrid"></div>
+    <div class="basis-rr" id="confStats"></div>
     <div class="basis-rr" id="fiboStats"></div>
+    <div class="basis-rr" id="checkItemStats"></div>
     <div class="basis-rr" id="resultTagStats"></div>
     <div class="basis-rr" id="beTouchStats"></div>
+    <div class="basis-rr" id="retroStats"></div>
     <div class="basis-rr" id="alertLagStats"></div>
     <div class="basis-rr" id="mvAlertStats"></div>
     <div class="basis-rr" id="hourStats"></div>
@@ -2216,6 +2236,15 @@ beTouchToggle.addEventListener('click', (e) => {
 /* ---- 損益（円）。符号切替ボタンは入力値の符号をその場で反転する ---- */
 const pnlField = document.getElementById('pnlField');
 const fPnl = document.getElementById('fPnl');
+/* ---- リスク額（円、S80）。円建て損益だけだとリスクの大小が違う日をそのまま比べてしまうため、
+   pnlAmount / riskAmount で R倍率を出せるように追加。0 または未入力なら R は計算しない。 */
+const riskField = document.getElementById('riskField');
+const fRisk = document.getElementById('fRisk');
+function tradeRMultiple(t) {
+  const risk = Number(t.riskAmount) || 0;
+  if (!risk || t.pnlAmount == null) return null;
+  return (t.pnlAmount || 0) / risk;
+}
 document.getElementById('pnlSignMinus').addEventListener('click', () => {
   const n = parseFloat(fPnl.value);
   if (Number.isFinite(n)) fPnl.value = String(-Math.abs(n));
@@ -2361,6 +2390,22 @@ async function uploadChartImageOrThrow(file) {
   const token = data.downloadTokens ? String(data.downloadTokens).split(',')[0] : '';
   return base + '/' + encodeURIComponent(path) + '?alt=media' + (token ? '&token=' + encodeURIComponent(token) : '');
 }
+/* S80: 記録削除時の孤児ファイル対策。ダウンロードURLは base+'/'+encodeURIComponent(path)+'?alt=media&token=...'
+   の形（uploadChartImageOrThrow 参照）なので、'?' 以前がそのまま削除エンドポイントの URL になる。
+   ベストエフォート：認証切れ・ネットワークエラーは無視する（記録の削除自体は失敗させない）。 */
+async function deleteChartImageBestEffort(url) {
+  if (!url || !url.startsWith('https://firebasestorage.googleapis.com/')) return;
+  const cfg = fbCfg();
+  if (!cfg || !cfg.bucket) return;
+  try {
+    const auth = await fbEnsureAuth(cfg);
+    await fetch(url.split('?')[0], { method: 'DELETE', headers: { 'Authorization': 'Firebase ' + auth.idToken } });
+  } catch (e) { /* noop: 放置されても無料枠内では実害が薄く、記録削除を優先する */ }
+}
+function deleteTradeImages(t) {
+  if (!t || !t.images) return;
+  [t.images.entry, t.images.higher, ...(t.images.others || [])].forEach(deleteChartImageBestEffort);
+}
 async function uploadChartImage(file) {
   const cfg = fbCfg();
   if (!cfg || !cfg.bucket) {
@@ -2414,6 +2459,9 @@ function renderImagePreview(key) {
 imagesField.addEventListener('click', (e) => {
   const btn = e.target.closest('.img-remove');
   if (!btn) return;
+  /* ⚠️ ここでは Storage 側を消さない。編集中に✕で外した後「編集をキャンセル」すると
+     保存済みの記録が参照している画像を先に消してしまう事故になるため
+     （孤児ファイル削除は「記録そのものを削除した」ときだけ安全に判定できる＝deleteTradeImages）。 */
   const key = btn.dataset.key;
   if (key === 'others') {
     formImages.others.splice(Number(btn.dataset.i), 1);
@@ -2510,11 +2558,12 @@ function syncFormFromMarket() {
   if (!isEntered) fExitResult.value = '';
 
   /* 結果・損益・建値タッチ・画像はエントリーのときだけ。判定が保留／スルーに変わったら値も消す */
-  [resultField, pnlField, beTouchField, imagesField].forEach(el => el.classList.toggle('hidden', !isEntered));
+  [resultField, pnlField, riskField, beTouchField, imagesField].forEach(el => el.classList.toggle('hidden', !isEntered));
   if (!isEntered) {
     setResultTagState('');
     fResultOther.value = '';
     fPnl.value = '';
+    fRisk.value = '';
     setBeTouchState('');
     formImages = { entry: '', higher: '', others: [] };
     ['entry', 'higher', 'others'].forEach(renderImagePreview);
@@ -2631,6 +2680,7 @@ function doSave() {
     resultTag:        isEntered ? getResultTag() : '',
     resultOtherReason: isEntered && getResultTag() === 'other' ? fResultOther.value : '',
     pnlAmount:    isEntered ? (parseFloat(fPnl.value) || 0) : 0,
+    riskAmount:   isEntered ? (parseFloat(fRisk.value) || 0) : 0,
     beTouch:      isEntered ? beTouchState : '',
     images:       isEntered ? Object.assign({}, formImages, { others: formImages.others.slice() }) : { entry: '', higher: '', others: [] },
     createdAt:  existing ? existing.createdAt : new Date().toISOString(),
@@ -2653,6 +2703,7 @@ function doSave() {
   setTradeTypeState(null);
   setResultTagState('');
   setBeTouchState('');
+  fRisk.value = '';
   formImages = { entry: '', higher: '', others: [] };
   ['entry', 'higher', 'others'].forEach(renderImagePreview);
   setDatetimeNow();
@@ -2705,12 +2756,33 @@ function renderStats() {
   const totalPnl = pnls.length ? pnls.reduce((s, v) => s + v, 0) : null;
   const avgPnl   = pnls.length ? mean(pnls) : null;
   const winPct   = pnls.length ? pnls.filter(v => v > 0).length / pnls.length * 100 : null;
+  /* 平均R倍率（S80）。リスク額を入れた記録だけが母数になる（リスク量で正規化した期待値）。 */
+  const rMultiples = settled.map(tradeRMultiple).filter(r => r != null);
+  const avgR = rMultiples.length ? mean(rMultiples) : null;
 
   /* byFibo = エントリーFibo水準別の損益（未記入/❌は除外） */
   const byFibo = {};
   settled.forEach(t => {
     const fibo = t.mvChecks && t.mvChecks.entry && t.mvChecks.entry.entryFibo;
     if (fibo && fibo !== '❌') (byFibo[fibo] || (byFibo[fibo] = [])).push(t.pnlAmount || 0);
+  });
+
+  /* ---- byConf = 確度%帯別の損益（S80） ----
+     checkConfidence() の重み付けスコアが実際に機能しているかを検証する軸。
+     mvChecks.higher に1項目でも値がある settled トレードだけを対象にする
+     （未記録は checkConfidence が満点扱いになり、意味のない90-100%行を作ってしまうため）。 */
+  const CONF_BANDS = [
+    { k: '90-100', label: '90〜100%', test: c => c >= 90 },
+    { k: '70-89',  label: '70〜89%',  test: c => c >= 70 && c < 90 },
+    { k: '0-69',   label: '69%以下',  test: c => c < 70 },
+  ];
+  const byConf = {};
+  settled.forEach(t => {
+    const hc = t.mvChecks && t.mvChecks.higher;
+    if (!hc || !MV_TF_CHECKS.some(c => hc[c.k])) return;
+    const conf = checkConfidence(hc, MV_TF_CHECKS);
+    const band = CONF_BANDS.find(b => b.test(conf));
+    if (band) (byConf[band.k] || (byConf[band.k] = [])).push(t.pnlAmount || 0);
   });
 
   /* byResultTag = 結果タグ別の成績 */
@@ -2734,6 +2806,8 @@ function renderStats() {
     { label: '平均損益', value: avgPnl == null ? '–' : fmtPnl(round2(avgPnl)), unit: '円', cls: pnlCls(avgPnl) },
     { label: '勝率', value: winPct == null ? '–' : winPct.toFixed(0), unit: '%',
       cls: winPct == null ? '' : winPct >= 50 ? 'pos' : 'neg' },
+    { label: '平均R倍率', value: avgR == null ? '–' : (avgR >= 0 ? '+' : '') + avgR.toFixed(2), unit: 'R',
+      cls: avgR == null ? '' : avgR >= 0 ? 'pos' : 'neg' },
   ];
   document.getElementById('statsGrid').innerHTML = tiles.map(t =>
     '<div class="stat-tile">' +
@@ -2742,6 +2816,25 @@ function renderStats() {
         (t.unit ? '<span class="unit">' + t.unit + '</span>' : '') +
       '</div>' +
     '</div>').join('');
+
+  /* ---- 確度%帯別の成績（S80） ----
+     根拠パネルの確度スコア（checkConfidence、RCI/MACDを厚くした重み付け）が実際に
+     機能しているかを検証する軸。ここで差が無ければ重み配分（S63）を見直す材料になる。 */
+  const confRows = CONF_BANDS.map(b => {
+    const pnlsK = byConf[b.k];
+    if (!pnlsK || !pnlsK.length) return null;
+    return { label: b.label, n: pnlsK.length, avg: mean(pnlsK),
+             win: pnlsK.filter(v => v > 0).length / pnlsK.length * 100 };
+  }).filter(Boolean);
+  document.getElementById('confStats').innerHTML =
+    '<h3>確度%帯別の成績</h3>' + (confRows.length
+      ? confRows.map(r =>
+          '<div class="row">' +
+            '<span class="name">' + esc(r.label) + '</span>' +
+            '<span class="n">' + r.n + '件 / 勝率 ' + r.win.toFixed(0) + '%</span>' +
+            '<span class="rr ' + pnlCls(r.avg) + '">平均 ' + fmtPnl(round2(r.avg)) + '円</span>' +
+          '</div>').join('')
+      : '<div class="empty-state">上位足の根拠を記録したエントリー記録がまだありません。</div>');
 
   /* ---- エントリーFibo水準別の成績 ----
      「38%エントリーが最高勝率」のような傾向を見るための軸。フィボの並び順（23→78%）で表示する。 */
@@ -2762,6 +2855,37 @@ function renderStats() {
           '</div>').join('')
       : '<div class="empty-state">エントリーFiboの記録がまだありません。' +
         '🔭一覧の根拠パネルでエントリーFiboを記録してください。</div>');
+
+  /* ---- 根拠項目別の成績（S80） ----
+     どの根拠が実際に効いているかを見る軸。MV_CHECK_SNAPSHOTS（上位足/エントリー足の定義）を
+     走査するため、項目を増減しても自動で追随する。entryFibo は上のFibo別成績と重複するため除く。 */
+  const itemGroups = [];
+  MV_CHECK_SNAPSHOTS.forEach(snap => {
+    snap.checks.forEach(c => {
+      if (c.k === 'entryFibo') return;
+      const byVal = {};
+      settled.forEach(t => {
+        const checks = t.mvChecks && t.mvChecks[snap.key];
+        const v = checks && checks[c.k];
+        if (!v || v === '❌') return;
+        (byVal[v] || (byVal[v] = [])).push(t.pnlAmount || 0);
+      });
+      const rows = Object.keys(byVal).map(v => ({ v, n: byVal[v].length, avg: mean(byVal[v]) }));
+      if (rows.length) itemGroups.push({ label: snap.label + '・' + c.label, rows });
+    });
+  });
+  document.getElementById('checkItemStats').innerHTML =
+    '<h3>根拠項目別の成績</h3>' + (itemGroups.length
+      ? itemGroups.map(g =>
+          '<div class="check-item-group"><div class="sub-h">' + esc(g.label) + '</div>' +
+            g.rows.map(r =>
+              '<div class="row">' +
+                '<span class="name">' + esc(r.v) + '</span>' +
+                '<span class="n">' + r.n + '件</span>' +
+                '<span class="rr ' + pnlCls(r.avg) + '">平均 ' + fmtPnl(round2(r.avg)) + '円</span>' +
+              '</div>').join('') +
+          '</div>').join('')
+      : '<div class="empty-state">根拠付きの記録がまだありません。</div>');
 
   /* ---- 結果タグ別の成績 ---- */
   const rtRows = RESULT_TAGS.map(rt => {
@@ -2794,6 +2918,21 @@ function renderStats() {
             '<span class="rr ' + pnlCls(r.avg) + '">平均 ' + fmtPnl(round2(r.avg)) + '円</span>' +
           '</div>').join('')
       : '<div class="empty-state">建値タッチの記録がまだありません。</div>');
+
+  /* ---- 見送りの振り返り（S80） ----
+     保留・スルーは件数を数えるだけでは「見送りすぎ」か「入りすぎ」かが分からないため、
+     後日 record-card の retro-toggle で押した「結果的に：獲れた／妥当だった」を集計する。
+     エントリー済みの記録は対象外（retroOutcome は保留・スルーにしか出さない）。 */
+  const retroTargets = trades.filter(t => t.result === 'hold' || t.result === 'through');
+  const retroMissed = retroTargets.filter(t => t.retroOutcome === 'missed').length;
+  const retroValid  = retroTargets.filter(t => t.retroOutcome === 'valid').length;
+  document.getElementById('retroStats').innerHTML =
+    '<h3>見送りの振り返り（保留・スルー）</h3>' + (retroMissed + retroValid > 0
+      ? '<div class="row"><span class="name">✅ 妥当だった</span><span class="n"></span>' +
+          '<span class="rr">' + retroValid + '件</span></div>' +
+        '<div class="row"><span class="name">🎯 逃した</span><span class="n"></span>' +
+          '<span class="rr neg">' + retroMissed + '件</span></div>'
+      : '<div class="empty-state">まだ振り返りがありません。履歴カードの「結果的に：」ボタンで記録してください。</div>');
 
   /* ---- アラート発生からエントリーまでの経過時間（S69） ----
      手法上「鳴ったら即エントリー」ではなく、値動き・インジケーターを見て判断してからエントリーする
@@ -2932,7 +3071,9 @@ function renderList() {
                  (t.manualAlertTf ? '　' + esc(t.manualAlertTf) : ''))
             : '') +
           (t.exitDatetime ? kv('エグジット日時', fmtDatetime(t.exitDatetime)) : '') +
-          (t.pnlAmount ? kv('損益', '<span class="' + pnlCls(t.pnlAmount) + '">' + fmtPnl(t.pnlAmount) + '円</span>') : '') +
+          (t.pnlAmount ? kv('損益', '<span class="' + pnlCls(t.pnlAmount) + '">' + fmtPnl(t.pnlAmount) + '円' +
+            (tradeRMultiple(t) != null ? '（' + (tradeRMultiple(t) >= 0 ? '+' : '') + tradeRMultiple(t).toFixed(2) + 'R）' : '') +
+            '</span>') : '') +
           (t.beTouch ? kv('建値タッチ', esc(BE_TOUCH_LABELS[t.beTouch] || t.beTouch)) : '') +
           (t.images && (t.images.entry || t.images.higher || (t.images.others || []).length)
             ? kv('チャート画像', imageThumbsHtml(t.images)) : '') +
@@ -2940,6 +3081,7 @@ function renderList() {
           (t.exitResult && EXIT_RESULT_LABELS[t.exitResult]
             ? kv('利確', esc(EXIT_RESULT_LABELS[t.exitResult])) : '') +
         '</div>' +
+        (!isEntered ? retroToggleHtml(t) : '') +
         basisDetailHtml(t.mvChecks) +
         (t.notes ? '<div class="record-notes">' + esc(t.notes) + '</div>' : '') +
       '</div>');
@@ -2958,6 +3100,30 @@ function imageThumbsHtml(images) {
 function kv(k, v) {
   return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
 }
+
+/* ---- 保留・スルーの振り返り（S80） ----
+   判定時点では正しく見送っても、後から見返すと「実は獲れていた」場合が一番高価な癖なので、
+   エントリーしなかった記録だけに「結果的に：獲れた／妥当だった」を後日タップできるようにする。
+   もう一度同じボタンを押すと解除（''に戻す）。統計は renderStats() の retroStats が集計する。 */
+function retroToggleHtml(t) {
+  const val = t.retroOutcome || '';
+  const btn = (v, label) => '<button type="button" class="retro-btn' + (val === v ? ' active ' + v : '') +
+    '" data-retro="' + esc(t.id) + '" data-retro-value="' + v + '">' + label + '</button>';
+  return '<div class="retro-toggle"><span class="k" style="align-self:center;">結果的に：</span>' +
+    btn('missed', '🎯 逃した') + btn('valid', '✅ 妥当だった') + '</div>';
+}
+document.getElementById('recordList').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-retro]');
+  if (!btn) return;
+  const trades = loadTrades();
+  const t = trades.find(x => x.id === btn.dataset.retro);
+  if (!t) return;
+  const v = btn.dataset.retroValue;
+  t.retroOutcome = t.retroOutcome === v ? '' : v;
+  t.updatedAt = new Date().toISOString();
+  saveTrades(trades);
+  renderAll();
+});
 
 /* ---- 環境認識ボードから焼き込んだ根拠のスナップショット表示 ----
    ❌ と未選択は「根拠として採用していない」ので省き、実際に確認した項目だけを並べる。
@@ -3010,9 +3176,12 @@ document.getElementById('deleteCancel').addEventListener('click', () => {
 document.getElementById('deleteConfirm').addEventListener('click', () => {
   deleteModal.classList.remove('show');
   if (!pendingDeleteId) return;
-  const trades = loadTrades().filter(t => t.id !== pendingDeleteId);
+  const allTrades = loadTrades();
+  const removed = allTrades.find(t => t.id === pendingDeleteId);
+  const trades = allTrades.filter(t => t.id !== pendingDeleteId);
   markDeleted('trades', pendingDeleteId);   /* S28: 他端末から復活させないため */
   saveTrades(trades);
+  deleteTradeImages(removed);   /* S80: Storage側の孤児ファイル対策（ベストエフォート、失敗しても記録削除は完了済み） */
   pendingDeleteId = null;
   renderAll();
   showToast('記録を削除しました');
@@ -3057,6 +3226,7 @@ function loadTradeIntoForm(t) {
     setResultTagState(t.resultTag || '');
   }
   fPnl.value = t.pnlAmount ? String(t.pnlAmount) : '';
+  fRisk.value = t.riskAmount ? String(t.riskAmount) : '';
   setBeTouchState(t.beTouch || '');
   formImages = t.images
     ? { entry: t.images.entry || '', higher: t.images.higher || '', others: (t.images.others || []).slice() }
@@ -3085,6 +3255,7 @@ cancelEditBtn.addEventListener('click', () => {
   setTradeTypeState(null);
   setResultTagState('');
   setBeTouchState('');
+  fRisk.value = '';
   formImages = { entry: '', higher: '', others: [] };
   ['entry', 'higher', 'others'].forEach(renderImagePreview);
   setDatetimeNow();
@@ -3103,8 +3274,8 @@ const CSV_BASIS_COLUMNS = MV_CHECK_SNAPSHOTS.flatMap(s =>
 const CSV_HEADERS = [
   'id', 'tradeType', 'alertPair', 'alertTf', 'result', 'entryPattern', 'datetime', 'exitDatetime',
   'pair', 'tfHigher', 'tfEntry', 'direction', 'exitResult', 'notes',
-  'manualAlertAt', 'manualAlertTf', 'resultTag', 'resultOtherReason', 'pnlAmount', 'beTouch',
-  'imgEntry', 'imgHigher', 'imgOthers', 'watchId',
+  'manualAlertAt', 'manualAlertTf', 'resultTag', 'resultOtherReason', 'pnlAmount', 'riskAmount', 'beTouch',
+  'retroOutcome', 'imgEntry', 'imgHigher', 'imgOthers', 'watchId',
   ...CSV_BASIS_COLUMNS.map(c => c.col),
   'createdAt',
 ];
@@ -3327,7 +3498,8 @@ document.getElementById('exportCsv').addEventListener('click', () => {
     rows.push([
       t.id, getTradeType(t), t.alertPair, t.alertTf, t.result, t.entryPattern, t.datetime,
       t.exitDatetime, t.pair, t.tfHigher, t.tfEntry, t.direction, t.exitResult, t.notes,
-      t.manualAlertAt, t.manualAlertTf, t.resultTag, t.resultOtherReason, t.pnlAmount, t.beTouch,
+      t.manualAlertAt, t.manualAlertTf, t.resultTag, t.resultOtherReason, t.pnlAmount, t.riskAmount || 0, t.beTouch,
+      t.retroOutcome || '',
       images.entry || '', images.higher || '',
       /* others は複数URLをJSON文字列で1列に格納。csvField() が " を "" にエスケープし、
          parseCsv() が復元するためそのまま往復できる */
@@ -3418,7 +3590,9 @@ document.getElementById('importCsvFile').addEventListener('change', (e) => {
           resultTag:        get(r, 'resultTag'),
           resultOtherReason: get(r, 'resultOtherReason'),
           pnlAmount:    Number(get(r, 'pnlAmount')) || 0,
+          riskAmount:   Number(get(r, 'riskAmount')) || 0,
           beTouch:      get(r, 'beTouch'),
+          retroOutcome: ['missed', 'valid'].includes(get(r, 'retroOutcome')) ? get(r, 'retroOutcome') : '',
           images: {
             entry:  get(r, 'imgEntry'),
             higher: get(r, 'imgHigher'),
@@ -4124,8 +4298,13 @@ function trendEntryChipHtml(w, tfKey) {
      これは「揃っている」のではなく「未記録」。視覚的に記録済みだけを見分けたいので非表示にする。 */
   const confHtml = conf === null ? '' : '<span class="d conf">' + conf + '%</span>';
   const body = '🎯' + confHtml + '<span class="d">根拠</span>';
+  /* S80: 週足・月足は表示トグルで出入りする任意足で、pairEntryDistance() の並び順には
+     使われない（MV_TREND_DEFAULT_TFS に入らないため）。チップ自体は他の足と同じ見た目なので、
+     ここだけ title に注記して「この足の圏内表示は並び順に影響しない」ことを伝える。 */
+  const isOptionalTf = (MV_TREND_TFS.find(t => t.k === tfKey) || {}).optional;
   const title = (d === null ? 'この足の根拠を記録' : 'エントリー水準まで ' + d.toFixed(1) + '%') +
-    (conf === null ? '' : '／確度 ' + conf + '%');
+    (conf === null ? '' : '／確度 ' + conf + '%') +
+    (isOptionalTf ? '（週足・月足は一覧の並び順には影響しません）' : '');
   if (!MV_TREND_KEY_TO_TF[tfKey])
     return '<span class="tent' + (hot ? '' : ' muted') + '" title="' + esc(title) + '">' + body + '</span>';
   return '<button type="button" class="tent tent-btn' + (hot ? '' : ' muted') + (open ? ' open' : '') + '"' +
@@ -5683,8 +5862,13 @@ async function runSync(opts) {
   const full = !!(opts && opts.full);
   const dryRun = !!(opts && opts.dryRun);
   if (syncRunning) return;
-  /* file:// で開いたとき（Playwright テスト等）は本番の共用表へ書き込まない。テストは window.__SYNC_ALLOW_FILE で許可する */
-  if (location.protocol === 'file:' && !window.__SYNC_ALLOW_FILE) return;
+  /* file:// で開いたとき（Playwright テスト等）は本番の共用表へ書き込まない。テストは window.__SYNC_ALLOW_FILE で許可する。
+     S80: S28のテスト（node s28-test.mjs）は http://localhost:8000 で配信するため file: 判定をすり抜け、
+     本番の共用 SUPABASE_URL（inqvrsfzskjusmbwlimx）へ実際に読み書きしてしまっていた（発見・修正）。
+     本番はGitHub Pages/jsDelivrのドメインからしか開かれないので、localhost/127.0.0.1 も同じ扱いにする。 */
+  const isTestOrigin = location.protocol === 'file:' ||
+    location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (isTestOrigin && !window.__SYNC_ALLOW_FILE) return;
   /* ⚠️ 最重要の安全弁。ローカルの読み込みに失敗している状態で同期すると、
      空になったローカルでクラウドの本物を潰す。 */
   if (STORAGE_FAILED.market || STORAGE_FAILED.trades) {

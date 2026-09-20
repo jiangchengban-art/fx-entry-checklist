@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const filePath = 'file://' + path.resolve('/home/user/fx-entry-checklist/index.html');
+const filePath = 'file:///' + path.resolve(__dirname, 'index.html').replace(/\\/g, '/');
 
 let pass = 0, fail = 0;
 function check(label, cond) {

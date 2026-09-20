@@ -68,16 +68,16 @@ async function newPage() {
   ok('原文が __corrupt_* に退避される', corrupt.length === 1, corrupt);
 
   // 全書き込み経路を叩いても上書きされないこと
+  // S51で環境ボード（#mvPairSelect）・S55で🎯タブ自体が撤去されたため、
+  // 一覧タブ内の書き込み経路（方向・ゾーン・アラート・根拠パネルの判定ボタン）だけを叩く。
   await page.click('.tab-btn[data-tab="trend"]');
   await page.waitForTimeout(300);
-  for (const sel of ['.tstate-btn', '.tzone-btn', '.mv-alert-badge', '.mv-judge-btn']) {
+  const panelOpenBtn = page.locator('[data-trend-panel-open]').first();
+  if (await panelOpenBtn.count()) { await panelOpenBtn.click().catch(() => {}); await page.waitForTimeout(150); }
+  for (const sel of ['.tstate-btn', '.tzone-btn', '.mv-alert-badge', '.mv-judge-btn', '.mv-tfcheck-btn']) {
     const el = page.locator(sel).first();
     if (await el.count()) { await el.click().catch(() => {}); await page.waitForTimeout(80); }
   }
-  await page.click('.tab-btn[data-tab="trade"]');
-  await page.waitForTimeout(200);
-  await page.selectOption('#mvPairSelect', 'USDJPY').catch(() => {});
-  await page.waitForTimeout(300);
 
   const raw = await page.evaluate(k => localStorage.getItem(k), MARKET_KEY);
   ok('壊れた原文が1バイトも書き換わっていない', raw === '{"pairs":[{"id":"w1","pair":"USDJPY"}', raw);
@@ -304,15 +304,20 @@ async function newPage() {
   ok('記録した足だけに at が付く（他の足は空のまま）', stamped.length === 1, stamped.map(x => x[0]));
   ok('trendAt = その足の at', touched.trendAt === stamped[0][1].at);
 
-  // アラート：chAt が ON/OFF どちらでも入る
+  // アラート：chAt が ON/OFF どちらでも入る。
+  // S71でバッジのタップは直接トグルではなく日時入力モーダル（#alertTimeModal）を開く方式になった。
   await page.locator('.mv-alert-badge').first().click();
+  await page.waitForTimeout(150);
+  await page.click('#alertTimeSave');
   await page.waitForTimeout(250);
   d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
   let withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
   ok('alerts[tf].chAt が入る（ON）', !!withAlert);
   const onAt = Object.values(withAlert.alerts).find(a => a.chAt).chAt;
   await page.waitForTimeout(1100);
-  await page.locator('.mv-alert-badge').first().click();
+  await page.locator('.mv-alert-badge.on').first().click();
+  await page.waitForTimeout(150);
+  await page.click('#alertTimeOff');
   await page.waitForTimeout(250);
   d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
   withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
@@ -321,6 +326,12 @@ async function newPage() {
      offEntry.on === false && offEntry.at === '' && offEntry.chAt > onAt,
      offEntry);
 
+  // S44以降、判定ボタン・根拠チェックボタンは行の🎯根拠パネル（[data-trend-panel-open]で開く）の中。
+  // S51で環境ボード（#mvPairSelect）、S55で🎯タブ自体が撤去されたため、パネルを開いてから叩く。
+  const panelBtn = page.locator('[data-trend-panel-open]').first();
+  await panelBtn.click();
+  await page.waitForTimeout(200);
+
   // 判定：judgeAt
   await page.locator('.mv-judge-btn').first().click();
   await page.waitForTimeout(250);
@@ -328,25 +339,26 @@ async function newPage() {
   ok('judgeAt が入る', d.pairs.some(p => p.judgeAt));
   ok('judgeLog に記録される（統計が壊れていない）', d.judgeLog.length === 1, d.judgeLog.length);
 
-  // 根拠チェック：checksAt（項目単位）
-  await page.click('.tab-btn[data-tab="trade"]');
-  await page.waitForTimeout(200);
-  await page.selectOption('#mvPairSelect', 'USDJPY');
-  await page.waitForTimeout(400);
+  // 根拠チェック：checksAt（項目単位）。パネルを開いた時点で tfHigher が固定されている前提。
   await page.locator('.mv-tfcheck-btn').first().click();
   await page.waitForTimeout(250);
   d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
   const wc = d.pairs.find(p => p.checksAt && Object.keys(p.checksAt).length);
   ok('checksAt が項目単位で入る', !!wc && Object.keys(wc.checksAt)[0].includes('.'),
      wc && Object.keys(wc.checksAt));
-  ok('checksHigher の形は変わっていない（CSV スナップショット互換）',
+  ok('checksHigher の形は変わっていない（CSV スナップショット互換、S72で時間足キー単位の入れ子に）',
      wc && typeof wc.checksHigher === 'object' && !Array.isArray(wc.checksHigher));
 
-  // 上位足プルダウン：tfAt
-  await page.selectOption('[data-mv-tf-select="tfHigher"]', { index: 1 });
-  await page.waitForTimeout(250);
-  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  ok('tfAt が入る', d.pairs.some(p => p.tfAt));
+  // 上位足は行の🎯根拠ボタンから固定される（S44）ので、別の足の根拠ボタンを押して tfAt を確認する。
+  const otherPanelBtn = page.locator('[data-trend-panel-open]').nth(1);
+  if (await otherPanelBtn.count()) {
+    await otherPanelBtn.click();
+    await page.waitForTimeout(250);
+    d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
+    ok('tfAt が入る', d.pairs.some(p => p.tfAt));
+  } else {
+    ok('tfAt が入る（別の足のボタンが無いためスキップ）', true);
+  }
 
   ok('JSエラーなし', errors.length === 0, errors);
   await ctx.close();
@@ -358,17 +370,17 @@ async function newPage() {
   const { ctx, page } = await newPage();
   await page.goto(URL);
   await page.waitForTimeout(300);
+  /* このoriginは他ブロックとlocalStorageを共有し得るため、まず明示的に空にする
+     （S80: 過去の実行で残ったデータが紛れ込む事故を防ぐ）。 */
+  await page.evaluate(() => localStorage.clear());
 
-  // S22 形式（updatedAt なし）の記録を流し込む
+  /* S22形式（updatedAtなし）の記録を流し込む。旧・建玉/RR方式（entryPrice/exits等）は
+     S54で完全撤去されたので、現行スキーマ（resultTag/pnlAmount）の欠落記録として扱われることだけ確認する。 */
   const legacy = [
     { id: 't1', tradeType: 'real', result: 'entered', pair: 'USDJPY', direction: 'long',
-      datetime: '2026-08-01T09:00', entryPrice: '150.00', slPrice: '149.00', slBasis: 'swing',
-      splitCount: 3, createdAt: '2026-08-01T09:00:00.000Z',
-      exits: [ { slot: 1, actual: true, basis: 'target', price: '152.00' },
-               { slot: 2, actual: true, basis: 'target', price: '153.00' },
-               { slot: 3, actual: true, basis: 'target', price: '154.00' } ] },
+      datetime: '2026-08-01T09:00', createdAt: '2026-08-01T09:00:00.000Z' },
     { id: 't2', tradeType: 'real', result: 'through', pair: 'EURUSD',
-      datetime: '2026-08-02T09:00', createdAt: '2026-08-02T09:00:00.000Z', exits: [] },
+      datetime: '2026-08-02T09:00', createdAt: '2026-08-02T09:00:00.000Z' },
   ];
   await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [TRADES_KEY, legacy]);
   await page.reload();
@@ -379,7 +391,7 @@ async function newPage() {
   const tiles = await page.locator('.stat-tile, .stat').allInnerTexts().catch(() => []);
   ok('統計タイルが描画される', tiles.length > 0, tiles.length);
   const joined = tiles.join(' | ');
-  ok('合成RR が計算される（+3.00 = (2+3+4)/3）', joined.includes('3.00'), joined.slice(0, 300));
+  ok('resultTag未設定の旧記録は損益0円・母数外として扱われクラッシュしない', joined.includes('トレード数'), joined.slice(0, 200));
 
   const stored = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), TRADES_KEY);
   ok('読み込むだけでは updatedAt が生えない（既存記録を書き換えない）',
@@ -393,14 +405,15 @@ async function newPage() {
   const { ctx, page } = await newPage();
   await page.goto(URL);
   await page.waitForTimeout(300);
+  await page.evaluate(() => localStorage.clear());
   await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)),
     [TRADES_KEY, [{ id: 'tX', tradeType: 'real', result: 'through', pair: 'USDJPY',
-                    datetime: '2026-08-01T09:00', createdAt: '2026-08-01T09:00:00.000Z', exits: [] }]]);
+                    datetime: '2026-08-01T09:00', createdAt: '2026-08-01T09:00:00.000Z' }]]);
   await page.reload();
   await page.waitForTimeout(500);
   await page.click('.tab-btn[data-tab="review"]');
   await page.waitForTimeout(400);
-  const del = page.locator('[data-del], .record-del, button:has-text("削除")').first();
+  const del = page.locator('[data-delete]').first();
   if (await del.count()) {
     await del.click();
     await page.waitForTimeout(300);
@@ -452,15 +465,17 @@ async function newPage() {
     const F = { id: 'f', pair: 'Y', checksAt: {}, alerts: { h1: { on: false, at: '', chAt: T2 } } };
     out.alertOff = mergePair(E, F).alerts.h1.on;
 
-    /* (d) 根拠チェックは項目単位で両方残る */
+    /* (d) 根拠チェックは項目単位で両方残る。
+       S72で checksHigher は時間足キーごとに独立し、複合キーは 'checksHigher.<tfKey>.<key>'
+       （3分割）になった（mergePair 参照）。 */
     const G = { id: 'g', pair: 'Z', alerts: {},
-      checksHigher: { granville: '1' }, checksEntry: {},
-      checksAt: { 'checksHigher.granville': T1 } };
+      checksHigher: { d: { roundNumber: '有' } }, checksEntry: {},
+      checksAt: { 'checksHigher.d.roundNumber': T1 } };
     const H = { id: 'h', pair: 'Z', alerts: {},
-      checksHigher: { macd: 'レギュラーダイバージェンス' }, checksEntry: {},
-      checksAt: { 'checksHigher.macd': T1 } };
+      checksHigher: { d: { macd: 'RD(転換)' } }, checksEntry: {},
+      checksAt: { 'checksHigher.d.macd': T1 } };
     const mh = mergePair(G, H);
-    out.checksBoth = [mh.checksHigher.granville, mh.checksHigher.macd];
+    out.checksBoth = [mh.checksHigher.d.roundNumber, mh.checksHigher.d.macd];
 
     /* (e) トレード：id 突き合わせ + updatedAt で新しい方 */
     out.trades = mergeTrades(
@@ -499,7 +514,7 @@ async function newPage() {
   ok('順序を入れ替えても結果は同じ', r.olderLoses === 'down', r.olderLoses);
   ok('他端末でOFFにしたアラートがOFFのまま伝わる', r.alertOff === false, r.alertOff);
   ok('根拠チェックは項目単位で両方残る',
-     r.checksBoth[0] === '1' && r.checksBoth[1] === 'レギュラーダイバージェンス', r.checksBoth);
+     r.checksBoth[0] === '有' && r.checksBoth[1] === 'RD(転換)', r.checksBoth);
   ok('トレードは3件になり、競合は新しい方が残る',
      r.trades.join(',') === 't1:local,t2:onlyLocal,t3:onlyRemote', r.trades);
   ok('削除した記録は他端末から復活しない', r.tombWins === 0, r.tombWins);
@@ -513,38 +528,24 @@ async function newPage() {
   await ctx.close();
 }
 
-/* ---------- 15. 同期UIと安全弁 ---------- */
+/* S80: 旧・同期UI（#syncUrl/#syncKey/#syncLogin のマジックリンク方式）の検証は
+   S78で丸ごと撤去されたUIを前提にしており、全滅していた（app_stateテーブル・
+   #syncSetup/#syncSaveConfig等が現行indexに存在しない）。ログインなし・1記録1行方式に
+   置き換わった現行仕様は s78-sync-test.mjs が17項目でカバーしているため、ここでは重複させず削除する。
+   「破損中は同期しない」安全弁だけは今も価値があるので、現行の runSync() 実装に即して残す。 */
 {
-  console.log('\n[15] 同期UI・安全弁');
+  console.log('\n[15] 安全弁（破損中は同期しない）');
   const { ctx, page } = await newPage();
   await page.goto(URL);
   await page.waitForTimeout(400);
-
-  ok('未設定チップが出る', (await page.locator('#syncChip').innerText()).includes('未設定'));
-  await page.click('.tab-btn[data-tab="settings"]');
-  await page.waitForTimeout(300);
-  ok('接続先の入力欄が出る', await page.locator('#syncSetup:not(.hidden)').count() === 1);
-  ok('ログイン欄はまだ出ない', await page.locator('#syncLogin.hidden').count() === 1);
-
-  await page.fill('#syncUrl', 'https://example.supabase.co');
-  await page.fill('#syncKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy.dummy');
-  await page.click('#syncSaveConfig');
-  await page.waitForTimeout(400);
-  ok('保存するとログイン欄に切り替わる', await page.locator('#syncLogin:not(.hidden)').count() === 1);
-  ok('チップが未ログインになる', (await page.locator('#syncChip').innerText()).includes('未ログイン'));
-
-  // 安全弁：破損中は同期しない
+  await page.evaluate(() => localStorage.clear());
   await page.evaluate(k => localStorage.setItem(k, '{broken'), MARKET_KEY);
   await page.reload();
   await page.waitForTimeout(600);
-  ok('破損中はチップが停止中になる', (await page.locator('#syncChip').innerText()).includes('停止中'));
   const blocked = await page.evaluate(async () => {
     let called = false;
     const orig = window.fetch;
     window.fetch = (...a) => { called = true; return orig(...a); };
-    localStorage.setItem('mochipoyo_sync_auth_v1', JSON.stringify({
-      access_token: 'x', refresh_token: 'y', expires_at: Date.now() + 999999,
-      email: 'a@b.c', user_id: 'u1' }));
     await runSync();
     window.fetch = orig;
     return called;
@@ -569,120 +570,11 @@ async function newPage() {
   await ctx.close();
 }
 
-/* ---------- 17. 2端末の通し同期（Supabase を模したサーバー相手に実際の fetch を通す） ---------- */
-{
-  console.log('\n[17] 2端末の通し同期');
-
-  /* クラウド側の1行を node 側に持ち、両端末のリクエストを実際に捌く */
-  const cloud = { row: null };
-  let conflictOnce = false;
-
-  const install = async (ctx) => {
-    await ctx.route('https://mock.supabase.co/**', async (route) => {
-      const req = route.request();
-      /* ファイル冒頭の定数 URL が globalThis.URL を隠すため、明示的に取る */
-      const url = new globalThis.URL(req.url());
-      const json = (status, body) => route.fulfill({
-        status, contentType: 'application/json', body: JSON.stringify(body),
-        headers: { 'access-control-allow-origin': '*' },
-      });
-      if (req.method() === 'OPTIONS') {
-        return route.fulfill({ status: 204, headers: {
-          'access-control-allow-origin': '*',
-          'access-control-allow-headers': '*',
-          'access-control-allow-methods': '*' } });
-      }
-      if (url.pathname === '/rest/v1/app_state') {
-        if (req.method() === 'GET') return json(200, cloud.row ? [cloud.row] : []);
-        if (req.method() === 'POST') {
-          cloud.row = { doc: JSON.parse(req.postData()).doc, rev: 1 };
-          return json(201, []);
-        }
-        if (req.method() === 'PATCH') {
-          const wantRev = Number((url.searchParams.get('rev') || '').replace('eq.', ''));
-          /* 1回だけ他端末が割り込んだ状況を作り、楽観ロックの再試行を検証する */
-          if (!conflictOnce) { conflictOnce = true; return json(200, []); }
-          if (!cloud.row || cloud.row.rev !== wantRev) return json(200, []);
-          const b = JSON.parse(req.postData());
-          cloud.row = { doc: b.doc, rev: b.rev };
-          return json(200, [cloud.row]);
-        }
-      }
-      return json(404, {});
-    });
-  };
-
-  const setup = async (page) => {
-    await page.evaluate(() => {
-      localStorage.setItem('mochipoyo_sync_config_v1',
-        JSON.stringify({ url: 'https://mock.supabase.co', key: 'anon-key-anon-key-anon-key' }));
-      localStorage.setItem('mochipoyo_sync_auth_v1', JSON.stringify({
-        access_token: 'tok', refresh_token: 'r',
-        expires_at: Date.now() + 3600000, email: 'me@example.com', user_id: 'u1' }));
-    });
-  };
-
-  // --- 端末A：日足を記録して同期 ---
-  const A = await newPage(); await install(A.ctx);
-  await A.page.goto(URL); await A.page.waitForTimeout(400);
-  await setup(A.page); await A.page.reload(); await A.page.waitForTimeout(600);
-
-  await A.page.click('.tab-btn[data-tab="trend"]');
-  await A.page.waitForTimeout(400);
-  await A.page.locator('.tstate-btn').first().click();
-  await A.page.waitForTimeout(300);
-  const aPair = await A.page.evaluate(k => {
-    const d = JSON.parse(localStorage.getItem(k));
-    const w = d.pairs.find(p => Object.values(p.trend).some(t => t.state));
-    const tf = Object.entries(w.trend).find(([, t]) => t.state);
-    return { pair: w.pair, tf: tf[0], state: tf[1].state };
-  }, MARKET_KEY);
-  await A.page.evaluate(() => runSync());
-  await A.page.waitForTimeout(1500);
-  ok('端末Aの記録がクラウドに上がる', !!cloud.row && cloud.row.doc.market.pairs.length > 0,
-     cloud.row && cloud.row.rev);
-  ok('楽観ロックの衝突から自動で復帰する', conflictOnce && !!cloud.row);
-
-  // --- 端末B：まっさらな状態で同期 → Aの記録が降りてくる ---
-  const B = await newPage(); await install(B.ctx);
-  await B.page.goto(URL); await B.page.waitForTimeout(400);
-  await setup(B.page); await B.page.reload(); await B.page.waitForTimeout(1800);
-  const gotOnB = await B.page.evaluate(([k, p, tf]) => {
-    const d = JSON.parse(localStorage.getItem(k));
-    const w = d.pairs.find(x => x.pair === p);
-    return w && w.trend[tf] && w.trend[tf].state;
-  }, [MARKET_KEY, aPair.pair, aPair.tf]);
-  ok('端末Bに端末Aの記録が届く', gotOnB === aPair.state, { gotOnB, expect: aPair.state });
-
-  // --- 端末Bで別の足を記録 → 同期 → 端末Aで両方見える ---
-  const otherTf = aPair.tf === 'd' ? 'h4' : 'd';
-  await B.page.evaluate(([p, tf]) => {
-    const d = loadMarket();
-    const w = d.pairs.find(x => x.pair === p);
-    mvWriteTrend(w.id, tf, { state: 'down', zone: 'red' });
-  }, [aPair.pair, otherTf]);
-  await B.page.evaluate(() => runSync());
-  await B.page.waitForTimeout(1500);
-
-  await A.page.evaluate(() => runSync());
-  await A.page.waitForTimeout(1500);
-  const onA = await A.page.evaluate(([k, p, t1, t2]) => {
-    const d = JSON.parse(localStorage.getItem(k));
-    const w = d.pairs.find(x => x.pair === p);
-    return { own: w.trend[t1].state, other: w.trend[t2].state,
-             pairs: d.pairs.length, dupes: d.pairs.length - new Set(d.pairs.map(x => x.pair)).size };
-  }, [MARKET_KEY, aPair.pair, aPair.tf, otherTf]);
-  ok('端末Aに自分の記録が残っている', onA.own === aPair.state, onA);
-  ok('端末Aに端末Bの別の足が届く（どちらも消えない）', onA.other === 'down', onA);
-  ok('ペアが重複しない', onA.dupes === 0 && onA.pairs === 28, onA);
-  ok('JSエラーなし（A/B とも）', A.errors.length === 0 && B.errors.length === 0,
-     [A.errors, B.errors]);
-
-  const chip = await A.page.locator('#syncChip').innerText();
-  ok('同期成功がチップに出る', chip.startsWith('✔'), chip);
-
-  await A.ctx.close(); await B.ctx.close();
-}
+/* S80: 旧セクション17（2端末の通し同期）は app_state 単一ドキュメント方式（S28〜S77）を
+   前提にしたモックサーバーだった。S78で trades_checklist の1記録1行方式に置換されたため、
+   このモック（/rest/v1/app_state・rev楽観ロック等）はもう現行コードのどの経路も通らない。
+   同等以上の2端末シナリオは s78-sync-test.mjs（差分取得・行単位マージ・墓標・安全弁など17項目）
+   が現行方式でカバーしているため、重複させずここは削除する。 */
 
 await browser.close();
 console.log('\n=== ' + pass + ' passed / ' + fail + ' failed ===');

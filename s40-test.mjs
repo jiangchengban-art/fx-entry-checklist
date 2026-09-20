@@ -172,7 +172,8 @@ console.log('\n[5] 一覧行への反映');
   await page.click(chip);
   await tapFig(page, '#trendGvFig', 36, 70);
   await page.click('#trendGvCancel');
-  ok('閉じると行のチップが更新される', (await page.textContent(chip)).includes('買②'));
+  /* S45で波番号のテキスト表示（🌊アイコンのみに）を撤去、位置ラベルは title 属性に移った */
+  ok('閉じると行のチップが更新される（title に波番号）', (await page.getAttribute(chip, 'title')).includes('買②'));
   /* S45: ミニ波形（.gv-mini）はタップ位置と無関係な表示だったため撤去済み。出ないことを確認 */
   eq('タップ記録の行にミニ波形は出ない(S45で撤去)', await page.locator(chip + ' .gv-mini').count(), 0);
 
@@ -191,7 +192,7 @@ console.log('\n[5] 一覧行への反映');
   });
   await page.reload();
   await page.click('[data-tab="trend"]');
-  ok('文字ラベルは残る', (await page.textContent(chip)).includes('買③'));
+  ok('文字ラベルは残る（title属性、S45でテキスト表示は撤去）', (await page.getAttribute(chip, 'title')).includes('買③'));
   /* S48: 🎯 自体は常時表示になったので、概算では muted（強調なし）で出る */
   eq('概算は圏内に数えないので 🎯 は muted',
      await page.locator(W1 + '.tent[data-tf="d"]:not(.muted)').count(), 0);
