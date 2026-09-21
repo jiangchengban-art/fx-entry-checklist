@@ -4018,12 +4018,21 @@ function mvSetGo(watchId) {
    別データなので、記録し直す巡回情報だけを消せば十分（誤って建玉系データを壊さないため）。
    ⚠️ S58: 手動GOフラグ（w.go/w.goAt）はここでは消さない。GOは「自分が見張ると決めた印」なので
       巡回記録（方向/ゾーン/波）のやり直しとは無関係 ── 解除はGOボタンの再タップのみで行う。 */
+/* ⚠️ S81: クリアも「今この時刻に書いた」として扱う。単に w.trend = {} で空にすると
+   足ごとの at が空（＝0）に戻り、端末間マージ（trend[tf].at の新しい方が勝つ）で
+   他端末に残っている古い記録が必ず勝ってしまう ── 消したはずの巡回記録が同期のたびに
+   復活し、こちらのクリアも他端末へ伝わらない。空の内容に現在時刻を打つことで、
+   クリアが1つの更新として正しく伝播する。 */
 function mvClearTrend(watchId) {
   const data = loadMarket();
   const w = data.pairs.find(p => p.id === watchId);
   if (!w) return null;
-  w.trend = {};
-  w.trendAt = '';
+  mvEnsureTrend(w);
+  const at = new Date().toISOString();
+  MV_TREND_TFS.forEach(t => {
+    w.trend[t.k] = { state: '', zone: '', granville: '', wpos: '', at };
+  });
+  w.trendAt = at;
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -4173,11 +4182,23 @@ function hasAnyHigherCheck(w, tfKey) {
   return MV_TF_CHECKS.some(c => checks[c.k]);
 }
 
+/* 巡回の内容が実際に入っている足のうち、いちばん新しい更新時刻（S81）。
+   ⚠️ w.trendAt をそのまま見ないこと。🧹クリアは「空の内容＋現在時刻」を書く（同期で
+   クリアを勝たせるため）ので、trendAt だけ見ると消した直後のペアが「たった今」になり、
+   本当は何も記録されていないのに巡回済みに見えてしまう。 */
+function trendContentAt(w) {
+  return MV_TREND_TFS.reduce((max, t) => {
+    const cur = (w.trend || {})[t.k] || {};
+    if (!cur.state && !cur.zone && !cur.granville) return max;
+    const v = Date.parse(cur.at || '');
+    return !isNaN(v) && v > max ? v : max;
+  }, 0);
+}
+
 /* 最終更新からの経過時間。1日4回の巡回に対して 12h で「1回抜けた」、36h で「1日抜けた」。 */
 function trendAgeHours(w) {
-  if (!w.trendAt) return Infinity;
-  const t = Date.parse(w.trendAt);
-  if (isNaN(t)) return Infinity;
+  const t = trendContentAt(w);
+  if (!t) return Infinity;
   return (Date.now() - t) / 3600000;
 }
 function isTrendStale(w) { return trendAgeHours(w) > TREND_STALE_H; }
@@ -4196,7 +4217,8 @@ function trendFreshChip(w) {
   if (!isFinite(h)) return '<span class="fresh cold">未記録</span>';
   const cls = h > TREND_COLD_H ? ' cold' : (h > TREND_STALE_H ? ' stale' : '');
   const text = h < 1 ? 'たった今' : (h < 24 ? Math.floor(h) + 'h' : Math.floor(h / 24) + 'd');
-  return '<span class="fresh' + cls + '" title="最終更新 ' + esc(fmtDatetime(w.trendAt)) + '">' +
+  return '<span class="fresh' + cls + '" title="最終更新 ' +
+    esc(fmtDatetime(new Date(trendContentAt(w)).toISOString())) + '">' +
     esc(text) + '</span>';
 }
 /* アラートバッジと判定ボタンは環境認識ボードと同じ data 属性を出す。
@@ -5673,7 +5695,7 @@ function mergeLog(local, remote) {
    ⚠️ 突き合わせのキーは id ではなくペア名。id は端末ごとに別々に採番されるため、
    id で突き合わせると全ペアが二重になる。id はローカルのものを保つ
    （選択中ペアの記憶が id を指しているため）。 */
-function mergePair(a, b) {
+function mergePair(a, b, dead) {
   const out = JSON.parse(JSON.stringify(a));
 
   if (ts(b.judgeAt) > ts(a.judgeAt)) { out.judge = b.judge || ''; out.judgeAt = b.judgeAt; }
@@ -5726,7 +5748,49 @@ function mergePair(a, b) {
     }
   });
 
+  if (dead) mvApplyPairTombstone(out, dead);
   return out;
+}
+
+/* ⚠️ S81: ペアの🗑削除は「そのペアの中身を消す」操作。プリセット28銘柄は loadMarket が
+   必ず作り直すので、行そのものは空で残る ── つまり削除後もローカルにペアが存在し、
+   mergePairs の「ローカルに無いペア」用の墓標チェックを一切通らなかった。その結果、
+   他端末に残る削除前の内容がフィールド単位で丸ごと戻ってきていた。
+   削除より古いタイムスタンプの内容は、相手から来たものも手元に残っているものも消す
+   （mergeTrades が墓標を最終結果に当てるのと同じ考え方）。これで削除が他端末へも伝わる。
+   削除より新しい記録＝消したあとに録り直したものなので、これは残す。 */
+function mvApplyPairTombstone(w, dead) {
+  if (ts(w.judgeAt) <= dead) { w.judge = ''; w.judgeAt = ''; }
+  if (ts(w.goAt)    <= dead) { w.go = false; w.goAt = ''; }
+  if (ts(w.tfAt)    <= dead) { w.tfHigher = ''; w.tfEntry = ''; w.tfAt = ''; }
+
+  MV_ALERT_TFS.forEach(t => {
+    const A = (w.alerts || {})[t.k];
+    if (A && ts(A.chAt) <= dead) w.alerts[t.k] = { on: false, at: '', chAt: '' };
+  });
+
+  MV_TREND_TFS.forEach(t => {
+    const T = (w.trend || {})[t.k];
+    if (T && ts(T.at) <= dead) {
+      w.trend[t.k] = { state: '', zone: '', granville: '', wpos: '', at: '' };
+    }
+  });
+  w.trendAt = MV_TREND_TFS.reduce((max, t) => {
+    const v = ((w.trend || {})[t.k] || {}).at || '';
+    return ts(v) > ts(max) ? v : max;
+  }, '');
+
+  Object.keys(w.checksAt || {}).forEach(ck => {
+    if (ts(w.checksAt[ck]) > dead) return;
+    const parts = ck.split('.');
+    if (parts[0] === 'checksEntry' && parts.length === 2) {
+      if (w.checksEntry) w.checksEntry[parts[1]] = '';
+    } else if (parts[0] === 'checksHigher' && parts.length === 3) {
+      const byTf = (w.checksHigher || {})[parts[1]];
+      if (byTf) byTf[parts[2]] = '';
+    }
+    delete w.checksAt[ck];
+  });
 }
 
 function mergePairs(local, remote, tomb) {
@@ -5736,13 +5800,15 @@ function mergePairs(local, remote, tomb) {
   (remote || []).forEach(rp => {
     if (!rp || !rp.pair) return;
     const lp = byName.get(rp.pair);
+    const dead = ts((tomb.pairs || {})[rp.pair]);
     if (lp) {
-      const merged = mergePair(lp, rp);
+      /* S81: プリセットは削除しても loadMarket が作り直すため、消したペアもここを通る。
+         墓標を mergePair へ渡し、削除より古い内容は双方から落とす。 */
+      const merged = mergePair(lp, rp, dead);
       out[out.indexOf(lp)] = merged;
       return;
     }
     /* ローカルに無いペア。こちらで消したものなら、削除より古い内容は連れ戻さない。 */
-    const dead = ts((tomb.pairs || {})[rp.pair]);
     if (dead) {
       const newest = Math.max(ts(rp.trendAt), ts(rp.judgeAt), ts(rp.tfAt), ts(rp.goAt),
         ...Object.values(rp.checksAt || {}).map(ts),
