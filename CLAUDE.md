@@ -333,7 +333,10 @@ function pairIsHot(w) / tfIsHot(w, tfKey)   // <= GV_ENTRY_RADIUS
 | ❶ | 上位足のネックライン付近で、5分足に反転の形が出たか | `necklineForm` | ダブルボトム / 逆三尊（買）・ダブルトップ / 三尊（売）・❌ |
 | ❷ | 5分足のMAを明確に抜けたか（＝ここからを1波と見なす） | `maBreak` | 上抜け（買）・下抜け（売）・❌ |
 | ❸ | ブレイクした水準がロールリバーサルとして機能したか | `rollReversal` | 確認 / ❌ |
-| ❸ | 実際に入ったフィボ水準 | `entryFibo` | 23% / 38% / 50% / 61% / 78% / ❌ |
+| ❸ | 実際に入った注文方法（S82） | `entryOrderType` | 指値 / 逆指値 / ❌ |
+| ❸ | 実際に入ったフィボ水準（指値のときだけ表示） | `entryFibo` | 23% / 38% / 50% / 61% / 78% / ❌ |
+
+**S82変更**：ユーザー指摘「FIBOの箇所にまず指値か逆指値かの選択をさせて、指値ならFIBOの選択へ、逆指値ならそのままでよい」に対応。`entryFibo` の直前に `entryOrderType`（指値/逆指値/❌）を追加し、**`entryFibo` の行は `entryOrderType === '指値'` のときだけ表示**するようにした（`trendPanelHtml()` の `rowsOf` が条件フィルタ）。逆指値はブレイクに飛び乗るだけでフィボの何%かという概念自体が無いため、選ばせない方が実態に合う。⚠️ **entryOrderType を「指値」以外（逆指値／❌／再タップでの解除）に変えると、`mvWriteCheck()` が隠れた `entryFibo` の値を自動でクリアする**（逆指値で入ったのに古いFibo値だけ残る食い違いを防ぐ）。⚠️ 根拠チェックのボタンは通常 `.on` の付け替えだけで再描画しない規約（§12最重要仕様3）だが、`entryOrderType` の変更だけは例外的にパネルを再描画する（下のFibo行の出現/消滅に影響するため。エントリー足セレクトの変更と同じ扱い）。CSV列は `en_*` が4列→5列（`en_rollReversal` の次に `en_entryOrderType` が入り、`en_entryFibo` はそのまま最後尾）。確度スコアの分母（エントリー足、均等割り）は4項目→5項目に変化。旧CSV（`en_entryOrderType` 列なし）を import しても `entryFibo` 単体は従来どおり復元される（未知の列は無視されるだけ）。端末間マージ・波マップ・並び順・エントリー圏の距離計算は無変更（`checksEntry` は「チェック項目単位」でマージされるので項目が増えても同期コードは無改修）。新設s82-test.mjs 13項目、既存s62-test.mjs/s44-test.mjsを新仕様に更新し全通過。sw.js: v52→v53
 
 **S65変更**：❸「フィボ×ロールリバーサルの重なり」（`fiboRoll`、重なり有/重なり無/❌）を撤去し、**上位足 `MV_TF_CHECKS` にあった `rollReversal`（ロールリバーサル、確認/❌）をエントリー足のこの位置に一本化**した。上位足でのロールリバーサル確認は、実運用ではエントリー足（5分足）での確認と重複していたため、ユーザー指摘により上位足からは削除。キー名は上位足と同じ `rollReversal` を使うが `checksHigher`/`checksEntry` で保存先が分かれるため衝突しない。既存データの `checksHigher.rollReversal`（旧上位足分）・`checksEntry.fiboRoll`（旧エントリー足分）は読み書きされないだけで無害（S58 の `w.mode` と同じ扱い）。CSV列は `hi_*` が6→5列（`hi_rollReversal` 消滅）、`en_*` は4列のまま（`en_fiboRoll` → `en_rollReversal`）。確度スコアの重み配分（上位足）は RCI各15・MACD35・ラウンドナンバー10（合計90を分母として%計算、100固定ではない）。sw.js: v35→v36
 
@@ -511,15 +514,16 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 
 ## 実装状態
 
-**✅ 本番使用可能** — 最新は S81（2026-09-21）。直近の変更点は下記「セッション履歴」表の先頭数行、詳細な機能一覧は「実装済み機能」節、S28〜S77の全文プローズ履歴は`docs/CHANGELOG_ARCHIVE.md`を参照（S80でCLAUDE.md本体を軽量化するため移設）。
+**✅ 本番使用可能** — 最新は S82（2026-09-21）。直近の変更点は下記「セッション履歴」表の先頭数行、詳細な機能一覧は「実装済み機能」節、S28〜S77の全文プローズ履歴は`docs/CHANGELOG_ARCHIVE.md`を参照（S80でCLAUDE.md本体を軽量化するため移設）。
 
 **⚠️ 利用開始にあたって必須の作業**：3端末とも**ホーム画面に追加**し、以後アイコンから起動すること（iOS の7日削除を回避する唯一の方法）。同期を使うには設定タブで Supabase の Project URL / anon key を入力してログインする。
 
-### セッション履歴（最新は S81。S28-69は`docs/CHANGELOG_ARCHIVE.md`に移設）
+### セッション履歴（最新は S82。S28-69は`docs/CHANGELOG_ARCHIVE.md`に移設）
 
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
 | セッション | 主な変更 | 日付 |
+| 82 | 🎯 **エントリー足のFibo選択に「指値／逆指値」の前置き選択を追加**。ユーザー要望「FIBOの箇所にまず指値か逆指値かの選択をさせて、指値ならFIBOの選択へ、逆指値ならそのままでよい」に対応。①`MV_ENTRY_CHECKS` の `entryFibo` 直前に `entryOrderType`（指値/逆指値/❌）を追加 ②`trendPanelHtml()` の `rowsOf` を条件フィルタに変更し、`entryFibo` 行は `checksEntry.entryOrderType === '指値'` のときだけ表示（逆指値・❌・未選択では隠す。逆指値はブレイクに乗るだけでフィボの水準という概念が無いため）③`mvWriteCheck()` に後始末を追加：`entryOrderType` が「指値」以外に変わったら、隠れた `entryFibo` の値を自動でクリア（古い値が食い違って残らないように）④根拠チェックのボタンは通常パネルを再描画しない規約（S33最重要仕様3）だが、`entryOrderType` の変更だけはFibo行の出現/消滅に関わるため例外的に再描画するようクリックハンドラに分岐を追加。CSV列は `en_*` が4列→5列（`en_entryOrderType` を追加）。確度スコア（エントリー足、均等割り）は分母が4項目→5項目に。端末間マージ・波マップ・並び順・エントリー圏距離計算は無変更（`checksEntry` は項目単位でマージされるため）。新設s82-test.mjs 13項目、既存s62-test.mjs（3ステップフローの項目数・保存内容・CSV列を新仕様に更新）・s44-test.mjs（パネルの行数を更新）を含め全スイート通過。sw.js: v52→v53 | 2026-09-21 |
 | 81 | 🐛 **3端末で「消した記録が同期のたびに復活し、新たな記録ができない」不具合の修正**。ユーザー報告「ゴミ箱や箒のマークで入力を消した後に新しく記録しようとすると、他端末の情報を取り入れましたという同期の更新で消す前に戻ってしまう」の原因を2つ特定し修正。①**🧹巡回記録クリア**（`mvClearTrend()`）が `w.trend = {}` と空にするだけで時刻を打っていなかった。端末間マージは `trend[tf].at` の新しい方を採るので、クリアすると時刻が空（＝0）に戻り、他端末に残る古い記録が**必ず**勝つ。消した記録が同期のたびに復活し、こちらのクリアも他端末へ伝わらなかった。→ 全時間足に「空の内容＋現在時刻」を書き、クリアを1つの更新として正しく伝播させる ②**🗑ペア削除**は墓標（`markDeleted('pairs', ...)`）を立てていたが、**プリセット28銘柄は `loadMarket()` が必ず作り直す**ため削除直後からローカルにペアが存在し、`mergePairs()` の「ローカルに無いペア」用の墓標チェックを一切通らなかった。結果、他端末に残る削除前の判定・GO・上位足/エントリー足・アラート・根拠チェック・巡回記録がフィールド単位で丸ごと戻っていた。→ `mergePair(a, b, dead)` に墓標を渡し、新設 `mvApplyPairTombstone()` でマージ結果に当てて削除より古い内容を**双方から**落とす（`mergeTrades()` が墓標を最終結果に当てるのと同じ考え方）。これで削除が他端末へも伝わる。削除より新しい＝消したあとに録り直したものは残す ③クリアが「空の内容＋現在時刻」になったため、`w.trendAt` をそのまま見る鮮度表示だとクリア直後のペアが「たった今」＝巡回済みに見えてしまう。新設 `trendContentAt()` で**中身が実際に入っている足**の最新時刻から鮮度を出すよう変更（`trendAgeHours()`/`trendFreshChip()`）。マージ用の `trendAt` の意味は無変更。データモデル・CSV・統計・波マップ・並び順・根拠パネル・Supabase の行構成は無変更。新設s81-test.mjs 26項目通過、既存全スイート通過（s78-sync 17／s44 64／s62 48／s60 17／s59 28／s55 15／s80 19／s76 11／s77 7／s75 8／s74 7／s73 9／s43 35／s42 45／s40 62）。sw.js: v51→v52 | 2026-09-21 |
 | 80 | 📊 **確度%帯別/根拠項目別の成績、リスク額＋R倍率、見送りの振り返り、本番同期の安全弁バグ修正**。ユーザーからの改善提案7点への対応。①📚統計に「確度%帯別の成績」（`checkConfidence()`の重み付けスコアが実際に機能しているかを検証）・「根拠項目別の成績」（`MV_CHECK_SNAPSHOTS`を走査しRCI/MACD等の値ごとの平均損益を表示）を追加 ②フォームに「リスク額（円）」（`riskAmount`）を追加し `pnlAmount/riskAmount` でR倍率を算出、履歴カード・平均R倍率タイルに表示 ③保留・スルー記録に「結果的に：獲れた／妥当だった」の振り返りボタン（`retroOutcome`）を追加、📚に集計タイル新設 ④トレード削除時にFirebase Storageの孤児画像をベストエフォートで削除（`deleteTradeImages()`） ⑤**重大発見・修正**：`runSync()`の安全弁が`file://`判定のみで、`http://localhost`で配信されるテスト（s28-test.mjs等）から本番の共用Supabaseテーブルへ実際に読み書きしていた。localhost/127.0.0.1も同じ扱いに拡張。`s78-sync-test.mjs`のモックURLも旧プロジェクトIDのままで実質何もインターセプトしていなかったため現在のURLに修正 ⑥CSV列に`riskAmount`/`retroOutcome`を追加 ⑦壊れたテスト整理：s24-test.mjs削除（S51/S55/S63等で前提UIが軒並み消滅）、s28-test.mjsの`.tab-btn[data-tab="trade"]`/`#mvPairSelect`等の廃止済みセレクタと旧`app_state`同期UIのテストを現行仕様に更新・削除、s40-test.mjsのS45で撤去された文字ラベル表示への依存を`title`属性参照に修正。データモデル・並び順・波マップ・端末間マージの中核ロジックは無変更。新設s80-test.mjs 19項目、s28-test.mjs 69項目・s78-sync-test.mjs 17項目・既存全スイート通過。sw.js: v50→v51 | 2026-09-20 |
 | 79 | 🎯 **🎯チップからエントリー距離%を削除、確度%のみ表示**。ユーザー指摘「🎯マークの右横に2つパーセントが並んでいる（距離%と確度%）のは紛らわしい」に対応。`trendEntryChipHtml()`の距離%（`pct`変数）を表示から削除し確度%のみ残す。距離情報はtitle属性のツールチップに残る。sw.js: v49→v50 | 2026-09-19 |
@@ -553,6 +557,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 ### Playwright テストの走らせ方（S80で全件グリーンに整理）
 ```bash
 npm install
+node s82-test.mjs      # S82: エントリー足Fiboの前に指値/逆指値選択（13項目・file:// で完結）
 node s81-test.mjs      # S81: 🧹クリア・🗑削除が同期で巻き戻らない（26項目・file:// で完結）
 node s80-test.mjs      # S80: 確度%帯別/根拠項目別の成績・リスク額+R倍率・見送りの振り返り・CSV往復（19項目・file:// で完結）
 node s78-sync-test.mjs # S78: 端末間同期（2端末モック、17項目・file:// で完結）
@@ -581,8 +586,8 @@ node s28-test.mjs      # S28: 破損検知・バックアップ・PWA・タイ�
 - ✅ **旧ツールバーボタン id（`#trendFilterAligned` 等）への依存は S62 で解消済み。** 絞り込みの起点は `[data-trend-summary-filter="go|stale"]`（`.trend-summary` 内のボタン。S63で`wait`、S67で`hot`の分岐を撤去）に統一されている。並び順の起点は `[data-trend-sort-tf="h1|h4|d|w"]`（S67新設）。新しくテストを書くときもこれらを使うこと
 - ✅ **一覧の行の🎯根拠パネルを開く（判定・根拠チェックボタンを叩く前に必要）のは `[data-trend-panel-open]` を`.first()`等でクリックするだけでよい。** S44以降、判定ボタン（`.mv-judge-btn`）・根拠チェックボタン（`.mv-tfcheck-btn`）はこのパネルの中にしか無い（旧`#mvPairSelect`のボード自体がS51で撤去済み）
 
-### CSV列構成（S80更新）
-`id`, `tradeType`, `alertPair`, `alertTf`, `result`, `entryPattern`, `datetime`, `exitDatetime`, `pair`, `tfHigher`, `tfEntry`, `direction`, `exitResult`, `notes`, `manualAlertAt`, `manualAlertTf`, `resultTag`, `resultOtherReason`, `pnlAmount`, `riskAmount`, `beTouch`, `retroOutcome`, `imgEntry`, `imgHigher`, `imgOthers`, `watchId`, `hi_*` × 5, `en_*` × 4, `createdAt`
+### CSV列構成（S82更新）
+`id`, `tradeType`, `alertPair`, `alertTf`, `result`, `entryPattern`, `datetime`, `exitDatetime`, `pair`, `tfHigher`, `tfEntry`, `direction`, `exitResult`, `notes`, `manualAlertAt`, `manualAlertTf`, `resultTag`, `resultOtherReason`, `pnlAmount`, `riskAmount`, `beTouch`, `retroOutcome`, `imgEntry`, `imgHigher`, `imgOthers`, `watchId`, `hi_*` × 5, `en_*` × 5, `createdAt`
 
 **S80変更**：`pnlAmount`の直後に`riskAmount`（円、リスク額。`pnlAmount/riskAmount`でR倍率を算出）、`beTouch`の直後に`retroOutcome`（保留・スルー記録の事後振り返り、`''|'missed'|'valid'`）を追加。旧CSV（両列なし）を import すると `riskAmount=0`/`retroOutcome=''` のデフォルト値になる。
 
@@ -591,7 +596,9 @@ node s28-test.mjs      # S28: 破損検知・バックアップ・PWA・タイ�
 根拠チェック列は `MV_CHECK_SNAPSHOTS`（`hi` = 上位足 / `en` = エントリー足）**× その区分の `checks`** から自動生成される（`CSV_BASIS_COLUMNS`）。S62 で区分ごとに定義が分かれたので、`MV_TF_CHECKS` / `MV_ENTRY_CHECKS` のどちらに項目を足してもCSV列が自動で増える。
 
 - `hi_*` (5): `rciShort` / `rciMid` / `rciLong` / `macd` / `roundNumber`
-- `en_*` (4): `necklineForm` / `maBreak` / `rollReversal` / `entryFibo`
+- `en_*` (5): `necklineForm` / `maBreak` / `rollReversal` / `entryOrderType` / `entryFibo`
+
+**S82変更**：`entryFibo` の直前に `entryOrderType`（指値/逆指値/❌）を追加。エントリー足のFibo選択の前に注文方法を選ばせ、指値のときだけFibo入力欄が出る（詳細は「12b. エントリー足の3ステップ確認フロー」参照）。CSV列は `en_*` が4列→5列。旧CSV（`en_entryOrderType` 列なし）を import すると `entryOrderType=''` になるが、`entryFibo` はそのまま復元される。sw.js: v52→v53
 
 **S65変更**：ユーザー指摘「エントリー足の❸『重なり』項目を消してロールRvに変更したい。上位足のロールRvは消してよい」に対応。エントリー足の `fiboRoll`（フィボ×ロールリバーサルの重なり、重なり有/重なり無/❌）を撤去し、上位足 `MV_TF_CHECKS` にあった `rollReversal`（ロールリバーサル、確認/❌）をエントリー足の同じ位置（❸）に一本化。上位足からは `rollReversal` を削除（実運用で5分足での確認と重複していたため）。CSV列は `hi_*` が6→5列（`hi_rollReversal` 消滅）、`en_*` は4列のまま（`en_fiboRoll` → `en_rollReversal` に入れ替え）。確度スコアの重み（上位足）は RCI各15・MACD35・ラウンドナンバー10（分母90、100固定ではなく残った項目の重み合計を分母にする）。🔭一覧の行の🎯チップにも上位足の確度%を表示するようになった（S64）ため、この重み変更はチップ表示にもそのまま反映される。旧CSVの `hi_rollReversal`/`en_fiboRoll` 列は import しても未知の列として無視される。端末間マージ・波マップ・エントリー圏の距離計算・並び順・統計タブは無変更。sw.js: v35→v36
 
@@ -614,7 +621,8 @@ node s28-test.mjs      # S28: 破損検知・バックアップ・PWA・タイ�
 
 セッション12（環境認識ボード新規実装）・セッション13（判定3択化・構造刷新）の詳細は `docs/CHANGELOG_ARCHIVE.md` を参照。**環境認識ボードの現行仕様は本ファイル冒頭「7. 環境認識ボード」の記載が最新**（セッション14で刷新済み）。
 
-### 実装済み機能（セッション81完了時点、S52-S58は`docs/CHANGELOG_ARCHIVE.md`に移設済み）
+### 実装済み機能（セッション82完了時点、S52-S58は`docs/CHANGELOG_ARCHIVE.md`に移設済み）
+- ✅ **エントリー足のFibo選択に指値/逆指値の前置き選択を追加**（S82）— entryFibo行はentryOrderTypeが「指値」のときだけ表示。逆指値に変えると隠れたFibo値を自動クリア
 - ✅ **消した記録が同期で復活する不具合の修正**（S81）— 🧹クリアが時刻を打たず必ず同期で負けていた問題、🗑削除の墓標がプリセット自動再生成で無視されていた問題を修正。削除操作が3端末すべてに正しく伝わるように
 - ✅ **確度%帯別/根拠項目別の成績、リスク額＋R倍率、見送りの振り返り**（S80）— 📚統計に確度スコア・各根拠項目の値ごとの成績検証、フォームに「リスク額」入力とR倍率表示、保留/スルー記録への事後振り返りボタンを追加。トレード削除時のFirebase孤児画像も削除。あわせて本番Supabaseへ書き込んでいたテストの安全弁バグを修正
 - ✅ **🎯チップからエントリー距離%を削除**（S79）— 距離%と確度%が並んで紛らわしかったため確度%のみ表示に

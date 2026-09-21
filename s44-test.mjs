@@ -280,10 +280,12 @@ console.log('\n[⑤] 根拠パネルの入口が「足」になる');
   eq('上位足が日足で確定する', (await pairOf(page, 'w1')).tfHigher, '日足');
   eq('固定表示も日足', (await page.textContent(W1 + '.tp-fixed')).trim(), '日足');
   ok('確度が出る', (await page.textContent(W1 + '.tp-conf')).includes('確度'));
-  /* S62: 上位足とエントリー足で項目が別々になったので、行数は両方の合計になる */
-  eq('根拠の行が 上位足＋エントリー足 のぶん出る',
+  /* S62: 上位足とエントリー足で項目が別々になったので、行数は両方の合計になる。
+     S82: entryFibo は entryOrderType が「指値」のときだけ出る行なので、未選択の
+     既定状態では1行少ない。 */
+  eq('根拠の行が 上位足＋エントリー足 のぶん出る（Fibo未選択で1行少ない）',
      await page.locator(W1 + '.tp-grid .tp-row').count(),
-     await page.evaluate(() => MV_TF_CHECKS.length + MV_ENTRY_CHECKS.length));
+     await page.evaluate(() => MV_TF_CHECKS.length + MV_ENTRY_CHECKS.length - 1));
 
   /* 別の足のボタンを押すと上位足が入れ替わる */
   await page.click(W1 + '[data-trend-panel-open][data-tf="h4"]');

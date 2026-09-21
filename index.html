@@ -1706,10 +1706,18 @@ const MV_ENTRY_CHECKS = mvNormalizeChecks([
   { k: 'rollReversal', label: 'ロールリバーサル', short: '❸ロールRv',
     hint: 'ブレイクした水準が支持線・抵抗帯として機能する兆候（ロールリバーサル）が出たか',
     opts: [{ v: '確認' }, { v: '❌' }] },
+  /* S82: Fibo水準は「指値で波の途中に置いた」ときだけ意味を持つ（成行・逆指値で
+     ブレイクに飛び乗った場合はフィボの何%か自体が無い）。まずここで注文方法を選ばせ、
+     指値のときだけ下のFibo選択を出す（trendPanelHtml の rowsOf が条件分岐）。
+     逆指値・❌を選んだ、または選び直したときは mvWriteCheck が下の entryFibo を自動で消す。 */
+  { k: 'entryOrderType', label: '注文方法', short: '❸注文方法',
+    hint: '指値（指定水準で待ち構えて約定）か逆指値（ブレイクに乗って約定）か',
+    opts: [{ v: '指値' }, { v: '逆指値' }, { v: '❌' }] },
   /* S38→S62: 実際に入ったフィボ水準。キー名は据え置き ── CSV列 en_entryFibo と
-     📚振り返りの「エントリーFibo水準別の成績」（byFibo）がこの名前を見ているため。 */
+     📚振り返りの「エントリーFibo水準別の成績」（byFibo）がこの名前を見ているため。
+     S82: 指値のときだけ表示（rowsOf 側の条件）。逆指値のときは該当なしなので選ばせない。 */
   { k: 'entryFibo', label: 'エントリーFibo', short: '❸Fibo',
-    hint: '重なった水準＝実際にエントリーしたフィボの%',
+    hint: '指値で入った水準＝実際にエントリーしたフィボの%',
     opts: [{ v: '23%' }, { v: '38%' }, { v: '50%' }, { v: '61%' }, { v: '78%' }, { v: '❌' }] },
 ]);
 
@@ -3905,6 +3913,12 @@ function mvWriteCheck(watchId, field, key, value) {
   w[store][key] = w[store][key] === value ? '' : value;
   if (!w.checksAt) w.checksAt = {};
   w.checksAt[store + '.' + key] = new Date().toISOString();
+  /* S82: 注文方法が「指値」以外（逆指値／❌／未選択に戻した）になったら、その下に出ていた
+     Fibo選択を消す。指値のときだけ意味を持つ項目なので、隠れた行に古い値だけ残ると
+     「逆指値で入ったのに38%と記録されている」ような食い違いが起きる。 */
+  if (store === 'checksEntry' && key === 'entryOrderType' && w[store].entryOrderType !== '指値') {
+    w[store].entryFibo = '';
+  }
   if (!saveMarket(data)) return null;
   return w;
 }
@@ -4372,7 +4386,14 @@ function trendPanelHtml(w) {
   const tfLabel = (MV_TREND_TFS.find(t => t.k === tfKey) || {}).label || higherTf;
   /* S62: 上位足とエントリー足は項目そのものが別なので、1行に2列並べる形はやめて
      区分ごとのセクションに積む。横幅をフルに使えるぶん選択肢の折り返しはむしろ減る。 */
-  const rowsOf = (field, list) => list.map(c =>
+  /* S82: エントリー足の entryFibo は「指値」を選んだときだけ意味を持つ（逆指値はブレイクに
+     乗るだけでフィボの何%かという概念が無い）ので、entryOrderType が指値のときだけ行を出す。
+     未選択（''）のときはまだ注文方法を選んでいないだけなので、こちらも一旦隠しておく
+     ── 選ばせる前にFiboを選ばせても意味の無い入力になるため。 */
+  const rowsOf = (field, list) => list.filter(c => {
+    if (field !== 'tfEntry' || c.k !== 'entryFibo') return true;
+    return (w.checksEntry || {}).entryOrderType === '指値';
+  }).map(c =>
     '<div class="tp-row">' +
       (c.link
         ? '<button type="button" class="tp-label link" data-guide-link="' + c.link + '"' +
@@ -4704,6 +4725,10 @@ trendListEl.addEventListener('click', (e) => {
     const { trendCheckBtn: id, field, key, value } = checkBtn.dataset;
     const w = mvWriteCheck(id, field, key, value);
     if (!w) { trendPatchById(id); return; }
+    /* S82: entryOrderType の変更だけは例外的にパネルを再描画する。この項目だけ下の
+       entryFibo 行の出し分け（rowsOf）に影響するため、.on の付け替えだけでは
+       Fibo行が現れたり消えたりしない。エントリー足の変更（グランビル連動）と同じ理由。 */
+    if (field === 'tfEntry' && key === 'entryOrderType') { trendPatchById(id); return; }
     /* S72: 上位足の根拠は時間足キーごとに独立しているので、書き込み直後に読み戻す先も
        MV_TF_TO_TREND_KEY[w.tfHigher] で揃える（trendCheckCell の読み取りと同じ規約）。 */
     const cur = field === 'tfHigher'
