@@ -88,8 +88,8 @@ console.log('\n[②] 選択肢の中身が実運用の3ステップになって�
     opts.necklineForm.includes('ダブルボトム') && opts.necklineForm.includes('逆三尊'));
   ok('❶ に売り側の形（ダブルトップ・三尊）がある',
     opts.necklineForm.includes('ダブルトップ') && opts.necklineForm.includes('三尊'));
-  eq('❷ はMAの上抜け／下抜け', opts.maBreak, ['上抜け', '下抜け', '❌']);
-  eq('❸ はロールリバーサル確認', opts.rollReversal, ['確認', '❌']);
+  eq('❷ はアラート（S83）', opts.maBreak, ['●', '✖']);
+  eq('❸ はグランビルのダマシ／ヒゲ発生（S83）', opts.rollReversal, ['ダマシ', 'ヒゲ発生']);
   eq('❸ 注文方法は指値/逆指値', opts.entryOrderType, ['指値', '逆指値', '❌']);
   eq('❸ Fibo は5水準', opts.entryFibo, ['23%', '38%', '50%', '61%', '78%', '❌']);
   await page.close();
@@ -125,9 +125,9 @@ console.log('\n[④] ❶❷の選択肢が上位足の方向で絞られる');
     .evaluateAll(els => els.map(e => e.dataset.value));
   eq('↗ なら❶は買い側の形だけ', await vals('necklineForm'),
     ['ダブルボトム', '逆三尊', '❌']);
-  eq('↗ なら❷は上抜けだけ', await vals('maBreak'), ['上抜け', '❌']);
-  eq('❸ ロールリバーサルは向きに関係なく全部出る', await vals('rollReversal'),
-    ['確認', '❌']);
+  eq('❷ アラートは向きに関係なく全部出る（S83）', await vals('maBreak'), ['●', '✖']);
+  eq('❸ グランビルは向きに関係なく全部出る（S83）', await vals('rollReversal'),
+    ['ダマシ', 'ヒゲ発生']);
   ok('目線バッジが買いを示す',
     (await panel.locator('.tp-side').textContent()).includes('買い'));
   await page.close();
@@ -140,7 +140,7 @@ console.log('\n[④] ❶❷の選択肢が上位足の方向で絞られる');
     .evaluateAll(els => els.map(e => e.dataset.value));
   eq('↘ なら❶は売り側の形だけ', await vals('necklineForm'),
     ['ダブルトップ', '三尊', '❌']);
-  eq('↘ なら❷は下抜けだけ', await vals('maBreak'), ['下抜け', '❌']);
+  eq('❷ アラートは向きに関係なく全部出る（S83）', await vals('maBreak'), ['●', '✖']);
   ok('目線バッジが売りを示す',
     (await panel.locator('.tp-side').textContent()).includes('売り'));
   await page.close();
@@ -169,8 +169,8 @@ console.log('\n[⑤] 記録できる・方向反転で向きの合わない記�
   const btn = (k, v) => item + '[data-trend-check-btn][data-field="tfEntry"][data-key="' +
     k + '"][data-value="' + v + '"]';
   await page.click(btn('necklineForm', 'ダブルボトム'));
-  await page.click(btn('maBreak', '上抜け'));
-  await page.click(btn('rollReversal', '確認'));
+  await page.click(btn('maBreak', '●'));
+  await page.click(btn('rollReversal', 'ダマシ'));
   /* S82: entryFibo は entryOrderType が「指値」のときだけ出る。先に注文方法を選ぶ
      （このクリックはパネルを再描画するので、以降の btn() locator は再描画後のDOMを拾う）。 */
   await page.click(btn('entryOrderType', '指値'));
@@ -179,7 +179,7 @@ console.log('\n[⑤] 記録できる・方向反転で向きの合わない記�
   const saved = () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('mochipoyo_market_view_v1')).pairs.find(p => p.id === 'p1').checksEntry);
   eq('5項目とも保存される', await saved(), {
-    necklineForm: 'ダブルボトム', maBreak: '上抜け', rollReversal: '確認',
+    necklineForm: 'ダブルボトム', maBreak: '●', rollReversal: 'ダマシ',
     entryOrderType: '指値', entryFibo: '38%',
   });
   ok('押したボタンに .on が付く',
@@ -188,9 +188,10 @@ console.log('\n[⑤] 記録できる・方向反転で向きの合わない記�
   /* 日足の方向を ↘ に反転させる（行の方向トグル） */
   await page.click(item + '[data-trend-state][data-tf="d"][data-value="down"]');
   const after = await saved();
-  eq('向きに紐づく❶❷は消える', [after.necklineForm, after.maBreak], ['', '']);
-  eq('向きを持たない❸は残る', [after.rollReversal, after.entryOrderType, after.entryFibo],
-    ['確認', '指値', '38%']);
+  eq('向きに紐づく❶は消える', after.necklineForm, '');
+  eq('向きを持たない❷❸は残る（S83：アラート・グランビルは向きが無い）',
+    [after.maBreak, after.rollReversal, after.entryOrderType, after.entryFibo],
+    ['●', 'ダマシ', '指値', '38%']);
 
   /* 逆指値に変えると Fibo は自動で消え、行も隠れる（S82の要点）。 */
   await page.click(btn('entryOrderType', '逆指値'));
@@ -209,8 +210,9 @@ console.log('\n[⑥] 確度スコアの分母が区分ごとに分かれる');
     /* 上位足：weight合計90（RCI各15+MACD35+ラウンド10）。
        MACD(weight:35)が❌の場合：(90-35)/90 ≈ 61% */
     higher: checkConfidence({ macd: '❌' }, MV_TF_CHECKS),
-    /* S82: エントリー足は entryOrderType 追加で5項目（weight無し）：❌1つで 4/5 = 80% */
-    entry: checkConfidence({ maBreak: '❌' }, MV_ENTRY_CHECKS),
+    /* S82: エントリー足は entryOrderType 追加で5項目（weight無し）：❌1つで 4/5 = 80%
+       S83で maBreak/rollReversal の選択肢から ❌ が消えたので necklineForm で検証する */
+    entry: checkConfidence({ necklineForm: '❌' }, MV_ENTRY_CHECKS),
     /* ⏳待ちはS63で撤去済み */
     full: checkConfidence({}, MV_ENTRY_CHECKS),
   }));
