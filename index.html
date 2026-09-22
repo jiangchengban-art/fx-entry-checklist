@@ -676,6 +676,21 @@
     padding: 8px 2px 0;
   }
 
+  /* S87: 振り返りタブの統計を種類ごとにアコーディオンでまとめる（12ブロック縦積みだと見づらいため） */
+  .stats-group {
+    border: 1px solid var(--border); border-radius: 10px; margin-top: 12px; overflow: hidden;
+  }
+  .stats-group summary {
+    padding: 10px 12px; font-size: 13.5px; font-weight: 700; color: var(--ink);
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px;
+    background: var(--surface-2);
+  }
+  .stats-group summary::-webkit-details-marker { display: none; }
+  .stats-group summary::before { content: '▸'; font-size: 11px; color: var(--ink-muted); }
+  .stats-group[open] summary::before { content: '▾'; }
+  .stats-group-body { padding: 10px 12px 14px; }
+  .stats-group-body .basis-rr:first-child { margin-top: 0; }
+
   .trend-toolbar {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
   }
@@ -1233,18 +1248,42 @@
       <button type="button" class="type-filter-btn" data-type="real">💰 リアル</button>
     </div>
     <div class="stats-grid" id="statsGrid"></div>
-    <div class="basis-rr" id="confStats"></div>
-    <div class="basis-rr" id="fiboStats"></div>
-    <div class="basis-rr" id="checkItemStats"></div>
-    <div class="basis-rr" id="resultTagStats"></div>
-    <div class="basis-rr" id="beTouchStats"></div>
-    <div class="basis-rr" id="retroStats"></div>
-    <div class="basis-rr" id="alertLagStats"></div>
-    <div class="basis-rr" id="mvAlertStats"></div>
-    <div class="basis-rr" id="hourStats"></div>
-    <div class="basis-rr" id="weekdayStats"></div>
-    <div class="basis-rr" id="pairStats"></div>
-    <div class="basis-rr" id="alertTfPnlStats"></div>
+
+    <details class="stats-group" open>
+      <summary>🔍 根拠・確度の検証</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="confStats"></div>
+        <div class="basis-rr" id="fiboStats"></div>
+        <div class="basis-rr" id="checkItemStats"></div>
+      </div>
+    </details>
+
+    <details class="stats-group">
+      <summary>🏁 結果・見送りの分析</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="resultTagStats"></div>
+        <div class="basis-rr" id="beTouchStats"></div>
+        <div class="basis-rr" id="retroStats"></div>
+      </div>
+    </details>
+
+    <details class="stats-group">
+      <summary>⏱ タイミング分析</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="alertLagStats"></div>
+        <div class="basis-rr" id="mvAlertStats"></div>
+        <div class="basis-rr" id="hourStats"></div>
+        <div class="basis-rr" id="weekdayStats"></div>
+      </div>
+    </details>
+
+    <details class="stats-group">
+      <summary>💱 ペア別の成績</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="pairStats"></div>
+        <div class="basis-rr" id="alertTfPnlStats"></div>
+      </div>
+    </details>
   </section>
 
   <section class="card">
