@@ -196,6 +196,11 @@
   }
   .form-field textarea { resize: vertical; min-height: 90px; }
   .field-note { font-size: 11.5px; color: var(--ink-muted); line-height: 1.6; }
+  .dt-manual {
+    margin-top: 4px; width: 100%; font-size: 12.5px; padding: 6px 8px;
+    border-radius: 6px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink); font-family: inherit;
+  }
   .result-toggle { display: flex; gap: 8px; }
   .result-btn {
     flex: 1; border-radius: 8px; padding: 11px 0; font-size: 13.5px; font-weight: 700;
@@ -203,6 +208,7 @@
     background: var(--surface); color: var(--ink-muted); transition: all 0.15s;
   }
   .result-btn:hover { background: var(--surface-2); }
+  .result-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .result-btn.entered.active { background: var(--good); border-color: var(--good); color: #fff; }
   .result-btn.hold.active { background: var(--warn); border-color: var(--warn); color: #fff; }
   .result-btn.through.active { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
@@ -1121,10 +1127,12 @@
         <div class="form-field">
           <label for="fDatetime">エントリー日時<span class="req">*</span></label>
           <input type="datetime-local" id="fDatetime" required>
+          <input type="text" class="dt-manual" id="fDatetimeManual" placeholder="手入力: 2026-09-22 21:30">
         </div>
         <div class="form-field">
           <label for="fExitDatetime">エグジット日時</label>
           <input type="datetime-local" id="fExitDatetime">
+          <input type="text" class="dt-manual" id="fExitDatetimeManual" placeholder="手入力: 2026-09-22 21:30">
         </div>
         <!-- fExitResult は旧記録（セッション9以前）との互換のため空値で残す。 -->
         <input type="hidden" id="fExitResult" value="">
@@ -1139,6 +1147,7 @@
         <div class="form-field">
           <label for="fAlertAt">アラート発生日時</label>
           <input type="datetime-local" id="fAlertAt">
+          <input type="text" class="dt-manual" id="fAlertAtManual" placeholder="手入力: 2026-09-22 21:30">
         </div>
         <div class="form-field">
           <label for="fAlertTf">アラート発生時間足</label>
@@ -1414,6 +1423,7 @@
     <div class="field">
       <label for="alertTimeInput">発生日時</label>
       <input type="datetime-local" id="alertTimeInput">
+      <input type="text" class="dt-manual" id="alertTimeInputManual" placeholder="手入力: 2026-09-22 21:30">
     </div>
     <div class="modal-actions">
       <button class="btn-danger-solid" type="button" id="alertTimeOff">OFFにする</button>
@@ -1884,10 +1894,11 @@ const RESULT_TAGS = [
 const RESULT_TAG_LABELS = Object.fromEntries(RESULT_TAGS.map(b => [b.v, b.label]));
 
 const RESULT_OTHER_REASONS = [
-  'ニュースで手仕舞い',
-  '時間切れ・撤退',
-  'ルール違反での早期決済',
-  'その他',
+  'RCI(上限OR下限)にて決済',
+  'ネックラインOR直近の高値・安値で決済',
+  '経済指標にて撤退',
+  '閉場前に決済',
+  'ルール違反での決済',
 ];
 
 const BE_TOUCH_OPTIONS = [
@@ -2631,6 +2642,7 @@ const tradeModal = document.getElementById('tradeModal');
 function openTradeModal(watchId) {
   if (watchId) { saveSelectedPairId(watchId); renderMarket(); }
   syncFormFromMarket();
+  dtManualSyncAll();
   tradeModal.classList.add('show');
   const inner = tradeModal.querySelector('.modal');
   if (inner) inner.scrollTop = 0;
@@ -2647,6 +2659,49 @@ function setDatetimeNow() {
   document.getElementById('fDatetime').value = d.toISOString().slice(0, 16);
 }
 setDatetimeNow();
+
+/* 日時フィールドの手入力対応（S84）。datetime-local はモバイル環境（特にiOS）だと
+   ホイール選択のみでキーボード手入力ができない機種があるため、隣に手入力用のテキスト欄を
+   併設し相互同期する。picker で選んだ場合もテキスト欄に反映される。 */
+const DT_MANUAL_PAIRS = [
+  ['fDatetime', 'fDatetimeManual'],
+  ['fExitDatetime', 'fExitDatetimeManual'],
+  ['fAlertAt', 'fAlertAtManual'],
+  ['alertTimeInput', 'alertTimeInputManual'],
+];
+function dtManualFromValue(v) { return v ? v.replace('T', ' ') : ''; }
+function dtManualParse(text) {
+  const m = String(text).trim().match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[ T](\d{1,2}):(\d{1,2})$/);
+  if (!m) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${m[1]}-${pad(m[2])}-${pad(m[3])}T${pad(m[4])}:${pad(m[5])}`;
+}
+function dtManualSync(dtId) {
+  const pair = DT_MANUAL_PAIRS.find(p => p[0] === dtId);
+  if (!pair) return;
+  const dtInput = document.getElementById(pair[0]);
+  const manualInput = document.getElementById(pair[1]);
+  manualInput.value = dtManualFromValue(dtInput.value);
+}
+function dtManualSyncAll() { DT_MANUAL_PAIRS.forEach(p => dtManualSync(p[0])); }
+DT_MANUAL_PAIRS.forEach(([dtId, manualId]) => {
+  const dtInput = document.getElementById(dtId);
+  const manualInput = document.getElementById(manualId);
+  dtInput.addEventListener('change', () => dtManualSync(dtId));
+  manualInput.addEventListener('change', () => {
+    const raw = manualInput.value.trim();
+    if (!raw) { dtInput.value = ''; return; }
+    const parsed = dtManualParse(raw);
+    if (!parsed) {
+      showToast('⚠ 日時の形式が正しくありません（例: 2026-09-22 21:30）');
+      dtManualSync(dtId);
+      return;
+    }
+    dtInput.value = parsed;
+    manualInput.value = dtManualFromValue(parsed);
+  });
+  dtManualSync(dtId);
+});
 
 /* ============ 保存フロー ============ */
 document.getElementById('tradeForm').addEventListener('submit', (e) => {
@@ -3237,6 +3292,7 @@ function loadTradeIntoForm(t) {
   fPnl.value = t.pnlAmount ? String(t.pnlAmount) : '';
   fRisk.value = t.riskAmount ? String(t.riskAmount) : '';
   setBeTouchState(t.beTouch || '');
+  dtManualSyncAll();
   formImages = t.images
     ? { entry: t.images.entry || '', higher: t.images.higher || '', others: (t.images.others || []).slice() }
     : { entry: '', higher: '', others: [] };
@@ -3966,6 +4022,7 @@ function openAlertTimeModal(watchId, tfKey) {
   const curDate = cur.at ? new Date(cur.at) : null;
   alertTimeInput.value = curDate && !Number.isNaN(curDate.getTime())
     ? toDatetimeLocalValue(curDate) : toDatetimeLocalValue(new Date());
+  dtManualSync('alertTimeInput');
   document.getElementById('alertTimeOff').hidden = !cur.on;
   alertTimeModal.classList.add('show');
 }
