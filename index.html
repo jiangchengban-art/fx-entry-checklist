@@ -209,6 +209,16 @@
   .result-btn.through.active { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
   .result-btn.demo.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .result-btn.real.active { background: var(--good); border-color: var(--good); color: #fff; }
+  .result-btn.warn.active { background: var(--warn); border-color: var(--warn); color: #fff; }
+  /* S88: ⚡1分足タブ。形状は5択あるので折り返しを許す */
+  .scalp-toggle { flex-wrap: wrap; }
+  .scalp-toggle .result-btn { min-width: 84px; }
+  .scalp-toggle .result-btn[data-value="●"], .scalp-toggle .result-btn[data-value="✖"] { font-size: 18px; padding: 7px 0; }
+  .scalp-head { font-size: 14px; margin: 20px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
+  .scalp-flag.warn { border-color: var(--warn); color: var(--warn); font-weight: 700; }
+  .scalp-flag.ok { color: var(--good); }
   #directionField.hidden { display: none; }
   .hidden { display: none !important; }
   .type-filter { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -1329,6 +1339,101 @@
     <div id="trendList"></div>
   </section>
 
+  <!-- ============ ⚡ 1分足スキャル（上位足1H×エントリー足1分足 専用の簡易記録、S88） ============ -->
+  <div class="tab-panel" id="tabPanel-scalp">
+  <section class="card">
+    <h2 id="scalpFormTitle">⚡ 1分足スキャル記録</h2>
+    <div class="section-note">上位足<strong>1時間足</strong>×エントリー足<strong>1分足</strong>専用の簡易記録です。条件が揃っている前提なので、1時間足は<strong>懸念点があるときだけ</strong>記録します（何も押さなければ「懸念なし」）。</div>
+    <form id="scalpForm" autocomplete="off">
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="sPair">通貨ペア<span class="req">*</span></label>
+          <select id="sPair"></select>
+        </div>
+        <div class="form-field">
+          <label for="sDatetime">エントリー日時<span class="req">*</span></label>
+          <input type="datetime-local" id="sDatetime">
+        </div>
+        <div class="form-field full">
+          <label>売買方向<span class="opt">任意</span></label>
+          <div class="result-toggle scalp-toggle" data-scalp-single="direction">
+            <button type="button" class="result-btn" data-value="long">▲ ロング</button>
+            <button type="button" class="result-btn" data-value="short">▼ ショート</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="scalp-head">🕐 1時間足の懸念点</h3>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>RCI<span class="opt">上限・下限に来ていない線だけタップ</span></label>
+          <div class="result-toggle scalp-toggle" data-scalp-multi="rci">
+            <button type="button" class="result-btn warn" data-value="短期">短期▲</button>
+            <button type="button" class="result-btn warn" data-value="中期">中期▲</button>
+            <button type="button" class="result-btn warn" data-value="長期">長期▲</button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="sMacd">MACD<span class="opt">微妙な形のときだけ</span></label>
+          <select id="sMacd">
+            <option value="">懸念なし</option>
+            <option value="▲">▲ 微妙な形</option>
+          </select>
+        </div>
+      </div>
+
+      <h3 class="scalp-head">⚡ 1分足</h3>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>形状</label>
+          <div class="result-toggle scalp-toggle" data-scalp-single="shape">
+            <button type="button" class="result-btn" data-value="ダブルボトム" data-side="long">ダブルボトム</button>
+            <button type="button" class="result-btn" data-value="逆三尊" data-side="long">逆三尊</button>
+            <button type="button" class="result-btn" data-value="ダブルトップ" data-side="short">ダブルトップ</button>
+            <button type="button" class="result-btn" data-value="三尊" data-side="short">三尊</button>
+            <button type="button" class="result-btn" data-value="なし">なし</button>
+          </div>
+        </div>
+        <div class="form-field full">
+          <label>ダマシで大口の約定を確認</label>
+          <div class="result-toggle scalp-toggle" data-scalp-single="damashi">
+            <button type="button" class="result-btn" data-value="●">●</button>
+            <button type="button" class="result-btn" data-value="✖">✖</button>
+          </div>
+        </div>
+        <div class="form-field full">
+          <label>急騰落後の浅い押し目が1分足MAにグランビル反応</label>
+          <div class="result-toggle scalp-toggle" data-scalp-single="pullback">
+            <button type="button" class="result-btn" data-value="●">●</button>
+            <button type="button" class="result-btn" data-value="✖">✖</button>
+          </div>
+        </div>
+        <div class="form-field full" id="scalpImagesField">
+          <label for="sImages">チャート画像<span class="opt">任意・複数可</span></label>
+          <input type="file" id="sImages" accept="image/*" multiple>
+          <div class="img-preview" id="sImagesPreview"></div>
+        </div>
+        <div class="form-field full">
+          <label for="sNotes">メモ<span class="opt">任意</span></label>
+          <textarea id="sNotes" rows="2" style="min-height:56px;"></textarea>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn-primary" type="submit" id="scalpSubmitBtn">💾 記録を保存</button>
+        <button class="btn-ghost hidden" type="button" id="scalpCancelEdit">編集をキャンセル</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>📋 スキャル記録</h2>
+    <div class="list-toolbar">
+      <span class="check-count" id="scalpSummary"></span>
+    </div>
+    <div id="scalpList"></div>
+  </section>
+  </div>
+
   <!-- ============ ⚙ 設定（CSV入出力） ============ -->
   <section class="card tab-panel" id="tabPanel-settings">
     <h2>⚙ 設定</h2>
@@ -1413,6 +1518,9 @@
 <nav class="tab-bar" id="tabBar">
   <button class="tab-btn" type="button" data-tab="trend">
     <span class="tab-icon">🔭</span><span class="tab-label">一覧</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="scalp">
+    <span class="tab-icon">⚡</span><span class="tab-label">1分足</span>
   </button>
   <button class="tab-btn" type="button" data-tab="review">
     <span class="tab-icon">📚</span><span class="tab-label">振り返り</span>
@@ -2768,6 +2876,10 @@ function doSave() {
 /* ---- 区分フィルター（履歴・統計 共用） ---- */
 const TYPE_FILTER_KEY = 'mochipoyo_type_filter';
 let typeFilter = localStorage.getItem(TYPE_FILTER_KEY) || 'all';
+/* S88: ⚡1分足タブの記録（kind:'scalp'）は同じ trades 配列に入れて同期・バックアップ・墓標を流用するが、
+   項目がまったく違うので📚振り返りの統計・履歴と CSV からは外す。 */
+function isScalpTrade(t) { return !!t && t.kind === 'scalp'; }
+function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t)); }
 function filterByType(trades) {
   if (typeFilter === 'all') return trades;
   return trades.filter(t => getTradeType(t) === typeFilter);
@@ -2794,7 +2906,7 @@ function fmtPnl(v) { return v == null ? '–' : (v > 0 ? '+' : '') + Math.round(
 function pnlCls(v) { return v == null ? '' : v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
 
 function renderStats() {
-  const trades = filterByType(loadTrades());
+  const trades = filterByType(mainTrades());
   const enteredCount = trades.filter(t => t.result === 'entered').length;
   const holdCount    = trades.filter(t => t.result === 'hold').length;
   const throughCount = trades.filter(t => t.result === 'through').length;
@@ -3070,7 +3182,7 @@ function fmtDatetimeShort(v) {
 function renderList() {
   /* エントリー日時は「分」までのため、同じ分に複数記録すると順序が決まらない。
      同着のときは記録時刻（createdAt）で新しい順に並べる。 */
-  const trades = filterByType(loadTrades()).slice().sort((a, b) =>
+  const trades = filterByType(mainTrades()).slice().sort((a, b) =>
     (b.datetime || b.createdAt || '').localeCompare(a.datetime || a.createdAt || '') ||
     (b.createdAt || '').localeCompare(a.createdAt || ''));
   const listEl = document.getElementById('recordList');
@@ -3539,7 +3651,7 @@ function renderStorageDiagnostics() {
 }
 
 document.getElementById('exportCsv').addEventListener('click', () => {
-  const trades = loadTrades();
+  const trades = mainTrades();
   if (trades.length === 0) { showToast('エクスポートする記録がありません'); return; }
   const rows = [CSV_HEADERS.join(',')];
   trades.forEach(t => {
@@ -5638,12 +5750,248 @@ document.addEventListener('keydown', (e) => {
   if (trendMapModal.classList.contains('show')) closeTrendMap();
 });
 
+/* ============ ⚡ 1分足スキャル（S88） ============
+   上位足1時間足×エントリー足1分足は回数が多いので、🔭一覧→根拠パネル→記録フォームの
+   フル手順とは別に、確認事項を絞った専用タブで記録する。
+   保存先は既存の trades 配列（kind:'scalp'）。同期（t:<id> 行）・JSONバックアップ・墓標・
+   画像の孤児削除（deleteTradeImages）をそのまま流用するため。統計・履歴・CSV からは mainTrades() で外す。
+   1時間足は「条件が揃っている前提」なので、懸念点があるときだけ記録する（空＝懸念なし）。 */
+const SCALP_LAST_PAIR_KEY = 'mochipoyo_scalp_last_pair';
+const SCALP_RCI_LINES = ['短期', '中期', '長期'];
+const scalpForm = document.getElementById('scalpForm');
+const scalpPairSel = document.getElementById('sPair');
+let scalpEditingId = null;
+let scalpState = null;     // { direction, shape, damashi, pullback, rci: [] }
+let scalpImages = [];
+let scalpUploading = 0;
+
+scalpPairSel.innerHTML = MV_PAIR_GROUPS.map(g =>
+  '<optgroup label="' + esc(g.label) + '">' +
+  g.pairs.map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') +
+  '</optgroup>').join('');
+
+function scalpResetForm() {
+  scalpEditingId = null;
+  scalpState = { direction: '', shape: '', damashi: '', pullback: '', rci: [] };
+  scalpImages = [];
+  let last = '';
+  try { last = localStorage.getItem(SCALP_LAST_PAIR_KEY) || ''; } catch (e) { /* noop */ }
+  if (last && MV_PRESET_PAIRS.includes(last)) scalpPairSel.value = last;
+  document.getElementById('sDatetime').value = toDatetimeLocalValue(new Date());
+  document.getElementById('sMacd').value = '';
+  document.getElementById('sNotes').value = '';
+  document.getElementById('scalpFormTitle').textContent = '⚡ 1分足スキャル記録';
+  document.getElementById('scalpSubmitBtn').textContent = '💾 記録を保存';
+  document.getElementById('scalpCancelEdit').classList.add('hidden');
+  scalpRenderToggles();
+  scalpRenderImages();
+}
+
+function scalpRenderToggles() {
+  scalpForm.querySelectorAll('[data-scalp-single]').forEach(group => {
+    const key = group.dataset.scalpSingle;
+    group.querySelectorAll('.result-btn').forEach(btn => {
+      btn.classList.toggle('active', scalpState[key] === btn.dataset.value);
+      /* 形状は売買方向に合うものだけ出す（ロングでダブルトップは選ばない）。方向未選択なら全部出す */
+      const side = btn.dataset.side;
+      btn.classList.toggle('hidden', !!(side && scalpState.direction && side !== scalpState.direction));
+    });
+  });
+  scalpForm.querySelectorAll('[data-scalp-multi="rci"] .result-btn').forEach(btn => {
+    btn.classList.toggle('active', scalpState.rci.includes(btn.dataset.value));
+  });
+}
+
+scalpForm.addEventListener('click', (e) => {
+  const btn = e.target.closest('.result-btn');
+  if (!btn) return;
+  const single = btn.closest('[data-scalp-single]');
+  const multi = btn.closest('[data-scalp-multi]');
+  const v = btn.dataset.value;
+  if (single) {
+    const key = single.dataset.scalpSingle;
+    scalpState[key] = scalpState[key] === v ? '' : v;   /* 再タップで解除 */
+    if (key === 'direction' && scalpState.shape) {
+      const shapeBtn = scalpForm.querySelector('[data-scalp-single="shape"] [data-value="' + scalpState.shape + '"]');
+      const side = shapeBtn && shapeBtn.dataset.side;
+      if (side && scalpState.direction && side !== scalpState.direction) scalpState.shape = '';
+    }
+  } else if (multi) {
+    const list = scalpState.rci;
+    const i = list.indexOf(v);
+    if (i >= 0) list.splice(i, 1); else list.push(v);
+    list.sort((a, b) => SCALP_RCI_LINES.indexOf(a) - SCALP_RCI_LINES.indexOf(b));
+  }
+  scalpRenderToggles();
+});
+
+function scalpRenderImages() {
+  document.getElementById('sImagesPreview').innerHTML = scalpImages.map((url, i) =>
+    '<span class="img-thumb"><a href="' + esc(url) + '" target="_blank" rel="noopener">画像' + (i + 1) + '</a>' +
+    ' <button type="button" class="img-remove" data-scalp-img="' + i + '">✕</button></span>').join('');
+}
+document.getElementById('sImagesPreview').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-scalp-img]');
+  if (!btn) return;
+  /* 記録フォームと同じく Storage 側はここでは消さない（編集キャンセル時に保存済み画像を失うため） */
+  scalpImages.splice(Number(btn.dataset.scalpImg), 1);
+  scalpRenderImages();
+});
+document.getElementById('sImages').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  const el = document.getElementById('sImagesPreview');
+  scalpUploading++;
+  el.insertAdjacentHTML('beforeend', '<span class="img-uploading">⏳ アップロード中…</span>');
+  try {
+    for (const file of files) {
+      const url = await uploadChartImage(file);
+      if (url) scalpImages.push(url);
+    }
+  } finally {
+    scalpUploading--;
+    scalpRenderImages();
+  }
+});
+
+scalpForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (scalpUploading > 0) { showToast('⏳ 画像のアップロード完了を待ってから保存してください'); return; }
+  const pair = scalpPairSel.value;
+  const dtVal = document.getElementById('sDatetime').value;
+  if (!pair || !dtVal) { showToast('⚠ 通貨ペアとエントリー日時を入力してください'); return; }
+  const trades = loadTrades();
+  const existing = scalpEditingId ? trades.find(t => t.id === scalpEditingId) : null;
+  const now = new Date().toISOString();
+  const rec = {
+    id: existing ? existing.id : mvGenId('sc'),
+    kind: 'scalp',
+    pair,
+    datetime: new Date(dtVal).toISOString(),
+    direction: scalpState.direction,
+    tfHigher: '1時間足',
+    tfEntry: '1分足',
+    scalp: {
+      rci: scalpState.rci.slice(),
+      macd: document.getElementById('sMacd').value,
+      shape: scalpState.shape,
+      damashi: scalpState.damashi,
+      pullback: scalpState.pullback,
+    },
+    images: { entry: '', higher: '', others: scalpImages.slice() },
+    notes: document.getElementById('sNotes').value.trim(),
+    createdAt: existing ? existing.createdAt : now,
+    updatedAt: now,
+  };
+  const next = existing ? trades.map(t => t.id === rec.id ? rec : t) : trades.concat(rec);
+  if (!saveTrades(next)) return;
+  try { localStorage.setItem(SCALP_LAST_PAIR_KEY, pair); } catch (err) { /* noop */ }
+  showToast(existing ? '記録を更新しました' : '記録を保存しました');
+  scalpResetForm();
+  renderScalpList();
+});
+document.getElementById('scalpCancelEdit').addEventListener('click', () => { scalpResetForm(); });
+
+function scalpLoadIntoForm(t) {
+  const s = t.scalp || {};
+  scalpEditingId = t.id;
+  scalpState = {
+    direction: t.direction || '', shape: s.shape || '', damashi: s.damashi || '',
+    pullback: s.pullback || '', rci: Array.isArray(s.rci) ? s.rci.slice() : [],
+  };
+  scalpImages = ((t.images || {}).others || []).slice();
+  scalpPairSel.value = t.pair;
+  const d = new Date(t.datetime);
+  document.getElementById('sDatetime').value = Number.isNaN(d.getTime()) ? '' : toDatetimeLocalValue(d);
+  document.getElementById('sMacd').value = s.macd || '';
+  document.getElementById('sNotes').value = t.notes || '';
+  document.getElementById('scalpFormTitle').textContent = '✎ スキャル記録の編集';
+  document.getElementById('scalpSubmitBtn').textContent = '💾 更新を保存';
+  document.getElementById('scalpCancelEdit').classList.remove('hidden');
+  scalpRenderToggles();
+  scalpRenderImages();
+  scalpForm.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* 懸念の有無。RCI・MACD のどちらかに記録があれば「懸念あり」 */
+function scalpConcerns(t) {
+  const s = t.scalp || {};
+  const out = (s.rci || []).map(line => 'RCI' + line + '▲');
+  if (s.macd) out.push('MACD' + s.macd);
+  return out;
+}
+
+function renderScalpList() {
+  const list = loadTrades().filter(isScalpTrade).sort((a, b) =>
+    (b.datetime || '').localeCompare(a.datetime || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const withConcern = list.filter(t => scalpConcerns(t).length).length;
+  document.getElementById('scalpSummary').textContent = list.length
+    ? list.length + ' 件（懸念あり ' + withConcern + ' / 懸念なし ' + (list.length - withConcern) + '）'
+    : '';
+  const el = document.getElementById('scalpList');
+  if (!list.length) { el.innerHTML = '<div class="empty-state">まだ記録がありません。</div>'; return; }
+  const mark = (label, v) => v
+    ? '<span class="scalp-flag' + (v === '●' ? ' ok' : v === '✖' ? ' warn' : '') + '">' + label + ' ' + esc(v) + '</span>'
+    : '';
+  el.innerHTML = list.map(t => {
+    const s = t.scalp || {};
+    const concerns = scalpConcerns(t);
+    const imgs = (t.images || {}).others || [];
+    return (
+      '<div class="record-card">' +
+        '<div class="record-head">' +
+          '<span class="datetime">' + fmtDatetime(t.datetime) + '</span>' +
+          '<span class="badge pair">' + esc(t.pair) + '</span>' +
+          (t.direction ? '<span class="badge ' + (t.direction === 'long' ? 'long' : 'short') + '">' +
+            (t.direction === 'long' ? '▲ ロング' : '▼ ショート') + '</span>' : '') +
+          '<span class="spacer"></span>' +
+          '<button class="btn-ghost" type="button" data-scalp-edit="' + esc(t.id) + '">✎ 編集</button>' +
+          '<button class="btn-delete" type="button" data-scalp-delete="' + esc(t.id) + '">削除</button>' +
+        '</div>' +
+        '<div class="record-body">' +
+          kv('1H 懸念', concerns.length
+            ? '<span class="scalp-flags">' + concerns.map(c => '<span class="scalp-flag warn">' + esc(c) + '</span>').join('') + '</span>'
+            : '<span class="scalp-flag ok">懸念なし</span>') +
+          kv('1分足', '<span class="scalp-flags">' +
+            (s.shape ? '<span class="scalp-flag">' + esc(s.shape) + '</span>' : '') +
+            mark('ダマシ大口', s.damashi) + mark('MA反応', s.pullback) + '</span>') +
+          (imgs.length ? kv('チャート画像', '<span class="img-thumbs">' + imgs.map((url, i) =>
+            '<a href="' + esc(url) + '" target="_blank" rel="noopener" class="img-thumb img-pic" title="画像' + (i + 1) + '">' +
+            '<img src="' + esc(url) + '" alt="画像' + (i + 1) + '" loading="lazy">画像' + (i + 1) + '</a>').join(' ') + '</span>') : '') +
+        '</div>' +
+        (t.notes ? '<div class="record-notes">' + esc(t.notes) + '</div>' : '') +
+      '</div>');
+  }).join('');
+}
+document.getElementById('scalpList').addEventListener('click', (e) => {
+  const ed = e.target.closest('[data-scalp-edit]');
+  if (ed) {
+    const t = loadTrades().find(x => x.id === ed.dataset.scalpEdit);
+    if (t) scalpLoadIntoForm(t);
+    return;
+  }
+  const del = e.target.closest('[data-scalp-delete]');
+  if (del) {
+    /* 削除は履歴と同じ確認モーダルを使う（確定時の墓標・画像削除・renderAll も共通） */
+    pendingDeleteId = del.dataset.scalpDelete;
+    const t = loadTrades().find(x => x.id === pendingDeleteId);
+    document.getElementById('deleteModalText').textContent = t
+      ? fmtDatetime(t.datetime) + ' の ' + t.pair + ' のスキャル記録を削除しますか？この操作は取り消せません。'
+      : 'この記録を削除しますか？この操作は取り消せません。';
+    deleteModal.classList.add('show');
+    if (pendingDeleteId === scalpEditingId) scalpResetForm();
+  }
+});
+scalpResetForm();
+
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';
 const tabBar = document.getElementById('tabBar');
 const tabButtons = Array.from(tabBar.querySelectorAll('.tab-btn'));
 const tabPanels = {
   trend:    document.getElementById('tabPanel-trend'),
+  scalp:    document.getElementById('tabPanel-scalp'),
   review:   document.getElementById('tabPanel-review'),
   settings: document.getElementById('tabPanel-settings'),
 };
@@ -5696,7 +6044,7 @@ guideDrawerBackdrop.addEventListener('click', (e) => {
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderTrendList(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderTrendList(); renderScalpList(); }
 document.querySelectorAll('.type-filter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);

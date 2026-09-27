@@ -38,7 +38,7 @@ async function newPage(seed) {
 console.log('\n[①] 🎯タブが存在しない・既定タブは一覧');
 {
   const page = await newPage();
-  eq('タブは3つ', await page.locator('.tab-btn').count(), 3);
+  eq('タブは4つ（S88で⚡1分足を追加）', await page.locator('.tab-btn').count(), 4);
   eq('🎯タブが無い', await page.locator('[data-tab="trade"]').count(), 0);
   ok('既定で一覧タブがアクティブ', await page.locator('[data-tab="trend"]').evaluate(el => el.classList.contains('active')));
   await page.context().close();
