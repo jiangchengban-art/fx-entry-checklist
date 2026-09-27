@@ -209,12 +209,48 @@
   .result-btn.through.active { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
   .result-btn.demo.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .result-btn.real.active { background: var(--good); border-color: var(--good); color: #fff; }
-  .result-btn.warn.active { background: var(--warn); border-color: var(--warn); color: #fff; }
-  /* S88: ⚡1分足タブ。形状は5択あるので折り返しを許す */
-  .scalp-toggle { flex-wrap: wrap; }
-  .scalp-toggle .result-btn { min-width: 84px; }
-  .scalp-toggle .result-btn[data-value="●"], .scalp-toggle .result-btn[data-value="✖"] { font-size: 18px; padding: 7px 0; }
-  .scalp-head { font-size: 14px; margin: 20px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+  /* S88→S89: ⚡1分足タブ。🔭一覧と同じコンパクトなカードで、ボタンをタップして記録する */
+  .sc-card.editing { border-color: var(--accent); }
+  .sc-card.flash { background: var(--accent-soft); }
+  /* 375px でヘッダ（通貨・▲▼・📷📝🧹💾）を1行、方向を選んだ後の1M行も1行に収める幅 */
+  .sc-card .trend-head { gap: 6px 5px; }
+  .sc-card .trend-tf { gap: 5px; }
+  .sc-card .tstate-btn { width: 28px; }
+  .sc-pair {
+    flex: none; width: 88px; font-size: 12px; font-weight: 700; font-family: inherit;
+    padding: 3px 2px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface); color: var(--ink);
+  }
+  .sc-pair.empty { color: var(--ink-muted); font-weight: 400; }
+  .sc-btn {
+    font-family: inherit; cursor: pointer; border-radius: 7px; height: 28px; padding: 0 7px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-muted);
+    font-size: 12px; font-weight: 700; transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .sc-btn:hover { background: var(--surface); }
+  .sc-btn.on      { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .sc-btn.on.warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .sc-btn.on.ok   { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+  .sc-btn.on.ng   { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
+  .sc-mark { width: 25px; padding: 0; font-size: 13px; }
+  .sc-yn { display: inline-flex; align-items: center; gap: 3px; }
+  .sc-ico { font-size: 15px; line-height: 1; }
+  .sc-macd {
+    height: 28px; font-size: 12px; font-family: inherit; padding: 0 4px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--ink-muted);
+  }
+  .sc-macd.on { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); font-weight: 700; }
+  .sc-none { font-size: 11px; color: var(--good); }
+  .sc-note {
+    flex: 1; min-width: 0; font-size: 12px; font-family: inherit; padding: 5px 8px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink);
+  }
+  .tgoto.sc-cam { width: auto; min-width: 26px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
+  .tgoto.on { color: var(--accent); border-color: var(--accent); }
+  .sc-imgs { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+  .sc-imgs a { color: var(--accent); }
+  .sc-img-rm { border: none; background: none; color: var(--ink-muted); cursor: pointer; padding: 0 2px; font-size: 11px; }
+  .sc-save { width: auto; min-width: 40px; height: 26px; padding: 0 8px; font-size: 13px; }
   .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
   .scalp-flag.warn { border-color: var(--warn); color: var(--warn); font-weight: 700; }
@@ -1066,6 +1102,8 @@
     .trend-head { gap: 6px 8px; padding: 8px 9px 6px; }
     .trend-head .pair { min-width: 66px; font-size: 13px; }
     .trend-head .spacer { flex-basis: 100%; height: 0; }
+    /* ⚡1分足カードは項目が少ないので改行させず1行に収める */
+    .sc-card .trend-head .spacer { flex-basis: 0; }
     /* 入力行は 375px でも1段に収める（22ペア分の縦スクロールを増やさない）。
        24 + 3×27 + 3×26 + グランビル ≒ 280px。圏内の行だけ 🎯＋根拠 が付いて2段目に折り返す。 */
     /* ⚠️ 実測で内容幅 305px に対し 24+87+84+58+29 + gap4×4 = 298px。🎯 を足しても1段に収まる。
@@ -1342,87 +1380,17 @@
   <!-- ============ ⚡ 1分足スキャル（上位足1H×エントリー足1分足 専用の簡易記録、S88） ============ -->
   <div class="tab-panel" id="tabPanel-scalp">
   <section class="card">
-    <h2 id="scalpFormTitle">⚡ 1分足スキャル記録</h2>
-    <div class="section-note">上位足<strong>1時間足</strong>×エントリー足<strong>1分足</strong>専用の簡易記録です。条件が揃っている前提なので、1時間足は<strong>懸念点があるときだけ</strong>記録します（何も押さなければ「懸念なし」）。</div>
-    <form id="scalpForm" autocomplete="off">
-      <div class="form-grid">
-        <div class="form-field">
-          <label for="sPair">通貨ペア<span class="req">*</span></label>
-          <select id="sPair"></select>
-        </div>
-        <div class="form-field">
-          <label for="sDatetime">エントリー日時<span class="req">*</span></label>
-          <input type="datetime-local" id="sDatetime">
-        </div>
-        <div class="form-field full">
-          <label>売買方向<span class="opt">任意</span></label>
-          <div class="result-toggle scalp-toggle" data-scalp-single="direction">
-            <button type="button" class="result-btn" data-value="long">▲ ロング</button>
-            <button type="button" class="result-btn" data-value="short">▼ ショート</button>
-          </div>
-        </div>
+    <h2>⚡ 1分足スキャル</h2>
+    <div class="section-note">上位足<strong>1時間足</strong>×エントリー足<strong>1分足</strong>専用。<strong>カード5枚</strong>で、タイミングが重なりそうな通貨を同時に記録できます。1時間足は<strong>懸念点だけ</strong>タップ（何も押さなければ懸念なし）。💾 を押した時刻をエントリー日時として保存します。</div>
+    <details class="trend-help">
+      <summary>📖 記号の見方</summary>
+      <div class="trend-help-body">
+        <strong>1H</strong>　短▲・中▲・長▲＝上限・下限に来ていないRCI／MACD▲＝微妙な形<br>
+        <strong>1M</strong>　W底・逆三尊・W天・三尊＝形状（売買方向に合うものだけ表示）／🐋＝ダマシで大口の約定を確認／〽＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
+        📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）
       </div>
-
-      <h3 class="scalp-head">🕐 1時間足の懸念点</h3>
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>RCI<span class="opt">上限・下限に来ていない線だけタップ</span></label>
-          <div class="result-toggle scalp-toggle" data-scalp-multi="rci">
-            <button type="button" class="result-btn warn" data-value="短期">短期▲</button>
-            <button type="button" class="result-btn warn" data-value="中期">中期▲</button>
-            <button type="button" class="result-btn warn" data-value="長期">長期▲</button>
-          </div>
-        </div>
-        <div class="form-field">
-          <label for="sMacd">MACD<span class="opt">微妙な形のときだけ</span></label>
-          <select id="sMacd">
-            <option value="">懸念なし</option>
-            <option value="▲">▲ 微妙な形</option>
-          </select>
-        </div>
-      </div>
-
-      <h3 class="scalp-head">⚡ 1分足</h3>
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>形状</label>
-          <div class="result-toggle scalp-toggle" data-scalp-single="shape">
-            <button type="button" class="result-btn" data-value="ダブルボトム" data-side="long">ダブルボトム</button>
-            <button type="button" class="result-btn" data-value="逆三尊" data-side="long">逆三尊</button>
-            <button type="button" class="result-btn" data-value="ダブルトップ" data-side="short">ダブルトップ</button>
-            <button type="button" class="result-btn" data-value="三尊" data-side="short">三尊</button>
-            <button type="button" class="result-btn" data-value="なし">なし</button>
-          </div>
-        </div>
-        <div class="form-field full">
-          <label>ダマシで大口の約定を確認</label>
-          <div class="result-toggle scalp-toggle" data-scalp-single="damashi">
-            <button type="button" class="result-btn" data-value="●">●</button>
-            <button type="button" class="result-btn" data-value="✖">✖</button>
-          </div>
-        </div>
-        <div class="form-field full">
-          <label>急騰落後の浅い押し目が1分足MAにグランビル反応</label>
-          <div class="result-toggle scalp-toggle" data-scalp-single="pullback">
-            <button type="button" class="result-btn" data-value="●">●</button>
-            <button type="button" class="result-btn" data-value="✖">✖</button>
-          </div>
-        </div>
-        <div class="form-field full" id="scalpImagesField">
-          <label for="sImages">チャート画像<span class="opt">任意・複数可</span></label>
-          <input type="file" id="sImages" accept="image/*" multiple>
-          <div class="img-preview" id="sImagesPreview"></div>
-        </div>
-        <div class="form-field full">
-          <label for="sNotes">メモ<span class="opt">任意</span></label>
-          <textarea id="sNotes" rows="2" style="min-height:56px;"></textarea>
-        </div>
-      </div>
-      <div class="form-footer">
-        <button class="btn-primary" type="submit" id="scalpSubmitBtn">💾 記録を保存</button>
-        <button class="btn-ghost hidden" type="button" id="scalpCancelEdit">編集をキャンセル</button>
-      </div>
-    </form>
+    </details>
+    <div id="scalpSlots"></div>
   </section>
 
   <section class="card">
@@ -5756,162 +5724,231 @@ document.addEventListener('keydown', (e) => {
    保存先は既存の trades 配列（kind:'scalp'）。同期（t:<id> 行）・JSONバックアップ・墓標・
    画像の孤児削除（deleteTradeImages）をそのまま流用するため。統計・履歴・CSV からは mainTrades() で外す。
    1時間足は「条件が揃っている前提」なので、懸念点があるときだけ記録する（空＝懸念なし）。 */
-const SCALP_LAST_PAIR_KEY = 'mochipoyo_scalp_last_pair';
+const SCALP_SLOTS_KEY = 'mochipoyo_scalp_slots_v1';   // 端末ごとの入力途中カード（記録そのものではない）
+const SCALP_SLOT_COUNT = 5;
 const SCALP_RCI_LINES = ['短期', '中期', '長期'];
-const scalpForm = document.getElementById('scalpForm');
-const scalpPairSel = document.getElementById('sPair');
-let scalpEditingId = null;
-let scalpState = null;     // { direction, shape, damashi, pullback, rci: [] }
-let scalpImages = [];
-let scalpUploading = 0;
+const SCALP_SHAPES = [
+  { v: 'ダブルボトム', short: 'W底',   side: 'long' },
+  { v: '逆三尊',       short: '逆三尊', side: 'long' },
+  { v: 'ダブルトップ', short: 'W天',   side: 'short' },
+  { v: '三尊',         short: '三尊',   side: 'short' },
+];
+const scalpSlotsEl = document.getElementById('scalpSlots');
+const scalpUploading = new Array(SCALP_SLOT_COUNT).fill(0);
 
-scalpPairSel.innerHTML = MV_PAIR_GROUPS.map(g =>
-  '<optgroup label="' + esc(g.label) + '">' +
-  g.pairs.map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') +
-  '</optgroup>').join('');
-
-function scalpResetForm() {
-  scalpEditingId = null;
-  scalpState = { direction: '', shape: '', damashi: '', pullback: '', rci: [] };
-  scalpImages = [];
-  let last = '';
-  try { last = localStorage.getItem(SCALP_LAST_PAIR_KEY) || ''; } catch (e) { /* noop */ }
-  if (last && MV_PRESET_PAIRS.includes(last)) scalpPairSel.value = last;
-  document.getElementById('sDatetime').value = toDatetimeLocalValue(new Date());
-  document.getElementById('sMacd').value = '';
-  document.getElementById('sNotes').value = '';
-  document.getElementById('scalpFormTitle').textContent = '⚡ 1分足スキャル記録';
-  document.getElementById('scalpSubmitBtn').textContent = '💾 記録を保存';
-  document.getElementById('scalpCancelEdit').classList.add('hidden');
-  scalpRenderToggles();
-  scalpRenderImages();
+/* S89: 1枚のカード＝入力途中の1トレード。複数の通貨でタイミングが重なっても並行して記録できるよう
+   5枚を常時表示する。途中の状態はタブ切替・再読み込みで消えないよう localStorage に置くが、
+   同期はしない（💾で保存した記録だけが trades に入り、そちらが同期される）。 */
+function scalpEmptySlot(pair) {
+  return { pair: pair || '', direction: '', rci: [], macd: '', shape: '', damashi: '', pullback: '',
+           images: [], notes: '', noteOpen: false, editId: '' };
 }
-
-function scalpRenderToggles() {
-  scalpForm.querySelectorAll('[data-scalp-single]').forEach(group => {
-    const key = group.dataset.scalpSingle;
-    group.querySelectorAll('.result-btn').forEach(btn => {
-      btn.classList.toggle('active', scalpState[key] === btn.dataset.value);
-      /* 形状は売買方向に合うものだけ出す（ロングでダブルトップは選ばない）。方向未選択なら全部出す */
-      const side = btn.dataset.side;
-      btn.classList.toggle('hidden', !!(side && scalpState.direction && side !== scalpState.direction));
-    });
-  });
-  scalpForm.querySelectorAll('[data-scalp-multi="rci"] .result-btn').forEach(btn => {
-    btn.classList.toggle('active', scalpState.rci.includes(btn.dataset.value));
-  });
-}
-
-scalpForm.addEventListener('click', (e) => {
-  const btn = e.target.closest('.result-btn');
-  if (!btn) return;
-  const single = btn.closest('[data-scalp-single]');
-  const multi = btn.closest('[data-scalp-multi]');
-  const v = btn.dataset.value;
-  if (single) {
-    const key = single.dataset.scalpSingle;
-    scalpState[key] = scalpState[key] === v ? '' : v;   /* 再タップで解除 */
-    if (key === 'direction' && scalpState.shape) {
-      const shapeBtn = scalpForm.querySelector('[data-scalp-single="shape"] [data-value="' + scalpState.shape + '"]');
-      const side = shapeBtn && shapeBtn.dataset.side;
-      if (side && scalpState.direction && side !== scalpState.direction) scalpState.shape = '';
-    }
-  } else if (multi) {
-    const list = scalpState.rci;
-    const i = list.indexOf(v);
-    if (i >= 0) list.splice(i, 1); else list.push(v);
-    list.sort((a, b) => SCALP_RCI_LINES.indexOf(a) - SCALP_RCI_LINES.indexOf(b));
+function scalpLoadSlots() {
+  let arr = null;
+  try { arr = JSON.parse(localStorage.getItem(SCALP_SLOTS_KEY) || 'null'); } catch (e) { /* noop */ }
+  if (!Array.isArray(arr)) arr = [];
+  const out = [];
+  for (let i = 0; i < SCALP_SLOT_COUNT; i++) {
+    const s = Object.assign(scalpEmptySlot(), arr[i] && typeof arr[i] === 'object' ? arr[i] : {});
+    if (!Array.isArray(s.rci)) s.rci = [];
+    if (!Array.isArray(s.images)) s.images = [];
+    out.push(s);
   }
-  scalpRenderToggles();
-});
-
-function scalpRenderImages() {
-  document.getElementById('sImagesPreview').innerHTML = scalpImages.map((url, i) =>
-    '<span class="img-thumb"><a href="' + esc(url) + '" target="_blank" rel="noopener">画像' + (i + 1) + '</a>' +
-    ' <button type="button" class="img-remove" data-scalp-img="' + i + '">✕</button></span>').join('');
+  return out;
 }
-document.getElementById('sImagesPreview').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-scalp-img]');
-  if (!btn) return;
-  /* 記録フォームと同じく Storage 側はここでは消さない（編集キャンセル時に保存済み画像を失うため） */
-  scalpImages.splice(Number(btn.dataset.scalpImg), 1);
-  scalpRenderImages();
-});
-document.getElementById('sImages').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files || []);
-  e.target.value = '';
-  if (!files.length) return;
-  const el = document.getElementById('sImagesPreview');
-  scalpUploading++;
-  el.insertAdjacentHTML('beforeend', '<span class="img-uploading">⏳ アップロード中…</span>');
-  try {
-    for (const file of files) {
-      const url = await uploadChartImage(file);
-      if (url) scalpImages.push(url);
+let scalpSlots = scalpLoadSlots();
+function scalpSaveSlots() {
+  try { localStorage.setItem(SCALP_SLOTS_KEY, JSON.stringify(scalpSlots)); } catch (e) { /* noop */ }
+}
+function scalpSlotIsBlank(s) {
+  return !s.editId && !s.direction && !s.rci.length && !s.macd && !s.shape && !s.damashi &&
+         !s.pullback && !s.images.length && !s.notes;
+}
+
+function scalpSlotHtml(i) {
+  const s = scalpSlots[i];
+  const btn = (key, v, label, cls, title) =>
+    '<button type="button" class="sc-btn ' + (cls || '') + (s[key] === v ? ' on' : '') + '" data-sc="' + key +
+    '" data-v="' + esc(v) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + label + '</button>';
+  const pairOpts = '<option value="">通貨を選択</option>' + MV_PAIR_GROUPS.map(g =>
+    '<optgroup label="' + esc(g.label) + '">' + g.pairs.map(p =>
+      '<option value="' + esc(p) + '"' + (s.pair === p ? ' selected' : '') + '>' + esc(p) + '</option>').join('') +
+    '</optgroup>').join('');
+  const dirBtn = (v, label, cls) =>
+    '<button type="button" class="tstate-btn ' + cls + (s.direction === v ? ' on' : '') +
+    '" data-sc="direction" data-v="' + v + '" title="' + (v === 'long' ? 'ロング' : 'ショート') + '">' + label + '</button>';
+  const rci = SCALP_RCI_LINES.map(line =>
+    '<button type="button" class="sc-btn warn' + (s.rci.includes(line) ? ' on' : '') + '" data-sc="rci" data-v="' + line +
+    '" title="RCI' + line + 'が上限・下限に来ていない">' + line.charAt(0) + '▲</button>').join('');
+  const shapes = SCALP_SHAPES.filter(x => !s.direction || x.side === s.direction)
+    .map(x => btn('shape', x.v, x.short, '', x.v)).join('');
+  const yn = (key, icon, title) =>
+    '<span class="sc-yn" title="' + title + '"><span class="sc-ico">' + icon + '</span>' +
+    btn(key, '●', '●', 'sc-mark ok', title + '：●') + btn(key, '✖', '✖', 'sc-mark ng', title + '：✖') + '</span>';
+  const concern = s.rci.length || s.macd;
+  const up = scalpUploading[i];
+  return (
+    '<div class="trend-item sc-card' + (s.editId ? ' editing' : '') + '" data-slot="' + i + '">' +
+      '<div class="trend-head">' +
+        '<select class="sc-pair' + (s.pair ? '' : ' empty') + '" data-sc-pair aria-label="通貨ペア">' + pairOpts + '</select>' +
+        '<span class="tgroup">' + dirBtn('long', '▲', 'up') + dirBtn('short', '▼', 'down') + '</span>' +
+        (s.editId ? '<span class="fresh alert">✎ 編集中</span>' : '') +
+        '<span class="spacer"></span>' +
+        '<label class="tgoto sc-cam' + (s.images.length ? ' on' : '') + '" title="チャート画像">📷' +
+          (s.images.length ? '<b>' + s.images.length + '</b>' : '') +
+          '<input type="file" accept="image/*" multiple hidden data-sc-file></label>' +
+        '<button type="button" class="tgoto' + (s.noteOpen || s.notes ? ' on' : '') + '" data-sc-act="note" title="メモ">📝</button>' +
+        '<button type="button" class="tclear" data-sc-act="clear" title="カードを空にする">🧹</button>' +
+        '<button type="button" class="go-btn sc-save" data-sc-act="save" title="保存">' + (s.editId ? '更新' : '💾') + '</button>' +
+      '</div>' +
+      '<div class="trend-tf"><span class="tf">1H</span><span class="tgroup">' + rci + '</span>' +
+        '<select class="sc-macd' + (s.macd ? ' on' : '') + '" data-sc-macd aria-label="MACD">' +
+          '<option value="">MACD —</option><option value="▲"' + (s.macd === '▲' ? ' selected' : '') + '>MACD▲</option>' +
+        '</select>' +
+        (concern ? '' : '<span class="sc-none">懸念なし</span>') +
+      '</div>' +
+      '<div class="trend-tf"><span class="tf">1M</span><span class="tgroup">' + shapes + '</span>' +
+        yn('damashi', '🐋', 'ダマシで大口の約定を確認') +
+        yn('pullback', '〽', '急騰落後の浅い押し目が1分足MAにグランビル反応') +
+      '</div>' +
+      (s.noteOpen || s.notes
+        ? '<div class="trend-tf"><span class="tf">📝</span><input type="text" class="sc-note" data-sc-note maxlength="200" placeholder="メモ" value="' + esc(s.notes) + '"></div>'
+        : '') +
+      (s.images.length || up
+        ? '<div class="trend-tf"><span class="tf">📷</span><span class="sc-imgs">' +
+            s.images.map((url, k) => '<span><a href="' + esc(url) + '" target="_blank" rel="noopener">画像' + (k + 1) + '</a>' +
+              '<button type="button" class="sc-img-rm" data-sc-img-rm="' + k + '" title="外す">✕</button></span>').join('') +
+            (up ? '<span class="img-uploading">⏳ アップロード中…</span>' : '') +
+          '</span></div>'
+        : '') +
+    '</div>');
+}
+function renderScalpSlots() {
+  scalpSlotsEl.innerHTML = scalpSlots.map((_, i) => scalpSlotHtml(i)).join('');
+}
+function scalpPatchSlot(i) {
+  const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
+  if (el) el.outerHTML = scalpSlotHtml(i); else renderScalpSlots();
+}
+const scalpSlotIndex = el => Number(el.closest('[data-slot]').dataset.slot);
+
+scalpSlotsEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sc]');
+  if (b) {
+    const i = scalpSlotIndex(b), s = scalpSlots[i], key = b.dataset.sc, v = b.dataset.v;
+    if (key === 'rci') {
+      const k = s.rci.indexOf(v);
+      if (k >= 0) s.rci.splice(k, 1); else s.rci.push(v);
+      s.rci.sort((a, c) => SCALP_RCI_LINES.indexOf(a) - SCALP_RCI_LINES.indexOf(c));
+    } else {
+      s[key] = s[key] === v ? '' : v;   /* 再タップで解除 */
+      if (key === 'direction' && s.direction && s.shape) {
+        const sh = SCALP_SHAPES.find(x => x.v === s.shape);
+        if (sh && sh.side !== s.direction) s.shape = '';   /* 向きに合わない形は残さない */
+      }
     }
-  } finally {
-    scalpUploading--;
-    scalpRenderImages();
+    scalpSaveSlots(); scalpPatchSlot(i);
+    return;
+  }
+  const act = e.target.closest('[data-sc-act]');
+  if (act) {
+    const i = scalpSlotIndex(act), s = scalpSlots[i], a = act.dataset.scAct;
+    if (a === 'save') { scalpSaveSlot(i); return; }
+    if (a === 'clear') scalpSlots[i] = scalpEmptySlot(s.editId ? '' : s.pair);
+    if (a === 'note') s.noteOpen = !(s.noteOpen || s.notes);
+    scalpSaveSlots(); scalpPatchSlot(i);
+    if (a === 'note' && scalpSlots[i].noteOpen) {
+      const inp = scalpSlotsEl.querySelector('[data-slot="' + i + '"] [data-sc-note]');
+      if (inp) inp.focus();
+    }
+    return;
+  }
+  const rm = e.target.closest('[data-sc-img-rm]');
+  if (rm) {
+    /* 記録フォームと同じく Storage 側はここでは消さない（編集中に外して保存しなかった場合に、保存済みの画像を失うため） */
+    const i = scalpSlotIndex(rm);
+    scalpSlots[i].images.splice(Number(rm.dataset.scImgRm), 1);
+    scalpSaveSlots(); scalpPatchSlot(i);
   }
 });
+scalpSlotsEl.addEventListener('change', async (e) => {
+  const el = e.target;
+  if (!el.closest('[data-slot]')) return;
+  const i = scalpSlotIndex(el), s = scalpSlots[i];
+  if (el.matches('[data-sc-pair]')) { s.pair = el.value; scalpSaveSlots(); scalpPatchSlot(i); return; }
+  if (el.matches('[data-sc-macd]')) { s.macd = el.value; scalpSaveSlots(); scalpPatchSlot(i); return; }
+  if (el.matches('[data-sc-file]')) {
+    const files = Array.from(el.files || []);
+    if (!files.length) return;
+    scalpUploading[i]++;
+    scalpPatchSlot(i);
+    try {
+      for (const file of files) {
+        const url = await uploadChartImage(file);
+        if (url) scalpSlots[i].images.push(url);
+      }
+    } finally {
+      scalpUploading[i]--;
+      scalpSaveSlots(); scalpPatchSlot(i);
+    }
+  }
+});
+/* メモは打鍵ごとに再描画するとフォーカスが外れるので、状態だけ更新する */
+scalpSlotsEl.addEventListener('input', (e) => {
+  if (!e.target.matches('[data-sc-note]')) return;
+  scalpSlots[scalpSlotIndex(e.target)].notes = e.target.value;
+  scalpSaveSlots();
+});
 
-scalpForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (scalpUploading > 0) { showToast('⏳ 画像のアップロード完了を待ってから保存してください'); return; }
-  const pair = scalpPairSel.value;
-  const dtVal = document.getElementById('sDatetime').value;
-  if (!pair || !dtVal) { showToast('⚠ 通貨ペアとエントリー日時を入力してください'); return; }
+function scalpSaveSlot(i) {
+  const s = scalpSlots[i];
+  if (scalpUploading[i] > 0) { showToast('⏳ 画像のアップロード完了を待ってから保存してください'); return; }
+  if (!s.pair) { showToast('⚠ 通貨を選んでください'); return; }
   const trades = loadTrades();
-  const existing = scalpEditingId ? trades.find(t => t.id === scalpEditingId) : null;
+  const existing = s.editId ? trades.find(t => t.id === s.editId) : null;
   const now = new Date().toISOString();
   const rec = {
     id: existing ? existing.id : mvGenId('sc'),
     kind: 'scalp',
-    pair,
-    datetime: new Date(dtVal).toISOString(),
-    direction: scalpState.direction,
+    pair: s.pair,
+    /* 新規は💾を押した時刻＝エントリー日時。編集では当時の日時を保つ */
+    datetime: existing ? existing.datetime : now,
+    direction: s.direction,
     tfHigher: '1時間足',
     tfEntry: '1分足',
-    scalp: {
-      rci: scalpState.rci.slice(),
-      macd: document.getElementById('sMacd').value,
-      shape: scalpState.shape,
-      damashi: scalpState.damashi,
-      pullback: scalpState.pullback,
-    },
-    images: { entry: '', higher: '', others: scalpImages.slice() },
-    notes: document.getElementById('sNotes').value.trim(),
+    scalp: { rci: s.rci.slice(), macd: s.macd, shape: s.shape, damashi: s.damashi, pullback: s.pullback },
+    images: { entry: '', higher: '', others: s.images.slice() },
+    notes: (s.notes || '').trim(),
     createdAt: existing ? existing.createdAt : now,
     updatedAt: now,
   };
   const next = existing ? trades.map(t => t.id === rec.id ? rec : t) : trades.concat(rec);
   if (!saveTrades(next)) return;
-  try { localStorage.setItem(SCALP_LAST_PAIR_KEY, pair); } catch (err) { /* noop */ }
-  showToast(existing ? '記録を更新しました' : '記録を保存しました');
-  scalpResetForm();
+  showToast((existing ? '更新しました：' : '記録しました：') + s.pair);
+  /* 同じ通貨で続けて入ることが多いので、通貨だけ残して空に戻す */
+  scalpSlots[i] = scalpEmptySlot(s.pair);
+  scalpSaveSlots(); scalpPatchSlot(i);
   renderScalpList();
-});
-document.getElementById('scalpCancelEdit').addEventListener('click', () => { scalpResetForm(); });
+}
 
-function scalpLoadIntoForm(t) {
-  const s = t.scalp || {};
-  scalpEditingId = t.id;
-  scalpState = {
-    direction: t.direction || '', shape: s.shape || '', damashi: s.damashi || '',
-    pullback: s.pullback || '', rci: Array.isArray(s.rci) ? s.rci.slice() : [],
-  };
-  scalpImages = ((t.images || {}).others || []).slice();
-  scalpPairSel.value = t.pair;
-  const d = new Date(t.datetime);
-  document.getElementById('sDatetime').value = Number.isNaN(d.getTime()) ? '' : toDatetimeLocalValue(d);
-  document.getElementById('sMacd').value = s.macd || '';
-  document.getElementById('sNotes').value = t.notes || '';
-  document.getElementById('scalpFormTitle').textContent = '✎ スキャル記録の編集';
-  document.getElementById('scalpSubmitBtn').textContent = '💾 更新を保存';
-  document.getElementById('scalpCancelEdit').classList.remove('hidden');
-  scalpRenderToggles();
-  scalpRenderImages();
-  scalpForm.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+/* 一覧の✎：空いているカードに読み込む。既に読み込み済みならそのカードを示す */
+function scalpLoadIntoSlot(t) {
+  let i = scalpSlots.findIndex(s => s.editId === t.id);
+  if (i < 0) i = scalpSlots.findIndex(scalpSlotIsBlank);
+  if (i < 0) { showToast('⚠ 空いているカードがありません（🧹で1枚空けてください）'); return; }
+  const sc = t.scalp || {};
+  scalpSlots[i] = Object.assign(scalpEmptySlot(), {
+    pair: t.pair || '', direction: t.direction || '', rci: Array.isArray(sc.rci) ? sc.rci.slice() : [],
+    macd: sc.macd || '', shape: sc.shape || '', damashi: sc.damashi || '', pullback: sc.pullback || '',
+    images: ((t.images || {}).others || []).slice(), notes: t.notes || '', editId: t.id,
+  });
+  scalpSaveSlots(); scalpPatchSlot(i);
+  const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 900);
+  }
 }
 
 /* 懸念の有無。RCI・MACD のどちらかに記録があれば「懸念あり」 */
@@ -5968,7 +6005,7 @@ document.getElementById('scalpList').addEventListener('click', (e) => {
   const ed = e.target.closest('[data-scalp-edit]');
   if (ed) {
     const t = loadTrades().find(x => x.id === ed.dataset.scalpEdit);
-    if (t) scalpLoadIntoForm(t);
+    if (t) scalpLoadIntoSlot(t);
     return;
   }
   const del = e.target.closest('[data-scalp-delete]');
@@ -5980,10 +6017,9 @@ document.getElementById('scalpList').addEventListener('click', (e) => {
       ? fmtDatetime(t.datetime) + ' の ' + t.pair + ' のスキャル記録を削除しますか？この操作は取り消せません。'
       : 'この記録を削除しますか？この操作は取り消せません。';
     deleteModal.classList.add('show');
-    if (pendingDeleteId === scalpEditingId) scalpResetForm();
   }
 });
-scalpResetForm();
+renderScalpSlots();
 
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';
