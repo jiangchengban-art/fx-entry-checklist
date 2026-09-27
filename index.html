@@ -213,11 +213,17 @@
   .sc-card.editing { border-color: var(--accent); }
   .sc-card.flash { background: var(--accent-soft); }
   /* 375px でヘッダ（通貨・▲▼・📷📝🧹💾）を1行、方向を選んだ後の1M行も1行に収める幅 */
-  .sc-card .trend-head { gap: 6px 5px; }
+  .sc-card .trend-head { gap: 6px 4px; }
   .sc-card .trend-tf { gap: 5px; }
-  .sc-card .tstate-btn { width: 28px; }
+  .sc-card .tstate-btn { width: 26px; }
+  /* S90: 足ラベル。1時間＝青の塗り、1分＝橙の枠で、文言と色の両方で見分ける */
+  .sc-card .trend-tf .tf { flex: 0 0 36px; }
+  .sc-card .trend-tf .sc-tf { text-align: center; border-radius: 6px; padding: 4px 0; font-size: 10.5px; }
+  .sc-card .trend-tf .sc-tf.h { background: var(--accent); color: #fff; }
+  .sc-card .trend-tf .sc-tf.m { border: 1.5px solid var(--warn); color: var(--warn); padding: 2.5px 0; }
+  .sc-ynl { font-size: 11px; font-weight: 700; color: var(--ink-2); margin-right: 1px; }
   .sc-pair {
-    flex: none; width: 88px; font-size: 12px; font-weight: 700; font-family: inherit;
+    flex: none; width: 72px; font-size: 12px; font-weight: 700; font-family: inherit;
     padding: 3px 2px; border: 1px solid var(--border); border-radius: 7px;
     background: var(--surface); color: var(--ink);
   }
@@ -234,13 +240,6 @@
   .sc-btn.on.ng   { background: var(--bad-soft);  color: var(--bad);  border-color: var(--bad); }
   .sc-mark { width: 25px; padding: 0; font-size: 13px; }
   .sc-yn { display: inline-flex; align-items: center; gap: 3px; }
-  .sc-ico { font-size: 15px; line-height: 1; }
-  .sc-macd {
-    height: 28px; font-size: 12px; font-family: inherit; padding: 0 4px;
-    border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: var(--ink-muted);
-  }
-  .sc-macd.on { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); font-weight: 700; }
-  .sc-none { font-size: 11px; color: var(--good); }
   .sc-note {
     flex: 1; min-width: 0; font-size: 12px; font-family: inherit; padding: 5px 8px;
     border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink);
@@ -250,7 +249,7 @@
   .sc-imgs { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
   .sc-imgs a { color: var(--accent); }
   .sc-img-rm { border: none; background: none; color: var(--ink-muted); cursor: pointer; padding: 0 2px; font-size: 11px; }
-  .sc-save { width: auto; min-width: 40px; height: 26px; padding: 0 8px; font-size: 13px; }
+  .sc-save { width: auto; min-width: 32px; height: 26px; padding: 0 5px; font-size: 13px; }
   .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
   .scalp-flag.warn { border-color: var(--warn); color: var(--warn); font-weight: 700; }
@@ -1385,9 +1384,10 @@
     <details class="trend-help">
       <summary>📖 記号の見方</summary>
       <div class="trend-help-body">
-        <strong>1H</strong>　短▲・中▲・長▲＝上限・下限に来ていないRCI／MACD▲＝微妙な形<br>
-        <strong>1M</strong>　W底・逆三尊・W天・三尊＝形状（売買方向に合うものだけ表示）／🐋＝ダマシで大口の約定を確認／〽＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
-        📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）
+        <strong>1時間</strong>　短✖・中✖・長✖＝上限・下限に来ていないRCI／MACD✖＝微妙な形（どれも懸念があるときだけタップ）<br>
+        <strong>1分</strong>　Wボトム・逆三尊・Wトップ・三尊＝形状（売買方向に合うものだけ表示）／ダマシ＝ダマシで大口の約定を確認／グランビル＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
+        ⏰ 1時間足のアラート発生（タップした時刻の00分で記録。14:10にタップ→14:00）　📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）<br>
+        下の記録一覧に、アラートからエントリーまでの平均・中央値の分数が出ます。
       </div>
     </details>
     <div id="scalpSlots"></div>
@@ -5728,10 +5728,10 @@ const SCALP_SLOTS_KEY = 'mochipoyo_scalp_slots_v1';   // 端末ごとの入力�
 const SCALP_SLOT_COUNT = 5;
 const SCALP_RCI_LINES = ['短期', '中期', '長期'];
 const SCALP_SHAPES = [
-  { v: 'ダブルボトム', short: 'W底',   side: 'long' },
-  { v: '逆三尊',       short: '逆三尊', side: 'long' },
-  { v: 'ダブルトップ', short: 'W天',   side: 'short' },
-  { v: '三尊',         short: '三尊',   side: 'short' },
+  { v: 'ダブルボトム', short: 'Wボトム', side: 'long' },
+  { v: '逆三尊',       short: '逆三尊',  side: 'long' },
+  { v: 'ダブルトップ', short: 'Wトップ', side: 'short' },
+  { v: '三尊',         short: '三尊',    side: 'short' },
 ];
 const scalpSlotsEl = document.getElementById('scalpSlots');
 const scalpUploading = new Array(SCALP_SLOT_COUNT).fill(0);
@@ -5741,7 +5741,27 @@ const scalpUploading = new Array(SCALP_SLOT_COUNT).fill(0);
    同期はしない（💾で保存した記録だけが trades に入り、そちらが同期される）。 */
 function scalpEmptySlot(pair) {
   return { pair: pair || '', direction: '', rci: [], macd: '', shape: '', damashi: '', pullback: '',
-           images: [], notes: '', noteOpen: false, editId: '' };
+           alertAt: '', images: [], notes: '', noteOpen: false, editId: '' };
+}
+/* S90: 1時間足のアラートは「鳴った足」を記録したいので、タップした時刻をその時の00分に切り捨てる
+   （14:10 にタップ → 14:00）。エントリー日時との差がレンジに注文が溜まってから動くまでの目安になる。 */
+function scalpHourFloorIso(d) {
+  const x = new Date(d.getTime());
+  x.setMinutes(0, 0, 0);
+  return x.toISOString();
+}
+function scalpHourLabel(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : String(d.getHours()).padStart(2, '0') + ':00';
+}
+/* アラート→エントリーの分数。アラートが無い・エントリーより後になっている記録は数えない */
+function scalpAlertLagMin(t) {
+  if (!t || !t.alertAt) return null;
+  const m = Math.round((ts(t.datetime) - ts(t.alertAt)) / 60000);
+  return ts(t.datetime) && ts(t.alertAt) && m >= 0 ? m : null;
+}
+function fmtLagMin(m) {
+  return m < 60 ? m + '分' : Math.floor(m / 60) + '時間' + (m % 60 ? (m % 60) + '分' : '');
 }
 function scalpLoadSlots() {
   let arr = null;
@@ -5752,6 +5772,7 @@ function scalpLoadSlots() {
     const s = Object.assign(scalpEmptySlot(), arr[i] && typeof arr[i] === 'object' ? arr[i] : {});
     if (!Array.isArray(s.rci)) s.rci = [];
     if (!Array.isArray(s.images)) s.images = [];
+    if (s.macd) s.macd = '✖';   /* S90: 旧 ▲（プルダウン）も懸念ありとして引き継ぐ */
     out.push(s);
   }
   return out;
@@ -5762,7 +5783,7 @@ function scalpSaveSlots() {
 }
 function scalpSlotIsBlank(s) {
   return !s.editId && !s.direction && !s.rci.length && !s.macd && !s.shape && !s.damashi &&
-         !s.pullback && !s.images.length && !s.notes;
+         !s.pullback && !s.alertAt && !s.images.length && !s.notes;
 }
 
 function scalpSlotHtml(i) {
@@ -5770,7 +5791,7 @@ function scalpSlotHtml(i) {
   const btn = (key, v, label, cls, title) =>
     '<button type="button" class="sc-btn ' + (cls || '') + (s[key] === v ? ' on' : '') + '" data-sc="' + key +
     '" data-v="' + esc(v) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + label + '</button>';
-  const pairOpts = '<option value="">通貨を選択</option>' + MV_PAIR_GROUPS.map(g =>
+  const pairOpts = '<option value="">通貨</option>' + MV_PAIR_GROUPS.map(g =>
     '<optgroup label="' + esc(g.label) + '">' + g.pairs.map(p =>
       '<option value="' + esc(p) + '"' + (s.pair === p ? ' selected' : '') + '>' + esc(p) + '</option>').join('') +
     '</optgroup>').join('');
@@ -5779,14 +5800,14 @@ function scalpSlotHtml(i) {
     '" data-sc="direction" data-v="' + v + '" title="' + (v === 'long' ? 'ロング' : 'ショート') + '">' + label + '</button>';
   const rci = SCALP_RCI_LINES.map(line =>
     '<button type="button" class="sc-btn warn' + (s.rci.includes(line) ? ' on' : '') + '" data-sc="rci" data-v="' + line +
-    '" title="RCI' + line + 'が上限・下限に来ていない">' + line.charAt(0) + '▲</button>').join('');
+    '" title="RCI' + line + 'が上限・下限に来ていない（懸念）">' + line.charAt(0) + '✖</button>').join('');
   const shapes = SCALP_SHAPES.filter(x => !s.direction || x.side === s.direction)
     .map(x => btn('shape', x.v, x.short, '', x.v)).join('');
-  const yn = (key, icon, title) =>
-    '<span class="sc-yn" title="' + title + '"><span class="sc-ico">' + icon + '</span>' +
+  const yn = (key, label, title) =>
+    '<span class="sc-yn" title="' + title + '"><span class="sc-ynl">' + label + '</span>' +
     btn(key, '●', '●', 'sc-mark ok', title + '：●') + btn(key, '✖', '✖', 'sc-mark ng', title + '：✖') + '</span>';
-  const concern = s.rci.length || s.macd;
   const up = scalpUploading[i];
+  const alertLabel = s.alertAt ? scalpHourLabel(s.alertAt) : '';
   return (
     '<div class="trend-item sc-card' + (s.editId ? ' editing' : '') + '" data-slot="' + i + '">' +
       '<div class="trend-head">' +
@@ -5794,6 +5815,8 @@ function scalpSlotHtml(i) {
         '<span class="tgroup">' + dirBtn('long', '▲', 'up') + dirBtn('short', '▼', 'down') + '</span>' +
         (s.editId ? '<span class="fresh alert">✎ 編集中</span>' : '') +
         '<span class="spacer"></span>' +
+        '<button type="button" class="tgoto' + (s.alertAt ? ' on' : '') + '" data-sc-act="alert" ' +
+          'title="1時間足のアラート発生（タップした時刻の00分で記録。もう一度タップで取り消し）">⏰</button>' +
         '<label class="tgoto sc-cam' + (s.images.length ? ' on' : '') + '" title="チャート画像">📷' +
           (s.images.length ? '<b>' + s.images.length + '</b>' : '') +
           '<input type="file" accept="image/*" multiple hidden data-sc-file></label>' +
@@ -5801,15 +5824,15 @@ function scalpSlotHtml(i) {
         '<button type="button" class="tclear" data-sc-act="clear" title="カードを空にする">🧹</button>' +
         '<button type="button" class="go-btn sc-save" data-sc-act="save" title="保存">' + (s.editId ? '更新' : '💾') + '</button>' +
       '</div>' +
-      '<div class="trend-tf"><span class="tf">1H</span><span class="tgroup">' + rci + '</span>' +
-        '<select class="sc-macd' + (s.macd ? ' on' : '') + '" data-sc-macd aria-label="MACD">' +
-          '<option value="">MACD —</option><option value="▲"' + (s.macd === '▲' ? ' selected' : '') + '>MACD▲</option>' +
-        '</select>' +
-        (concern ? '' : '<span class="sc-none">懸念なし</span>') +
+      /* S90: 「1H」「1M」は字面が似て見分けにくいので、文言と色を分けた（1時間＝青の塗り／1分＝橙の枠） */
+      '<div class="trend-tf"><span class="tf sc-tf h">1時間</span><span class="tgroup">' + rci +
+        btn('macd', '✖', 'MACD✖', 'warn', 'MACDが微妙な形（懸念）') + '</span>' +
+        (alertLabel ? '<span class="fresh alert" title="1時間足のアラート発生">⏰' + alertLabel + '</span>' : '') +
       '</div>' +
-      '<div class="trend-tf"><span class="tf">1M</span><span class="tgroup">' + shapes + '</span>' +
-        yn('damashi', '🐋', 'ダマシで大口の約定を確認') +
-        yn('pullback', '〽', '急騰落後の浅い押し目が1分足MAにグランビル反応') +
+      '<div class="trend-tf"><span class="tf sc-tf m">1分</span><span class="tgroup">' + shapes + '</span></div>' +
+      '<div class="trend-tf"><span class="tf"></span>' +
+        yn('damashi', 'ダマシ', 'ダマシで大口の約定を確認') +
+        yn('pullback', 'グランビル', '急騰落後の浅い押し目が1分足MAにグランビル反応') +
       '</div>' +
       (s.noteOpen || s.notes
         ? '<div class="trend-tf"><span class="tf">📝</span><input type="text" class="sc-note" data-sc-note maxlength="200" placeholder="メモ" value="' + esc(s.notes) + '"></div>'
@@ -5856,6 +5879,10 @@ scalpSlotsEl.addEventListener('click', (e) => {
     if (a === 'save') { scalpSaveSlot(i); return; }
     if (a === 'clear') scalpSlots[i] = scalpEmptySlot(s.editId ? '' : s.pair);
     if (a === 'note') s.noteOpen = !(s.noteOpen || s.notes);
+    if (a === 'alert') {
+      s.alertAt = s.alertAt ? '' : scalpHourFloorIso(new Date());
+      if (s.alertAt) showToast('⏰ 1時間足アラート ' + scalpHourLabel(s.alertAt) + ' を記録');
+    }
     scalpSaveSlots(); scalpPatchSlot(i);
     if (a === 'note' && scalpSlots[i].noteOpen) {
       const inp = scalpSlotsEl.querySelector('[data-slot="' + i + '"] [data-sc-note]');
@@ -5876,7 +5903,6 @@ scalpSlotsEl.addEventListener('change', async (e) => {
   if (!el.closest('[data-slot]')) return;
   const i = scalpSlotIndex(el), s = scalpSlots[i];
   if (el.matches('[data-sc-pair]')) { s.pair = el.value; scalpSaveSlots(); scalpPatchSlot(i); return; }
-  if (el.matches('[data-sc-macd]')) { s.macd = el.value; scalpSaveSlots(); scalpPatchSlot(i); return; }
   if (el.matches('[data-sc-file]')) {
     const files = Array.from(el.files || []);
     if (!files.length) return;
@@ -5916,6 +5942,7 @@ function scalpSaveSlot(i) {
     direction: s.direction,
     tfHigher: '1時間足',
     tfEntry: '1分足',
+    alertAt: s.alertAt || '',
     scalp: { rci: s.rci.slice(), macd: s.macd, shape: s.shape, damashi: s.damashi, pullback: s.pullback },
     images: { entry: '', higher: '', others: s.images.slice() },
     notes: (s.notes || '').trim(),
@@ -5939,7 +5966,8 @@ function scalpLoadIntoSlot(t) {
   const sc = t.scalp || {};
   scalpSlots[i] = Object.assign(scalpEmptySlot(), {
     pair: t.pair || '', direction: t.direction || '', rci: Array.isArray(sc.rci) ? sc.rci.slice() : [],
-    macd: sc.macd || '', shape: sc.shape || '', damashi: sc.damashi || '', pullback: sc.pullback || '',
+    macd: sc.macd ? '✖' : '', shape: sc.shape || '', damashi: sc.damashi || '', pullback: sc.pullback || '',
+    alertAt: t.alertAt || '',
     images: ((t.images || {}).others || []).slice(), notes: t.notes || '', editId: t.id,
   });
   scalpSaveSlots(); scalpPatchSlot(i);
@@ -5954,8 +5982,8 @@ function scalpLoadIntoSlot(t) {
 /* 懸念の有無。RCI・MACD のどちらかに記録があれば「懸念あり」 */
 function scalpConcerns(t) {
   const s = t.scalp || {};
-  const out = (s.rci || []).map(line => 'RCI' + line + '▲');
-  if (s.macd) out.push('MACD' + s.macd);
+  const out = (s.rci || []).map(line => 'RCI' + line + '✖');
+  if (s.macd) out.push('MACD✖');   /* 旧 ▲ も懸念あり */
   return out;
 }
 
@@ -5963,8 +5991,13 @@ function renderScalpList() {
   const list = loadTrades().filter(isScalpTrade).sort((a, b) =>
     (b.datetime || '').localeCompare(a.datetime || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   const withConcern = list.filter(t => scalpConcerns(t).length).length;
+  const lags = list.map(scalpAlertLagMin).filter(m => m != null).sort((a, b) => a - b);
+  const lagText = lags.length
+    ? '　⏰→エントリー 平均 ' + fmtLagMin(Math.round(lags.reduce((a, b) => a + b, 0) / lags.length)) +
+      '・中央値 ' + fmtLagMin(lags[Math.floor((lags.length - 1) / 2)]) + '（' + lags.length + '件）'
+    : '';
   document.getElementById('scalpSummary').textContent = list.length
-    ? list.length + ' 件（懸念あり ' + withConcern + ' / 懸念なし ' + (list.length - withConcern) + '）'
+    ? list.length + ' 件（懸念あり ' + withConcern + ' / 懸念なし ' + (list.length - withConcern) + '）' + lagText
     : '';
   const el = document.getElementById('scalpList');
   if (!list.length) { el.innerHTML = '<div class="empty-state">まだ記録がありません。</div>'; return; }
@@ -5987,12 +6020,14 @@ function renderScalpList() {
           '<button class="btn-delete" type="button" data-scalp-delete="' + esc(t.id) + '">削除</button>' +
         '</div>' +
         '<div class="record-body">' +
-          kv('1H 懸念', concerns.length
+          (t.alertAt ? kv('1時間足アラート', scalpHourLabel(t.alertAt) +
+            (scalpAlertLagMin(t) != null ? '（エントリーまで ' + fmtLagMin(scalpAlertLagMin(t)) + '）' : '')) : '') +
+          kv('1時間足の懸念', concerns.length
             ? '<span class="scalp-flags">' + concerns.map(c => '<span class="scalp-flag warn">' + esc(c) + '</span>').join('') + '</span>'
             : '<span class="scalp-flag ok">懸念なし</span>') +
           kv('1分足', '<span class="scalp-flags">' +
-            (s.shape ? '<span class="scalp-flag">' + esc(s.shape) + '</span>' : '') +
-            mark('ダマシ大口', s.damashi) + mark('MA反応', s.pullback) + '</span>') +
+            (s.shape ? '<span class="scalp-flag">' + esc((SCALP_SHAPES.find(x => x.v === s.shape) || { short: s.shape }).short) + '</span>' : '') +
+            mark('ダマシ', s.damashi) + mark('グランビル', s.pullback) + '</span>') +
           (imgs.length ? kv('チャート画像', '<span class="img-thumbs">' + imgs.map((url, i) =>
             '<a href="' + esc(url) + '" target="_blank" rel="noopener" class="img-thumb img-pic" title="画像' + (i + 1) + '">' +
             '<img src="' + esc(url) + '" alt="画像' + (i + 1) + '" loading="lazy">画像' + (i + 1) + '</a>').join(' ') + '</span>') : '') +
