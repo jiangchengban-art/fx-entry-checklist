@@ -59,6 +59,8 @@ check('MACD✖がon', await isOn(0, '[data-sc="macd"]'));
 // ⏰ 1時間足アラート：タップした時刻の00分
 await tap(0, '[data-sc-act="alert"]');
 const slotAlert = await page.evaluate(() => scalpSlots[0].alertAt);
+check('⏰を押しただけでは記録に入らない', (await trades()).length === 0);
+check('⏰のトーストは「控えました（💾で記録）」', (await page.textContent('#toast')).includes('控えました（💾で記録）'));
 check('アラートは00分に切り捨て', new Date(slotAlert).getMinutes() === 0 && new Date(slotAlert).getSeconds() === 0 && Date.now() - Date.parse(slotAlert) < 3600000 && Date.now() >= Date.parse(slotAlert));
 check('カードに⏰HH:00が出る', (await page.textContent(card(0))).includes('⏰' + String(new Date(slotAlert).getHours()).padStart(2, '0') + ':00'));
 await tap(0, '[data-sc-act="alert"]');

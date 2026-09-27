@@ -250,6 +250,14 @@
   .sc-imgs a { color: var(--accent); }
   .sc-img-rm { border: none; background: none; color: var(--ink-muted); cursor: pointer; padding: 0 2px; font-size: 11px; }
   .sc-save { width: auto; min-width: 32px; height: 26px; padding: 0 5px; font-size: 13px; }
+  /* S92: 👀 監視リスト。1段目＝通貨と1時間足の不成立3つ、2段目＝メモ・→カード・🗑 */
+  .sw-add { width: auto; min-width: 150px; font-weight: 400; }
+  .sw-item .sw-pair { flex: 0 0 72px; font-size: 13px; font-weight: 700; }
+  .sw-item .trend-head .spacer { flex-basis: 0 !important; }
+  .sw-ok { font-size: 11px; font-weight: 700; color: var(--good); padding: 2px 7px; border-radius: 999px; background: var(--good-soft); }
+  .sw-item.ng { border-left: 3px solid var(--bad); }
+  .sw-item.ok { border-left: 3px solid var(--good); }
+  .tgoto.sw-card { width: auto; padding: 0 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
   .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
   .scalp-flag.warn { border-color: var(--warn); color: var(--warn); font-weight: 700; }
@@ -1379,6 +1387,17 @@
   <!-- ============ ⚡ 1分足スキャル（上位足1H×エントリー足1分足 専用の簡易記録、S88） ============ -->
   <div class="tab-panel" id="tabPanel-scalp">
   <section class="card">
+    <h2>👀 監視リスト</h2>
+    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。3端末で同期されます。</div>
+    <div class="list-toolbar">
+      <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
+      <span class="spacer"></span>
+      <span class="check-count" id="scalpWatchCount"></span>
+    </div>
+    <div id="scalpWatch"></div>
+  </section>
+
+  <section class="card">
     <h2>⚡ 1分足スキャル</h2>
     <div class="section-note">上位足<strong>1時間足</strong>×エントリー足<strong>1分足</strong>専用。<strong>カード5枚</strong>で、タイミングが重なりそうな通貨を同時に記録できます。1時間足は<strong>懸念点だけ</strong>タップ（何も押さなければ懸念なし）。💾 を押した時刻をエントリー日時として保存します。</div>
     <details class="trend-help">
@@ -1386,7 +1405,7 @@
       <div class="trend-help-body">
         <strong>1時間</strong>　短✖・中✖・長✖＝上限・下限に来ていないRCI／MACD✖＝微妙な形（どれも懸念があるときだけタップ）<br>
         <strong>1分</strong>　Wボトム・逆三尊・Wトップ・三尊＝形状（売買方向に合うものだけ表示）／ダマシ＝ダマシで大口の約定を確認／グランビル＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
-        ⏰ 1時間足のアラート発生（タップした時刻の00分で記録。14:10にタップ→14:00）　📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）<br>
+        ⏰ 1時間足のアラート発生（タップした時刻の00分でカードに控えます。14:10にタップ→14:00。<strong>記録に入るのは💾を押したときだけ</strong>で、見送るなら🧹で捨てられます）　📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）<br>
         下の記録一覧に、アラートからエントリーまでの平均・中央値の分数が出ます。
       </div>
     </details>
@@ -2847,7 +2866,10 @@ let typeFilter = localStorage.getItem(TYPE_FILTER_KEY) || 'all';
 /* S88: ⚡1分足タブの記録（kind:'scalp'）は同じ trades 配列に入れて同期・バックアップ・墓標を流用するが、
    項目がまったく違うので📚振り返りの統計・履歴と CSV からは外す。 */
 function isScalpTrade(t) { return !!t && t.kind === 'scalp'; }
-function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t)); }
+/* S92: 👀監視リスト（kind:'scalpwatch'）も同じ trades 配列に置いて同期・墓標を流用する。
+   トレードではないので、統計・履歴・CSV からはスキャル記録と同じく外す。 */
+function isScalpWatch(t) { return !!t && t.kind === 'scalpwatch'; }
+function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t)); }
 function filterByType(trades) {
   if (typeFilter === 'all') return trades;
   return trades.filter(t => getTradeType(t) === typeFilter);
@@ -5816,7 +5838,7 @@ function scalpSlotHtml(i) {
         (s.editId ? '<span class="fresh alert">✎ 編集中</span>' : '') +
         '<span class="spacer"></span>' +
         '<button type="button" class="tgoto' + (s.alertAt ? ' on' : '') + '" data-sc-act="alert" ' +
-          'title="1時間足のアラート発生（タップした時刻の00分で記録。もう一度タップで取り消し）">⏰</button>' +
+          'title="1時間足のアラート発生（タップした時刻の00分でカードに控える。💾で記録に入る。もう一度タップで取り消し）">⏰</button>' +
         '<label class="tgoto sc-cam' + (s.images.length ? ' on' : '') + '" title="チャート画像">📷' +
           (s.images.length ? '<b>' + s.images.length + '</b>' : '') +
           '<input type="file" accept="image/*" multiple hidden data-sc-file></label>' +
@@ -5881,7 +5903,9 @@ scalpSlotsEl.addEventListener('click', (e) => {
     if (a === 'note') s.noteOpen = !(s.noteOpen || s.notes);
     if (a === 'alert') {
       s.alertAt = s.alertAt ? '' : scalpHourFloorIso(new Date());
-      if (s.alertAt) showToast('⏰ 1時間足アラート ' + scalpHourLabel(s.alertAt) + ' を記録');
+      /* S91: ここではカードに控えるだけ。アラートが鳴っただけでは入るか未定なので、
+         記録（trades）に入るのは💾を押したときだけ。見送るなら🧹で捨てる。 */
+      if (s.alertAt) showToast('⏰ ' + scalpHourLabel(s.alertAt) + ' をカードに控えました（💾で記録）');
     }
     scalpSaveSlots(); scalpPatchSlot(i);
     if (a === 'note' && scalpSlots[i].noteOpen) {
@@ -6056,6 +6080,145 @@ document.getElementById('scalpList').addEventListener('click', (e) => {
 });
 renderScalpSlots();
 
+/* ============ 👀 監視リスト（S92） ============
+   1時間足で狙っている通貨を絞り込むメモ。グランビル・RCI・MACD のどれが不成立かだけを✖で持ち、
+   条件が外れたら🗑で消す。3端末で使うので trades 配列に kind:'scalpwatch' で置き、
+   同期（t:<id> 行・updatedAt の新しい方が勝つ）と削除の墓標（markDeleted）をそのまま使う。 */
+const SCALP_WATCH_NG = [
+  { k: 'granville', label: 'グランビル', title: 'グランビルが不成立' },
+  { k: 'rci',       label: 'RCI',        title: 'RCIが不成立' },
+  { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
+];
+const scalpWatchEl = document.getElementById('scalpWatch');
+const scalpWatchAddEl = document.getElementById('scalpWatchAdd');
+let scalpWatchPendingRender = false;
+const scalpWatchNoteTimers = {};
+
+function scalpWatchItems() {
+  return loadTrades().filter(isScalpWatch)
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+}
+function scalpWatchItemHtml(t) {
+  const ng = t.ng || {};
+  const anyNg = SCALP_WATCH_NG.some(c => ng[c.k]);
+  return (
+    '<div class="trend-item sc-card sw-item ' + (anyNg ? 'ng' : 'ok') + '" data-sw="' + esc(t.id) + '">' +
+      '<div class="trend-head">' +
+        '<span class="sw-pair">' + esc(t.pair) + '</span>' +
+        '<span class="tgroup">' + SCALP_WATCH_NG.map(c =>
+          '<button type="button" class="sc-btn ng' + (ng[c.k] ? ' on' : '') + '" data-sw-ng="' + c.k +
+          '" title="' + c.title + '（タップで✖／もう一度で解除）">' + c.label + (ng[c.k] ? '✖' : '') + '</button>').join('') +
+        '</span>' +
+        '<span class="spacer"></span>' +
+        (anyNg ? '' : '<span class="sw-ok" title="グランビル・RCI・MACD がすべて成立">✅揃い</span>') +
+      '</div>' +
+      '<div class="trend-tf">' +
+        '<input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ" value="' + esc(t.notes || '') + '">' +
+        '<button type="button" class="tgoto sw-card" data-sw-card title="空いているカードにこの通貨を送る">→カード</button>' +
+        '<button type="button" class="tclear" data-sw-del title="監視リストから消す">🗑</button>' +
+      '</div>' +
+    '</div>');
+}
+function renderScalpWatch() {
+  /* メモを打っている最中に同期で描き直すとフォーカスと入力が飛ぶので、入力欄を離れるまで待つ */
+  if (scalpWatchEl.contains(document.activeElement) && document.activeElement.matches('[data-sw-note]')) {
+    scalpWatchPendingRender = true;
+    return;
+  }
+  scalpWatchPendingRender = false;
+  const items = scalpWatchItems();
+  const watched = new Set(items.map(t => t.pair));
+  scalpWatchAddEl.innerHTML = '<option value="">＋ 通貨を追加</option>' + MV_PAIR_GROUPS.map(g =>
+    '<optgroup label="' + esc(g.label) + '">' + g.pairs.filter(p => !watched.has(p)).map(p =>
+      '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
+  const ready = items.filter(t => !SCALP_WATCH_NG.some(c => (t.ng || {})[c.k])).length;
+  document.getElementById('scalpWatchCount').textContent = items.length ? items.length + ' 通貨（揃い ' + ready + '）' : '';
+  scalpWatchEl.innerHTML = items.length
+    ? items.map(scalpWatchItemHtml).join('')
+    : '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>';
+}
+function scalpWatchUpdate(id, fn, rerender) {
+  const trades = loadTrades();
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  fn(t);
+  t.updatedAt = new Date().toISOString();
+  if (!saveTrades(trades)) return;
+  if (rerender) {
+    const el = scalpWatchEl.querySelector('[data-sw="' + id + '"]');
+    if (el) el.outerHTML = scalpWatchItemHtml(t);
+    const items = scalpWatchItems();
+    const ready = items.filter(x => !SCALP_WATCH_NG.some(c => (x.ng || {})[c.k])).length;
+    document.getElementById('scalpWatchCount').textContent = items.length + ' 通貨（揃い ' + ready + '）';
+  }
+}
+scalpWatchAddEl.addEventListener('change', () => {
+  const pair = scalpWatchAddEl.value;
+  if (!pair) return;
+  const trades = loadTrades();
+  if (trades.some(t => isScalpWatch(t) && t.pair === pair)) { renderScalpWatch(); return; }
+  const now = new Date().toISOString();
+  trades.push({ id: mvGenId('sw'), kind: 'scalpwatch', pair, ng: { granville: false, rci: false, macd: false },
+                notes: '', createdAt: now, updatedAt: now });
+  if (!saveTrades(trades)) return;
+  renderScalpWatch();
+});
+scalpWatchEl.addEventListener('click', (e) => {
+  const row = e.target.closest('[data-sw]');
+  if (!row) return;
+  const id = row.dataset.sw;
+  const ngBtn = e.target.closest('[data-sw-ng]');
+  if (ngBtn) {
+    const k = ngBtn.dataset.swNg;
+    scalpWatchUpdate(id, t => { t.ng = Object.assign({}, t.ng); t.ng[k] = !t.ng[k]; }, true);
+    return;
+  }
+  if (e.target.closest('[data-sw-del]')) {
+    /* 条件が外れたら1タップで消す（メモ程度のものなので確認は出さない）。墓標で他端末からの復活を防ぐ */
+    clearTimeout(scalpWatchNoteTimers[id]);
+    markDeleted('trades', id);
+    saveTrades(loadTrades().filter(t => t.id !== id));
+    renderScalpWatch();
+    return;
+  }
+  if (e.target.closest('[data-sw-card]')) {
+    const t = loadTrades().find(x => x.id === id);
+    if (!t) return;
+    let i = scalpSlots.findIndex(s => !s.editId && s.pair === t.pair && scalpSlotIsBlank(s));
+    if (i < 0) i = scalpSlots.findIndex(scalpSlotIsBlank);
+    if (i < 0) { showToast('⚠ 空いているカードがありません（🧹で1枚空けてください）'); return; }
+    /* 監視リストの RCI は短中長を区別しないのでカードへは運ばない（どの線かはカードで選ぶ）。MACD はそのまま懸念として運ぶ */
+    scalpSlots[i] = Object.assign(scalpEmptySlot(t.pair), { macd: (t.ng || {}).macd ? '✖' : '', notes: t.notes || '' });
+    scalpSaveSlots(); scalpPatchSlot(i);
+    const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 900);
+    }
+  }
+});
+/* メモは打鍵ごとに保存すると同期の送信が細かく走るので、手が止まってから保存する */
+scalpWatchEl.addEventListener('input', (e) => {
+  if (!e.target.matches('[data-sw-note]')) return;
+  const id = e.target.closest('[data-sw]').dataset.sw;
+  const v = e.target.value;
+  clearTimeout(scalpWatchNoteTimers[id]);
+  scalpWatchNoteTimers[id] = setTimeout(() => scalpWatchUpdate(id, t => { t.notes = v; }, false), 600);
+});
+scalpWatchEl.addEventListener('focusout', (e) => {
+  if (!e.target.matches('[data-sw-note]')) return;
+  const id = e.target.closest('[data-sw]').dataset.sw;
+  if (scalpWatchNoteTimers[id]) {
+    clearTimeout(scalpWatchNoteTimers[id]);
+    delete scalpWatchNoteTimers[id];
+    const v = e.target.value;
+    scalpWatchUpdate(id, t => { t.notes = v; }, false);
+  }
+  if (scalpWatchPendingRender) setTimeout(renderScalpWatch, 0);
+});
+renderScalpWatch();
+
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';
 const tabBar = document.getElementById('tabBar');
@@ -6115,7 +6278,7 @@ guideDrawerBackdrop.addEventListener('click', (e) => {
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderTrendList(); renderScalpList(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderTrendList(); renderScalpList(); renderScalpWatch(); }
 document.querySelectorAll('.type-filter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);
