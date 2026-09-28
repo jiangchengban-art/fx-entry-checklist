@@ -274,6 +274,8 @@
   @media (prefers-reduced-motion: reduce) { .sc-pane.from-right, .sc-pane.from-left { animation: none; } }
   /* S92: 👀 監視リスト。1段目＝通貨と1時間足の不成立3つ、2段目＝メモ・→カード・🗑 */
   .sw-add { width: auto; min-width: 150px; font-weight: 400; }
+  .sc-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .sc-filter-count { font-size: 12px; color: var(--ink-muted); }
   .sc-add-card { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
   .sw-item .sw-pair { flex: 0 0 72px; font-size: 13px; font-weight: 700; }
   .sw-item .trend-head .spacer { flex-basis: 0 !important; }
@@ -1455,10 +1457,14 @@
         <strong>1時間</strong>　短✖・中✖・長✖＝上限・下限に来ていないRCI／MACD✖＝微妙な形（どれも懸念があるときだけタップ）<br>
         <strong>1分</strong>　Wボトム・逆三尊・Wトップ・三尊＝形状（売買方向に合うものだけ表示）／ダマシ＝ダマシで大口の約定を確認／グランビル＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
         ⏰ 1時間足のアラート発生（タップした時刻の00分でカードに控えます。14:10にタップ→14:00。<strong>記録に入るのは💾を押したときだけ</strong>で、見送るなら🧹で捨てられます）　📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）<br>
-        5枚で足りないときは下の「＋ カードを追加」で増やせます。追加したカード（6枚目以降）は🧹でカードごと消えます。<br>
+        「✏️ 入力中のみ」で入力途中のカードだけに絞れます（通貨だけのカードは空扱い）。5枚で足りないときは下の「＋ カードを追加」で増やせます。追加したカード（6枚目以降）は🧹でカードごと消えます。<br>
         下の記録一覧に、アラートからエントリーまでの平均・中央値の分数が出ます。
       </div>
     </details>
+    <div class="sc-filter-bar">
+      <button type="button" class="btn-ghost trend-filter-btn" id="scalpActiveOnly" title="入力途中のカードだけ表示する（通貨だけ選んだカードは空扱い）">✏️ 入力中のみ</button>
+      <span class="sc-filter-count" id="scalpActiveCount"></span>
+    </div>
     <div id="scalpSlots"></div>
     <button type="button" class="btn-ghost sc-add-card" id="scalpAddCard" title="カードを1枚増やす（6枚目以降は🧹でカードごと消せます）">＋ カードを追加</button>
   </section>
@@ -6096,6 +6102,7 @@ scalpSlots.forEach(() => scalpUploading.push(0));
 function scalpAddSlot(pair) {
   scalpSlots.push(scalpEmptySlot(pair));
   scalpUploading.push(0);
+  scalpForceShow.add(scalpSlots.length - 1);
   scalpSaveSlots();
   renderScalpSlots();
   return scalpSlots.length - 1;
@@ -6168,13 +6175,38 @@ function scalpSlotHtml(i) {
         : '') +
     '</div>');
 }
+/* S96: 「入力中のみ」＝空のカード（通貨だけ残っているものも含む）を隠す。端末ごとの表示設定。
+   触っている最中のカードは空に戻っても消さない（最後の項目を外した瞬間に指の下から消えるのを防ぐ）。
+   💾・🧹で空になったカード、次の全描画（切替・再読み込み）で空のカードは隠れる。 */
+const SCALP_ACTIVE_ONLY_KEY = 'mochipoyo_scalp_active_only';
+let scalpActiveOnly = false;
+try { scalpActiveOnly = localStorage.getItem(SCALP_ACTIVE_ONLY_KEY) === '1'; } catch (e) { /* noop */ }
+const scalpForceShow = new Set();
+const scalpSlotHidden = i => scalpActiveOnly && scalpSlotIsBlank(scalpSlots[i]) && !scalpForceShow.has(i);
+function renderScalpFilterBar() {
+  const btn = document.getElementById('scalpActiveOnly');
+  btn.classList.toggle('on', scalpActiveOnly);
+  const active = scalpSlots.filter(x => !scalpSlotIsBlank(x)).length;
+  document.getElementById('scalpActiveCount').textContent = '入力中 ' + active + ' / ' + scalpSlots.length + ' 枚';
+}
 function renderScalpSlots() {
-  scalpSlotsEl.innerHTML = scalpSlots.map((_, i) => scalpSlotHtml(i)).join('');
+  const html = scalpSlots.map((_, i) => scalpSlotHidden(i) ? '' : scalpSlotHtml(i)).join('');
+  scalpSlotsEl.innerHTML = html ||
+    '<div class="empty-state">入力中のカードはありません。「✏️ 入力中のみ」を外すか「＋ カードを追加」で始めてください。</div>';
+  renderScalpFilterBar();
 }
 function scalpPatchSlot(i) {
   const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
-  if (el) el.outerHTML = scalpSlotHtml(i); else renderScalpSlots();
+  if (!el || scalpSlotHidden(i)) { renderScalpSlots(); return; }
+  el.outerHTML = scalpSlotHtml(i);
+  renderScalpFilterBar();
 }
+document.getElementById('scalpActiveOnly').addEventListener('click', () => {
+  scalpActiveOnly = !scalpActiveOnly;
+  try { localStorage.setItem(SCALP_ACTIVE_ONLY_KEY, scalpActiveOnly ? '1' : ''); } catch (e) { /* noop */ }
+  scalpForceShow.clear();
+  renderScalpSlots();
+});
 const scalpSlotIndex = el => Number(el.closest('[data-slot]').dataset.slot);
 
 document.getElementById('scalpAddCard').addEventListener('click', () => {
@@ -6183,6 +6215,8 @@ document.getElementById('scalpAddCard').addEventListener('click', () => {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 scalpSlotsEl.addEventListener('click', (e) => {
+  const touched = e.target.closest('[data-slot]');
+  if (touched) scalpForceShow.add(Number(touched.dataset.slot));
   const b = e.target.closest('[data-sc]');
   if (b) {
     const i = scalpSlotIndex(b), s = scalpSlots[i], key = b.dataset.sc, v = b.dataset.v;
@@ -6203,11 +6237,14 @@ scalpSlotsEl.addEventListener('click', (e) => {
   const act = e.target.closest('[data-sc-act]');
   if (act) {
     const i = scalpSlotIndex(act), s = scalpSlots[i], a = act.dataset.scAct;
-    if (a === 'save') { scalpSaveSlot(i); return; }
+    if (a === 'save') { scalpForceShow.delete(i); scalpSaveSlot(i); return; }
+    if (a === 'clear') scalpForceShow.delete(i);
     if (a === 'clear' && i >= SCALP_SLOT_COUNT) {
       /* S95: 追加したカード（6枚目以降）は🧹でカードごと消す。アップロード中は待つ */
       if (scalpUploading[i] > 0) { showToast('⏳ 画像のアップロード完了を待ってください'); return; }
       scalpSlots.splice(i, 1); scalpUploading.splice(i, 1);
+      const shifted = [...scalpForceShow].filter(k => k !== i).map(k => k > i ? k - 1 : k);
+      scalpForceShow.clear(); shifted.forEach(k => scalpForceShow.add(k));
       scalpSaveSlots(); renderScalpSlots();
       return;
     }
