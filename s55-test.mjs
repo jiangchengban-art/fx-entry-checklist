@@ -1,4 +1,4 @@
-/* S55 スモークテスト：🎯タブ廃止・🔭一覧からモーダルで記録フォームを開く */
+/* S55 スモークテスト：🎯タブ廃止・記録フォームのモーダル（S94から🔭一覧はモーダルを使わず根拠パネルの💾で記録） */
 import { chromium } from 'playwright';
 import path from 'path';
 
@@ -44,7 +44,17 @@ console.log('\n[①] 🎯タブが存在しない・既定タブは一覧');
   await page.context().close();
 }
 
-console.log('\n[②] 根拠パネル→「📝 記録フォームへ」でモーダルが開く');
+/* 根拠パネルの記録欄で💾まで済ませる（S94）。ペアは judge='entered' で seed 済み */
+async function recordViaPanel(page, id, dir, tag, pnl) {
+  await page.click('[data-trend-goto-board="' + id + '"]');
+  await page.click('[data-tr-draft="' + id + '"][data-key="tradeType"][data-value="demo"]');
+  await page.click('[data-tr-draft="' + id + '"][data-key="direction"][data-value="' + dir + '"]');
+  await page.click('[data-tr-draft="' + id + '"][data-key="resultTag"][data-value="' + tag + '"]');
+  await page.fill('[data-tr-input="' + id + '"][data-key="pnl"]', pnl);
+  await page.click('[data-tr-act="save"][data-id="' + id + '"]');
+}
+
+console.log('\n[②] 根拠パネルの💾でモーダルを開かずに記録できる（S94）');
 {
   const page = await newPage({
     [MARKET]: { pairs: [mkPair('w1', 'USDJPY')], snapshots: [], judgeLog: [] },
@@ -52,21 +62,11 @@ console.log('\n[②] 根拠パネル→「📝 記録フォームへ」でモー
   });
   await page.click('[data-tab="trend"]');
   await page.click('[data-trend-panel-open="w1"]');
-  await page.click('[data-trend-goto-form="w1"]');
-  ok('モーダルが表示される', await page.locator('#tradeModal').evaluate(el => el.classList.contains('show')));
+  eq('📝記録フォームへボタンは無い', await page.locator('[data-trend-goto-form]').count(), 0);
+  await page.click('[data-trend-panel-open="w1"]');
+  await recordViaPanel(page, 'w1', 'long', 'reg', '12000');
+  ok('モーダルは開かない', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
   ok('一覧タブはアクティブのまま', await page.locator('[data-tab="trend"]').evaluate(el => el.classList.contains('active')));
-  ok('通貨ペアがUSDJPYで表示される', (await page.textContent('#formMarketSummary')).includes('USDJPY'));
-
-  /* 新規保存 */
-  await page.click('#tradeTypeToggle [data-value="demo"]');
-  const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  await page.fill('#fDatetime', now.toISOString().slice(0, 16));
-  await page.selectOption('#fDirection', 'long');
-  await page.click('#resultTagToggle [data-value="reg"]');
-  await page.fill('#fPnl', '12000');
-  await page.click('#beTouchToggle [data-value="none"]');
-  await page.click('#formSubmitBtn');
-  ok('保存後モーダルが閉じる', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
 
   await page.click('[data-tab="review"]');
   const list = await page.textContent('#recordList');
@@ -74,7 +74,7 @@ console.log('\n[②] 根拠パネル→「📝 記録フォームへ」でモー
   await page.context().close();
 }
 
-console.log('\n[③] ヘッダの「→」ボタンでもモーダルが開く');
+console.log('\n[③] ヘッダの「→」ボタンは根拠パネル（記録欄つき）を開く（S94）');
 {
   const page = await newPage({
     [MARKET]: { pairs: [mkPair('w1', 'EURUSD')], snapshots: [], judgeLog: [] },
@@ -82,9 +82,10 @@ console.log('\n[③] ヘッダの「→」ボタンでもモーダルが開く')
   });
   await page.click('[data-tab="trend"]');
   await page.click('[data-trend-goto-board="w1"]');
-  ok('モーダルが表示される', await page.locator('#tradeModal').evaluate(el => el.classList.contains('show')));
-  await page.click('#tradeModalClose');
-  ok('✕ボタンでモーダルが閉じる', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
+  ok('モーダルは開かない', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
+  eq('パネルが開く', await page.locator('[data-trend-item="w1"] .trend-panel').count(), 1);
+  await page.click('[data-trend-goto-board="w1"]');
+  eq('もう一度で閉じる', await page.locator('[data-trend-item="w1"] .trend-panel').count(), 0);
   await page.context().close();
 }
 
@@ -95,16 +96,7 @@ console.log('\n[④] 編集ボタンでモーダルが開く');
     [SELECTED]: 'w1',
   });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-panel-open="w1"]');
-  await page.click('[data-trend-goto-form="w1"]');
-  await page.click('#tradeTypeToggle [data-value="demo"]');
-  const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  await page.fill('#fDatetime', now.toISOString().slice(0, 16));
-  await page.selectOption('#fDirection', 'short');
-  await page.click('#resultTagToggle [data-value="max"]');
-  await page.fill('#fPnl', '5000');
-  await page.click('#beTouchToggle [data-value="touched"]');
-  await page.click('#formSubmitBtn');
+  await recordViaPanel(page, 'w1', 'short', 'max', '5000');
 
   await page.click('[data-tab="review"]');
   await page.click('[data-edit]');
@@ -120,11 +112,13 @@ console.log('\n[⑤] 背景クリック・Escapeで閉じる');
     [SELECTED]: 'w1',
   });
   await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-goto-board="w1"]');
+  await recordViaPanel(page, 'w1', 'long', 'reg', '1000');
+  await page.click('[data-tab="review"]');
+  await page.click('[data-edit]');
   await page.locator('#tradeModal').click({ position: { x: 5, y: 5 } });
   ok('背景クリックで閉じる', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
 
-  await page.click('[data-trend-goto-board="w1"]');
+  await page.click('[data-edit]');
   await page.keyboard.press('Escape');
   ok('Escapeで閉じる', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
   await page.context().close();

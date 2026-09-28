@@ -99,7 +99,8 @@ console.log('\n[③] パネルは縦2セクション（旧・横並び3列では
 {
   const page = await newPage({ [MARKET]: { pairs: [seedPair('up')] } }, { width: 375, height: 1200 });
   await openPanel(page);
-  const panel = page.locator('[data-trend-item="p1"] .trend-panel');
+  /* S94: パネルの下に記録欄（2つ目の .tp-grid）が付いたので、根拠の部分（1つ目）だけを見る */
+  const panel = page.locator('[data-trend-item="p1"] .trend-panel .tp-grid').first();
   eq('セクション見出しは2つ（上位足／エントリー足）', await panel.locator('.tp-sec').count(), 2);
   const names = await panel.locator('.tp-sec-name').allTextContents();
   eq('見出しの並びは上位足→エントリー足', names, ['上位足', 'エントリー足']);
@@ -262,7 +263,7 @@ console.log('\n[⑧] 履歴サマリーが区分ごとの項目名で出る');
   await page.close();
 }
 
-console.log('\n[⑨] 記録フォームまで通る');
+console.log('\n[⑨] 💾で記録まで通る（S94でモーダルを経由しなくなった）');
 {
   const page = await newPage({ [MARKET]: { pairs: [seedPair('up')] } }, { width: 1000, height: 1200 });
   await openPanel(page);
@@ -270,12 +271,12 @@ console.log('\n[⑨] 記録フォームまで通る');
   await page.selectOption(item + '[data-trend-tfentry]', '5分足');
   await page.click(item + '[data-trend-check-btn][data-field="tfEntry"][data-key="necklineForm"][data-value="逆三尊"]');
   await page.click(item + '[data-mv-judge][data-value="entered"]');
-  await page.waitForSelector(item + '.tp-goto:not([disabled])');
-  await page.click(item + '.tp-goto');
-  await page.waitForSelector('#tradeModal.show');
-  const summary = await page.locator('#formMarketSummary').textContent();
-  ok('フォームに上位足×エントリー足が引き継がれる', summary.includes('日足') && summary.includes('5分足'));
-  ok('フォームの根拠に❶の記録が出る', summary.includes('逆三尊'));
+  await page.click('[data-tr-draft="p1"][data-key="tradeType"][data-value="demo"]');
+  await page.click('[data-tr-draft="p1"][data-key="direction"][data-value="long"]');
+  await page.click(item + '.tr-save:not([disabled])');
+  const t = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]')[0]);
+  ok('記録に上位足×エントリー足が引き継がれる', !!t && t.tfHigher === '日足' && t.tfEntry === '5分足');
+  ok('記録の根拠に❶が入る', !!t && t.mvChecks.entry.necklineForm === '逆三尊');
   await page.close();
 }
 

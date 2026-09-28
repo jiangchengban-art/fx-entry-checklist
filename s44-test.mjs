@@ -284,7 +284,7 @@ console.log('\n[⑤] 根拠パネルの入口が「足」になる');
      S82: entryFibo は entryOrderType が「指値」のときだけ出る行なので、未選択の
      既定状態では1行少ない。 */
   eq('根拠の行が 上位足＋エントリー足 のぶん出る（Fibo未選択で1行少ない）',
-     await page.locator(W1 + '.tp-grid .tp-row').count(),
+     await page.locator(W1 + '.tp-grid .tp-row:has([data-trend-check-btn])').count(),   /* S94: 記録欄の行は数えない */
      await page.evaluate(() => MV_TF_CHECKS.length + MV_ENTRY_CHECKS.length - 1));
 
   /* 別の足のボタンを押すと上位足が入れ替わる */
@@ -296,14 +296,14 @@ console.log('\n[⑤] 根拠パネルの入口が「足」になる');
   await page.click(W1 + '[data-trend-panel-open][data-tf="h4"]');
   eq('再タップで閉じる', await page.locator('.trend-panel').count(), 0);
 
-  /* 記録フォームへは tfEntry と judge が揃うまで押せない */
+  /* 💾記録は tfEntry と judge が揃うまで押せない（S94でモーダルへのボタンから置き換え） */
   await page.click(W1 + '[data-trend-panel-open][data-tf="d"]');
-  ok('未入力では記録フォームへが押せない',
-     await page.locator(W1 + '.tp-goto[disabled]').count() === 1);
+  ok('未入力では💾記録が押せない',
+     await page.locator(W1 + '.tr-save[disabled]').count() === 1);
   await page.selectOption(W1 + '[data-trend-tfentry]', '15分足');
   await page.click(W1 + '.mv-judge-btn.entered');
   ok('エントリー足と判定が揃うと押せる',
-     await page.locator(W1 + '.tp-goto[disabled]').count() === 0);
+     await page.locator(W1 + '.tr-save[disabled]').count() === 0);
   const w = await pairOf(page, 'w1');
   eq('判定が保存される', w.judge, 'entered');
   ok('judgeLog に積まれる（統計が壊れない）', await page.evaluate(() =>

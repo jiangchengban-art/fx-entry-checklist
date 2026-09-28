@@ -900,6 +900,23 @@
   .tp-foot .tp-goto { margin-left: auto; font-size: 12px; padding: 6px 12px; }
   .tp-foot .tp-goto:disabled { opacity: 0.45; cursor: not-allowed; }
   .tp-hint { margin-top: 6px; font-size: 11px; color: var(--warn); text-align: right; }
+  /* S94: 根拠パネル内の記録欄（モーダルを開かずに💾で保存する） */
+  .tp-row .tr-in {
+    width: 88px; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit;
+  }
+  .tp-row .tr-in.wide { width: 100%; }
+  .tr-pnl { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .tr-pnl .unit { font-size: 11px; color: var(--ink-muted); }
+  .tr-sign { width: 28px; height: 26px; padding: 0; font-size: 14px; font-weight: 700; border-radius: 6px;
+             border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); cursor: pointer; }
+  .tr-sign.plus { color: var(--good); border-color: var(--good); }
+  .tr-sign.minus { color: var(--bad); border-color: var(--bad); }
+  .tp-foot .tr-tools { display: flex; gap: 4px; margin-left: auto; align-items: center; }
+  .tp-foot .tr-save { font-size: 12px; padding: 6px 12px; }
+  .tp-foot .tr-save:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tr-imgs { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; align-items: center; }
+  .tr-entered-at { font-size: 11px; color: var(--ink-muted); }
   .tp-conf { font-size: 11px; color: var(--good); margin-bottom: 6px; }
   .tp-conf b { font-size: 12px; }
   .tp-conf.muted { color: var(--ink-muted); }
@@ -2677,7 +2694,10 @@ document.getElementById('fImgOthers').addEventListener('change', (e) => handleIm
    必須（上位足・エントリー足・判定）が欠けていれば null を返し、呼び出し側が保存を止める。 */
 function marketFieldsFromBoard() {
   const data = loadMarket();
-  const w = data.pairs.find(p => p.id === loadSelectedPairId());
+  return marketFieldsOf(data.pairs.find(p => p.id === loadSelectedPairId()));
+}
+/* S94: 🔭一覧の根拠パネルから💾で直接保存するときは、選択中ペアではなくそのペアを渡す */
+function marketFieldsOf(w) {
   if (!w || !w.tfHigher || !w.tfEntry || !w.judge) return null;
   const alerts = w.alerts || {};
   return {
@@ -4624,11 +4644,159 @@ function trendPanelHtml(w) {
     '</div>' +
     '<div class="tp-foot">' +
       '<div class="mv-choice">' + trendJudgeBtnsHtml(w) + '</div>' +
-      '<button type="button" class="btn-accent-solid tp-goto"' + (ready ? '' : ' disabled') +
-        ' data-trend-goto-form="' + esc(w.id) + '">📝 記録フォームへ</button>' +
     '</div>' +
-    (ready ? '' : '<div class="tp-hint">' + esc(missing.join('と') + 'を決めると記録に進めます') + '</div>') +
+    trendDraftHtml(w, ready) +
+    (ready ? '' : '<div class="tp-hint">' + esc(missing.join('と') + 'を決めると💾で記録できます') + '</div>') +
   '</div>';
+}
+
+/* ============ 根拠パネル内の記録欄（S94） ============
+   ユーザー要望「一覧タブの記録方法も1分足タブと同じに」。📝記録フォーム（モーダル）を開かず、
+   パネルの中でタップして💾を押せばそのまま記録される。
+   入力途中の内容はペアごとに端末ローカルへ控える（⚡1分足のカードと同じ扱い・同期しない）。
+   同期されるのは💾で保存した記録だけ。
+   日時：✅エントリーをタップした時刻をエントリー日時として控え、結果を入れて💾したときはその時刻を決済日時にする。 */
+const TREND_DRAFT_KEY = 'mochipoyo_trend_drafts_v1';
+const trendDraftUploading = {};
+function trendDraftEmpty() {
+  return { tradeType: '', direction: '', enteredAt: '', resultTag: '', resultOtherReason: '',
+           pnlSign: '+', pnl: '', risk: '', beTouch: '', images: [], notes: '', noteOpen: false };
+}
+function trendDraftsLoad() {
+  try { const o = JSON.parse(localStorage.getItem(TREND_DRAFT_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; }
+  catch (e) { return {}; }
+}
+function trendDraftGet(id) {
+  const d = Object.assign(trendDraftEmpty(), trendDraftsLoad()[id] || {});
+  if (!Array.isArray(d.images)) d.images = [];
+  return d;
+}
+function trendDraftPut(id, d) {
+  const all = trendDraftsLoad();
+  if (d) all[id] = d; else delete all[id];
+  try { localStorage.setItem(TREND_DRAFT_KEY, JSON.stringify(all)); } catch (e) { /* noop */ }
+}
+/* 🔭のアラートバッジで記録済みの発生時刻のうち、いちばん新しいもの（フォームの「アラート発生日時」に入る） */
+function trendLatestAlert(w) {
+  let best = null;
+  MV_ALERT_TFS.forEach(t => {
+    const a = (w.alerts || {})[t.k];
+    if (a && a.on && a.at && (!best || ts(a.at) > ts(best.at))) best = { at: a.at, tf: t.full };
+  });
+  return best;
+}
+function trendDraftHtml(w, ready) {
+  const d = trendDraftGet(w.id);
+  const entered = w.judge === 'entered';
+  const id = esc(w.id);
+  const b = (key, v, label, extra) =>
+    '<button type="button" class="mv-tfcheck-btn' + (d[key] === v ? ' on' : '') + '" data-tr-draft="' + id +
+    '" data-key="' + key + '" data-value="' + esc(v) + '"' + (extra || '') + '>' + label + '</button>';
+  const row = (label, body) => '<div class="tp-row"><span class="tp-label">' + label + '</span>' + body + '</div>';
+  const choice = inner => '<div class="mv-choice wrap tp-choice">' + inner + '</div>';
+  const up = trendDraftUploading[w.id] > 0;
+  let html = '<div class="tp-grid">' +
+    '<div class="tp-sec"><span class="tp-sec-name">記録</span>' +
+      (entered && d.enteredAt ? '<span class="tr-entered-at" title="✅エントリーをタップした時刻。これがエントリー日時になります">⏱ ' +
+        esc(fmtDatetime(d.enteredAt)) + '</span>' : '') +
+    '</div>' +
+    row('区分', choice(b('tradeType', 'demo', '検証') + b('tradeType', 'real', 'リアル')));
+  if (entered) {
+    html +=
+      row('方向', choice(b('direction', 'long', '▲ ロング') + b('direction', 'short', '▼ ショート'))) +
+      row('結果', choice(RESULT_TAGS.map(r => b('resultTag', r.v, esc(r.label))).join('')) +
+        (d.resultTag === 'other'
+          ? '<select class="tr-in wide" data-tr-select="' + id + '" data-key="resultOtherReason">' +
+              '<option value="">理由を選ぶ…</option>' + RESULT_OTHER_REASONS.map(r =>
+                '<option' + (d.resultOtherReason === r ? ' selected' : '') + '>' + esc(r) + '</option>').join('') +
+            '</select>'
+          : '')) +
+      row('損益', '<span class="tr-pnl">' +
+        '<button type="button" class="tr-sign ' + (d.pnlSign === '-' ? 'minus' : 'plus') + '" data-tr-sign="' + id +
+          '" title="符号を切り替える">' + (d.pnlSign === '-' ? '－' : '＋') + '</button>' +
+        '<input type="text" inputmode="decimal" class="tr-in" data-tr-input="' + id + '" data-key="pnl" placeholder="例 12000" value="' + esc(d.pnl) + '">' +
+        '<span class="unit">円</span></span>') +
+      row('リスク', '<span class="tr-pnl"><input type="text" inputmode="decimal" class="tr-in" data-tr-input="' + id +
+        '" data-key="risk" placeholder="例 10000" value="' + esc(d.risk) + '"><span class="unit">円</span></span>') +
+      row('建値タッチ', choice(BE_TOUCH_OPTIONS.map(o => b('beTouch', o.v, esc(o.label))).join('')));
+  }
+  if (d.noteOpen || d.notes) {
+    html += row('メモ', '<input type="text" class="tr-in wide" data-tr-input="' + id + '" data-key="notes" maxlength="500" placeholder="振り返り・備考" value="' + esc(d.notes) + '">');
+  }
+  if (d.images.length || up) {
+    html += row('画像', '<span class="tr-imgs">' + d.images.map((url, k) =>
+      '<span><a href="' + esc(url) + '" target="_blank" rel="noopener">画像' + (k + 1) + '</a>' +
+      '<button type="button" class="sc-img-rm" data-tr-img-rm="' + id + '" data-k="' + k + '" title="外す">✕</button></span>').join('') +
+      (up ? '<span class="img-uploading">⏳ アップロード中…</span>' : '') + '</span>');
+  }
+  html += '</div>' +
+    '<div class="tp-foot"><span class="tr-tools">' +
+      '<label class="tgoto sc-cam' + (d.images.length ? ' on' : '') + '" title="チャート画像">📷' +
+        (d.images.length ? '<b>' + d.images.length + '</b>' : '') +
+        '<input type="file" accept="image/*" multiple hidden data-tr-file="' + id + '"></label>' +
+      '<button type="button" class="tgoto' + (d.noteOpen || d.notes ? ' on' : '') + '" data-tr-act="note" data-id="' + id + '" title="メモ">📝</button>' +
+      '<button type="button" class="tclear" data-tr-act="clear" data-id="' + id + '" title="記録欄を空にする">🧹</button>' +
+      '<button type="button" class="btn-accent-solid tr-save"' + (ready ? '' : ' disabled') +
+        ' data-tr-act="save" data-id="' + id + '" title="この内容で記録する">💾 記録</button>' +
+    '</span></div>';
+  return html;
+}
+function trendDraftSave(id) {
+  const w = loadMarket().pairs.find(p => p.id === id);
+  const mv = marketFieldsOf(w);
+  if (!mv) { showToast('⚠ エントリー足と判定を決めてください'); return; }
+  const d = trendDraftGet(id);
+  if (trendDraftUploading[id] > 0) { showToast('⏳ 画像のアップロード完了を待ってから保存してください'); return; }
+  if (!d.tradeType) { showToast('⚠ 「検証／リアル」を選択してください'); return; }
+  const isEntered = mv.result === 'entered';
+  if (isEntered && !d.direction) { showToast('⚠ 売買方向（ロング／ショート）を選択してください'); return; }
+  const now = new Date();
+  const pnlAbs = Math.abs(parseFloat(String(d.pnl).replace(/,/g, '')) || 0);
+  const alert = trendLatestAlert(w);
+  const trade = Object.assign({
+    id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    tradeType: d.tradeType,
+  }, mv, {
+    /* ✅エントリーをタップした時刻（控え）。無ければ💾の時刻 */
+    datetime:     isEntered && d.enteredAt ? toDatetimeLocalValue(new Date(d.enteredAt)) : toDatetimeLocalValue(now),
+    /* 結果まで入れて💾したとき＝決済後の記録なので、その時刻を決済日時にする */
+    exitDatetime: isEntered && d.resultTag ? toDatetimeLocalValue(now) : '',
+    direction:    isEntered ? d.direction : '',
+    exitResult:   '',
+    notes:        (d.notes || '').trim(),
+    manualAlertAt: alert ? alert.at : '',
+    manualAlertTf: alert ? alert.tf : '',
+    resultTag:        isEntered ? d.resultTag : '',
+    resultOtherReason: isEntered && d.resultTag === 'other' ? d.resultOtherReason : '',
+    pnlAmount:    isEntered ? (d.pnlSign === '-' ? -pnlAbs : pnlAbs) : 0,
+    riskAmount:   isEntered ? Math.abs(parseFloat(String(d.risk).replace(/,/g, '')) || 0) : 0,
+    beTouch:      isEntered ? d.beTouch : '',
+    images:       { entry: '', higher: '', others: d.images.slice() },
+    createdAt:    now.toISOString(),
+    updatedAt:    now.toISOString(),
+  });
+  const trades = loadTrades();
+  trades.push(trade);
+  if (!saveTrades(trades)) return;
+  trendDraftPut(id, null);
+  trendPanel = null;
+  renderAll();
+  showToast('✔ ' + (MV_JUDGE_LABELS[trade.result] || trade.result) + ' を記録しました（' + trade.pair + '）');
+}
+/* 行ヘッダの「→」：エントリー圏の外でも記録できるよう、根拠パネルを開く。
+   上位足は前回の上位足、無ければ表示中の最初の足 */
+function trendOpenPanelFor(id) {
+  const w = loadMarket().pairs.find(p => p.id === id);
+  if (!w) return;
+  let tfKey = MV_TF_TO_TREND_KEY[w.tfHigher];
+  if (!MV_TREND_KEY_TO_TF[tfKey]) tfKey = (trendVisibleTfs.find(t => MV_TREND_KEY_TO_TF[t.k]) || {}).k;
+  if (!tfKey || !mvSetTf(id, 'tfHigher', MV_TREND_KEY_TO_TF[tfKey])) return;
+  const prev = trendPanel;
+  trendPanel = { id, tfKey };
+  if (prev && prev.id !== id) trendPatchById(prev.id);
+  trendPatchById(id);
+  const el = trendListEl.querySelector('[data-trend-item="' + CSS.escape(id) + '"] .trend-panel');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* 1ペア分の行。ヘッダ（ペア名・目線・鮮度・アラート）＋可視時間足ごとの入力行。
@@ -4676,7 +4844,7 @@ function trendItemHtml(w) {
       '<button type="button" class="tclear" data-trend-del-pair="' + esc(w.id) + '"' +
         ' title="このペアのデータを完全に削除（元に戻せません）">🗑</button>' +
       '<button type="button" class="tgoto" data-trend-goto-board="' + esc(w.id) + '"' +
-        ' title="このペアを選択して記録フォームへ">→</button>' +
+        ' title="このペアの根拠・記録欄を開く">→</button>' +
     '</div>' + trendAlertTimesHtml(w) + tfRows + panel +
   '</div>';
 }
@@ -4753,7 +4921,14 @@ function trendApplyFilters(pairs) {
   return shown;
 }
 
+let trendListPendingRender = false;
 function renderTrendList() {
+  /* S94: 記録欄（損益・メモ）を打っている最中に同期で描き直すと入力が飛ぶので、欄を離れるまで待つ */
+  if (trendListEl.contains(document.activeElement) && document.activeElement.matches('[data-tr-input]')) {
+    trendListPendingRender = true;
+    return;
+  }
+  trendListPendingRender = false;
   const data = loadMarket();
   /* S67: 選択した時間足（trendSortTf）でアラートが発生した日時の新しい順。
      アラートが無いペアは末尾に沈み、同値は名前順で安定する。
@@ -4924,12 +5099,46 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
-  /* S33: 5フィールドが揃ったので、そのまま記録フォームへ送る。
-     ⚠️ marketFieldsFromBoard() は「選択中のペア」しか見ないので、
-        saveSelectedPairId を renderMarket より先に呼ぶこと。 */
-  const gotoForm = e.target.closest('[data-trend-goto-form]');
-  if (gotoForm) {
-    openTradeModal(gotoForm.dataset.trendGotoForm);
+  /* S94: 根拠パネル内の記録欄。入力途中はペアごとの控えに書き、💾で trades に入る */
+  const drBtn = e.target.closest('[data-tr-draft]');
+  if (drBtn) {
+    const { trDraft: id, key, value } = drBtn.dataset;
+    const d = trendDraftGet(id);
+    d[key] = d[key] === value ? '' : value;   /* 再タップで解除 */
+    if (key === 'resultTag' && d.resultTag !== 'other') d.resultOtherReason = '';
+    trendDraftPut(id, d);
+    trendPatchById(id);
+    return;
+  }
+  const signBtn = e.target.closest('[data-tr-sign]');
+  if (signBtn) {
+    const id = signBtn.dataset.trSign;
+    const d = trendDraftGet(id);
+    d.pnlSign = d.pnlSign === '-' ? '+' : '-';
+    trendDraftPut(id, d);
+    trendPatchById(id);
+    return;
+  }
+  const trImgRm = e.target.closest('[data-tr-img-rm]');
+  if (trImgRm) {
+    const id = trImgRm.dataset.trImgRm;
+    const d = trendDraftGet(id);
+    d.images.splice(Number(trImgRm.dataset.k), 1);
+    trendDraftPut(id, d);
+    trendPatchById(id);
+    return;
+  }
+  const trAct = e.target.closest('[data-tr-act]');
+  if (trAct) {
+    const id = trAct.dataset.id, a = trAct.dataset.trAct;
+    if (a === 'save') { trendDraftSave(id); return; }
+    if (a === 'clear') trendDraftPut(id, null);
+    if (a === 'note') { const d = trendDraftGet(id); d.noteOpen = !(d.noteOpen || d.notes); trendDraftPut(id, d); }
+    trendPatchById(id);
+    if (a === 'note') {
+      const inp = trendListEl.querySelector('[data-tr-input="' + CSS.escape(id) + '"][data-key="notes"]');
+      if (inp) inp.focus();
+    }
     return;
   }
 
@@ -4942,7 +5151,14 @@ trendListEl.addEventListener('click', (e) => {
   }
   const judgeBtn = e.target.closest('[data-mv-judge]');
   if (judgeBtn) {
-    mvSetJudge(judgeBtn.dataset.mvJudge, judgeBtn.dataset.value);
+    const id = judgeBtn.dataset.mvJudge;
+    mvSetJudge(id, judgeBtn.dataset.value);
+    /* S94: ✅エントリーをタップした時刻をエントリー日時として控える（💾で記録に入る）。外したら控えも消す */
+    const w = loadMarket().pairs.find(p => p.id === id);
+    const d = trendDraftGet(id);
+    const entered = !!w && w.judge === 'entered';
+    if (entered && !d.enteredAt) { d.enteredAt = new Date().toISOString(); trendDraftPut(id, d); trendPatchById(id); }
+    if (!entered && d.enteredAt) { d.enteredAt = ''; trendDraftPut(id, d); trendPatchById(id); }
     return;
   }
 
@@ -5008,16 +5224,56 @@ trendListEl.addEventListener('click', (e) => {
     return;
   }
 
-  /* そのペアを選択状態にして🎯記録フォームへ移動する（S51: 環境認識ボード廃止に伴い行き先変更）。 */
+  /* S94: 記録フォーム（モーダル）ではなく、そのペアの根拠パネル（記録欄つき）を開く */
   const goto = e.target.closest('[data-trend-goto-board]');
   if (goto) {
-    openTradeModal(goto.dataset.trendGotoBoard);
+    const id = goto.dataset.trendGotoBoard;
+    if (trendPanel && trendPanel.id === id) { trendPanel = null; trendPatchById(id); return; }
+    trendOpenPanelFor(id);
   }
 });
 
 /* S33: 根拠パネルのプルダウン（S34: 根拠チェックはボタン群化してクリックハンドラへ移動、
    ここに残るのはエントリー足の <select> のみ）。 */
-trendListEl.addEventListener('change', (e) => {
+/* S94: 記録欄の数値・メモは打鍵ごとに再描画するとフォーカスが外れるので、控えだけ更新する */
+trendListEl.addEventListener('input', (e) => {
+  const inp = e.target.closest('[data-tr-input]');
+  if (!inp) return;
+  const id = inp.dataset.trInput;
+  const d = trendDraftGet(id);
+  d[inp.dataset.key] = inp.value;
+  trendDraftPut(id, d);
+});
+trendListEl.addEventListener('focusout', (e) => {
+  if (e.target.matches('[data-tr-input]') && trendListPendingRender) setTimeout(renderTrendList, 0);
+});
+trendListEl.addEventListener('change', async (e) => {
+  const sel = e.target.closest('[data-tr-select]');
+  if (sel) {
+    const id = sel.dataset.trSelect;
+    const d = trendDraftGet(id);
+    d[sel.dataset.key] = sel.value;
+    trendDraftPut(id, d);
+    return;
+  }
+  const file = e.target.closest('[data-tr-file]');
+  if (file) {
+    const id = file.dataset.trFile;
+    const files = Array.from(file.files || []);
+    if (!files.length) return;
+    trendDraftUploading[id] = (trendDraftUploading[id] || 0) + 1;
+    trendPatchById(id);
+    try {
+      for (const f of files) {
+        const url = await uploadChartImage(f);
+        if (url) { const d = trendDraftGet(id); d.images.push(url); trendDraftPut(id, d); }
+      }
+    } finally {
+      trendDraftUploading[id]--;
+      trendPatchById(id);
+    }
+    return;
+  }
   /* エントリー足。グランビルのセルが「🔭連動 ⇄ 選択可」で入れ替わるのでパネルを描き直す。 */
   const tfEntry = e.target.closest('[data-trend-tfentry]');
   if (tfEntry) {
