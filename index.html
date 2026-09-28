@@ -250,6 +250,28 @@
   .sc-imgs a { color: var(--accent); }
   .sc-img-rm { border: none; background: none; color: var(--ink-muted); cursor: pointer; padding: 0 2px; font-size: 11px; }
   .sc-save { width: auto; min-width: 32px; height: 26px; padding: 0 5px; font-size: 13px; }
+  /* S93: ⚡タブ内の画面切替（👀監視リスト／⚡1分足記録）。上に貼り付けて、スクロールしても切り替えられる */
+  .sc-seg {
+    position: sticky; top: 0; z-index: 20; display: flex; gap: 4px; padding: 4px;
+    margin: -8px 0 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--page); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  .sc-seg-btn {
+    flex: 1; border: none; border-radius: 9px; padding: 9px 0; font-family: inherit;
+    font-size: 13.5px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-muted);
+  }
+  .sc-seg-btn.active { background: var(--accent); color: #fff; }
+  .sc-seg-n { margin-left: 5px; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+  .sc-seg-n:empty { display: none; }
+  .sc-seg-btn.active .sc-seg-n { background: rgba(255, 255, 255, 0.25); color: #fff; }
+  .sc-pane { display: none; }
+  .sc-pane.active { display: block; }
+  .sc-pane.from-right { animation: scPaneRight 0.18s ease-out; }
+  .sc-pane.from-left  { animation: scPaneLeft  0.18s ease-out; }
+  @keyframes scPaneRight { from { transform: translateX(28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+  @keyframes scPaneLeft  { from { transform: translateX(-28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+  .sc-swipe-hint { margin-top: 10px; font-size: 11px; color: var(--ink-muted); }
+  @media (prefers-reduced-motion: reduce) { .sc-pane.from-right, .sc-pane.from-left { animation: none; } }
   /* S92: 👀 監視リスト。1段目＝通貨と1時間足の不成立3つ、2段目＝メモ・→カード・🗑 */
   .sw-add { width: auto; min-width: 150px; font-weight: 400; }
   .sw-item .sw-pair { flex: 0 0 72px; font-size: 13px; font-weight: 700; }
@@ -1386,6 +1408,12 @@
 
   <!-- ============ ⚡ 1分足スキャル（上位足1H×エントリー足1分足 専用の簡易記録、S88） ============ -->
   <div class="tab-panel" id="tabPanel-scalp">
+  <!-- S93: 監視リストと1分足記録を別画面に分け、上の切替ボタンか横スワイプで行き来する -->
+  <div class="sc-seg" id="scalpSeg" role="tablist">
+    <button type="button" class="sc-seg-btn" data-sc-pane="watch" role="tab">👀 監視リスト<b class="sc-seg-n" id="scalpSegWatchN"></b></button>
+    <button type="button" class="sc-seg-btn" data-sc-pane="cards" role="tab">⚡ 1分足記録</button>
+  </div>
+  <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト</h2>
     <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。3端末で同期されます。</div>
@@ -1395,8 +1423,11 @@
       <span class="check-count" id="scalpWatchCount"></span>
     </div>
     <div id="scalpWatch"></div>
+    <div class="sc-swipe-hint">← 左にスワイプで ⚡ 1分足記録</div>
   </section>
+  </div>
 
+  <div class="sc-pane" data-pane="cards">
   <section class="card">
     <h2>⚡ 1分足スキャル</h2>
     <div class="section-note">上位足<strong>1時間足</strong>×エントリー足<strong>1分足</strong>専用。<strong>カード5枚</strong>で、タイミングが重なりそうな通貨を同時に記録できます。1時間足は<strong>懸念点だけ</strong>タップ（何も押さなければ懸念なし）。💾 を押した時刻をエントリー日時として保存します。</div>
@@ -1419,6 +1450,7 @@
     </div>
     <div id="scalpList"></div>
   </section>
+  </div>
   </div>
 
   <!-- ============ ⚙ 設定（CSV入出力） ============ -->
@@ -6133,6 +6165,7 @@ function renderScalpWatch() {
       '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
   const ready = items.filter(t => !SCALP_WATCH_NG.some(c => (t.ng || {})[c.k])).length;
   document.getElementById('scalpWatchCount').textContent = items.length ? items.length + ' 通貨（揃い ' + ready + '）' : '';
+  document.getElementById('scalpSegWatchN').textContent = items.length ? String(items.length) : '';
   scalpWatchEl.innerHTML = items.length
     ? items.map(scalpWatchItemHtml).join('')
     : '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>';
@@ -6190,6 +6223,7 @@ scalpWatchEl.addEventListener('click', (e) => {
     /* 監視リストの RCI は短中長を区別しないのでカードへは運ばない（どの線かはカードで選ぶ）。MACD はそのまま懸念として運ぶ */
     scalpSlots[i] = Object.assign(scalpEmptySlot(t.pair), { macd: (t.ng || {}).macd ? '✖' : '', notes: t.notes || '' });
     scalpSaveSlots(); scalpPatchSlot(i);
+    setScalpPane('cards', true);
     const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -6218,6 +6252,61 @@ scalpWatchEl.addEventListener('focusout', (e) => {
   if (scalpWatchPendingRender) setTimeout(renderScalpWatch, 0);
 });
 renderScalpWatch();
+
+/* ============ ⚡タブ内の画面切替（S93） ============
+   監視リストと1分足記録を同じ画面に縦に並べると見にくいので、2つの画面に分けて
+   上の切替ボタンか横スワイプで行き来する。最後に見ていた画面はこの端末だけで覚える。 */
+const SCALP_PANE_KEY = 'mochipoyo_scalp_pane';
+const SCALP_PANES = ['watch', 'cards'];
+const scalpPanelEl = document.getElementById('tabPanel-scalp');
+let scalpPane = 'watch';
+try { if (SCALP_PANES.includes(localStorage.getItem(SCALP_PANE_KEY))) scalpPane = localStorage.getItem(SCALP_PANE_KEY); } catch (e) { /* noop */ }
+
+function setScalpPane(name, animate) {
+  if (!SCALP_PANES.includes(name)) return;
+  const dir = SCALP_PANES.indexOf(name) > SCALP_PANES.indexOf(scalpPane) ? 'from-right' : 'from-left';
+  const changed = name !== scalpPane;
+  scalpPane = name;
+  try { localStorage.setItem(SCALP_PANE_KEY, name); } catch (e) { /* noop */ }
+  scalpPanelEl.querySelectorAll('.sc-pane').forEach(el => {
+    const on = el.dataset.pane === name;
+    el.classList.toggle('active', on);
+    el.classList.remove('from-right', 'from-left');
+    if (on && animate && changed) { void el.offsetWidth; el.classList.add(dir); }
+  });
+  scalpPanelEl.querySelectorAll('.sc-seg-btn').forEach(b => {
+    const on = b.dataset.scPane === name;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  if (changed) {
+    /* 切替ボタンが上に貼り付いているので、画面の頭（切替ボタンの位置）まで戻す */
+    const top = scalpPanelEl.getBoundingClientRect().top + window.scrollY - 8;
+    if (window.scrollY > top) window.scrollTo({ top, behavior: 'auto' });
+  }
+}
+document.getElementById('scalpSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sc-pane]');
+  if (b) setScalpPane(b.dataset.scPane, true);
+});
+/* 横スワイプ：縦スクロールと区別するため、横に70px以上かつ縦の動きより十分大きいときだけ。
+   入力欄・プルダウンの上で始まった操作は無視する（文字選択やプルダウン操作を奪わない）。 */
+let scalpTouch = null;
+scalpPanelEl.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1 || e.target.closest('input, select, textarea')) { scalpTouch = null; return; }
+  scalpTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+}, { passive: true });
+scalpPanelEl.addEventListener('touchend', (e) => {
+  if (!scalpTouch) return;
+  const dx = e.changedTouches[0].clientX - scalpTouch.x;
+  const dy = e.changedTouches[0].clientY - scalpTouch.y;
+  const quick = Date.now() - scalpTouch.t < 700;
+  scalpTouch = null;
+  if (!quick || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+  const i = SCALP_PANES.indexOf(scalpPane) + (dx < 0 ? 1 : -1);
+  if (i >= 0 && i < SCALP_PANES.length) setScalpPane(SCALP_PANES[i], true);
+}, { passive: true });
+setScalpPane(scalpPane, false);
 
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';

@@ -33,8 +33,28 @@ const row = pair => `#scalpWatch [data-sw]:has(.sw-pair:text-is("${pair}"))`;
 
 // 1. 表示と追加
 await page.click('.tab-btn[data-tab="scalp"]');
-check('監視リストが⚡タブの最上部にある', await page.evaluate(() =>
-  document.querySelector('#tabPanel-scalp > section:first-child #scalpWatch') !== null));
+check('初回は👀監視リストの画面', await page.isVisible('#scalpWatch') && !(await page.isVisible('#scalpSlots')));
+check('切替ボタンが2つ', await page.locator('#scalpSeg [data-sc-pane]').count() === 2);
+await page.click('[data-sc-pane="cards"]');
+check('⚡記録に切り替わる', await page.isVisible('#scalpSlots') && !(await page.isVisible('#scalpWatch')));
+check('切替ボタンのactive', await page.$eval('[data-sc-pane="cards"]', el => el.classList.contains('active')));
+// 横スワイプ（右へ＝前の画面へ）
+const swipe = (x0, x1, y0 = 400, y1 = 400) => page.evaluate(([x0, x1, y0, y1]) => {
+  const el = document.querySelector('#tabPanel-scalp .sc-pane.active .card');
+  const mk = (x, y) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [mk(x0, y0)], changedTouches: [mk(x0, y0)] }));
+  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: [mk(x1, y1)] }));
+}, [x0, x1, y0, y1]);
+await swipe(80, 300);
+check('右スワイプで👀監視リストへ', await page.isVisible('#scalpWatch'));
+await swipe(300, 80);
+check('左スワイプで⚡記録へ', await page.isVisible('#scalpSlots'));
+await swipe(300, 240, 400, 700);
+check('縦スクロール気味の動きでは切り替わらない', await page.isVisible('#scalpSlots'));
+await page.reload();
+await page.click('.tab-btn[data-tab="scalp"]');
+check('最後に見ていた画面を覚えている', await page.isVisible('#scalpSlots'));
+await page.click('[data-sc-pane="watch"]');
 check('空状態の表示', (await page.textContent('#scalpWatch')).includes('まだありません'));
 await page.selectOption('#scalpWatchAdd', 'USDJPY');
 await page.selectOption('#scalpWatchAdd', 'GOLD');
@@ -73,6 +93,9 @@ check('離れたら保存', (await watch()).find(t => t.pair === 'GOLD').notes =
 await page.click(`${row('USDJPY')} [data-sw-card]`);
 const slot = await page.evaluate(() => scalpSlots.find(s => s.pair === 'USDJPY'));
 check('→カードで通貨とMACD懸念が空きカードへ', slot && slot.macd === '✖' && slot.rci.length === 0);
+check('→カードで⚡記録の画面に切り替わる', await page.isVisible('#scalpSlots'));
+check('切替ボタンに監視数', (await page.textContent('#scalpSegWatchN')) === '2');
+await page.click('[data-sc-pane="watch"]');
 
 // 6. 振り返り・CSV・スキャル記録一覧には出ない
 check('mainTrades から除外', await page.evaluate(() => mainTrades().length === 0));
@@ -107,6 +130,7 @@ check('削除した通貨は候補に戻る', await page.locator('#scalpWatchAdd
 // 9. 再読み込み後も残る・375pxに収まる
 await page.reload();
 await page.click('.tab-btn[data-tab="scalp"]');
+await page.click('[data-sc-pane="watch"]');
 check('再読み込み後も残る', await page.locator('#scalpWatch [data-sw]').count() === 1);
 check('375pxで横スクロールなし', await page.evaluate(() => document.documentElement.scrollWidth <= 375));
 check('1行目（通貨＋3条件）が1行に収まる', await page.$$eval('#scalpWatch [data-sw] .trend-head > :not(.spacer)',
