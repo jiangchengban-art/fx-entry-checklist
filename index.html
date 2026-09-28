@@ -274,6 +274,7 @@
   @media (prefers-reduced-motion: reduce) { .sc-pane.from-right, .sc-pane.from-left { animation: none; } }
   /* S92: 👀 監視リスト。1段目＝通貨と1時間足の不成立3つ、2段目＝メモ・→カード・🗑 */
   .sw-add { width: auto; min-width: 150px; font-weight: 400; }
+  .sc-add-card { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
   .sw-item .sw-pair { flex: 0 0 72px; font-size: 13px; font-weight: 700; }
   .sw-item .trend-head .spacer { flex-basis: 0 !important; }
   .sw-ok { font-size: 11px; font-weight: 700; color: var(--good); padding: 2px 7px; border-radius: 999px; background: var(--good-soft); }
@@ -1454,10 +1455,12 @@
         <strong>1時間</strong>　短✖・中✖・長✖＝上限・下限に来ていないRCI／MACD✖＝微妙な形（どれも懸念があるときだけタップ）<br>
         <strong>1分</strong>　Wボトム・逆三尊・Wトップ・三尊＝形状（売買方向に合うものだけ表示）／ダマシ＝ダマシで大口の約定を確認／グランビル＝急騰落後の浅い押し目が1分足MAにグランビル反応<br>
         ⏰ 1時間足のアラート発生（タップした時刻の00分でカードに控えます。14:10にタップ→14:00。<strong>記録に入るのは💾を押したときだけ</strong>で、見送るなら🧹で捨てられます）　📷 チャート画像　📝 メモ　🧹 カードを空にする　💾 保存（保存後もカードの通貨は残ります）<br>
+        5枚で足りないときは下の「＋ カードを追加」で増やせます。追加したカード（6枚目以降）は🧹でカードごと消えます。<br>
         下の記録一覧に、アラートからエントリーまでの平均・中央値の分数が出ます。
       </div>
     </details>
     <div id="scalpSlots"></div>
+    <button type="button" class="btn-ghost sc-add-card" id="scalpAddCard" title="カードを1枚増やす（6枚目以降は🧹でカードごと消せます）">＋ カードを追加</button>
   </section>
 
   <section class="card">
@@ -6035,7 +6038,7 @@ document.addEventListener('keydown', (e) => {
    画像の孤児削除（deleteTradeImages）をそのまま流用するため。統計・履歴・CSV からは mainTrades() で外す。
    1時間足は「条件が揃っている前提」なので、懸念点があるときだけ記録する（空＝懸念なし）。 */
 const SCALP_SLOTS_KEY = 'mochipoyo_scalp_slots_v1';   // 端末ごとの入力途中カード（記録そのものではない）
-const SCALP_SLOT_COUNT = 5;
+const SCALP_SLOT_COUNT = 5;   // 常に出しておく枚数。これを超える分は＋で足し、🧹でカードごと消す（S95）
 const SCALP_RCI_LINES = ['短期', '中期', '長期'];
 const SCALP_SHAPES = [
   { v: 'ダブルボトム', short: 'Wボトム', side: 'long' },
@@ -6044,7 +6047,7 @@ const SCALP_SHAPES = [
   { v: '三尊',         short: '三尊',    side: 'short' },
 ];
 const scalpSlotsEl = document.getElementById('scalpSlots');
-const scalpUploading = new Array(SCALP_SLOT_COUNT).fill(0);
+const scalpUploading = [];
 
 /* S89: 1枚のカード＝入力途中の1トレード。複数の通貨でタイミングが重なっても並行して記録できるよう
    5枚を常時表示する。途中の状態はタブ切替・再読み込みで消えないよう localStorage に置くが、
@@ -6078,7 +6081,7 @@ function scalpLoadSlots() {
   try { arr = JSON.parse(localStorage.getItem(SCALP_SLOTS_KEY) || 'null'); } catch (e) { /* noop */ }
   if (!Array.isArray(arr)) arr = [];
   const out = [];
-  for (let i = 0; i < SCALP_SLOT_COUNT; i++) {
+  for (let i = 0; i < Math.max(SCALP_SLOT_COUNT, arr.length); i++) {
     const s = Object.assign(scalpEmptySlot(), arr[i] && typeof arr[i] === 'object' ? arr[i] : {});
     if (!Array.isArray(s.rci)) s.rci = [];
     if (!Array.isArray(s.images)) s.images = [];
@@ -6088,6 +6091,15 @@ function scalpLoadSlots() {
   return out;
 }
 let scalpSlots = scalpLoadSlots();
+scalpSlots.forEach(() => scalpUploading.push(0));
+/* S95: 5枚で足りないときに1枚足す。足したカードの番号を返す */
+function scalpAddSlot(pair) {
+  scalpSlots.push(scalpEmptySlot(pair));
+  scalpUploading.push(0);
+  scalpSaveSlots();
+  renderScalpSlots();
+  return scalpSlots.length - 1;
+}
 function scalpSaveSlots() {
   try { localStorage.setItem(SCALP_SLOTS_KEY, JSON.stringify(scalpSlots)); } catch (e) { /* noop */ }
 }
@@ -6131,7 +6143,7 @@ function scalpSlotHtml(i) {
           (s.images.length ? '<b>' + s.images.length + '</b>' : '') +
           '<input type="file" accept="image/*" multiple hidden data-sc-file></label>' +
         '<button type="button" class="tgoto' + (s.noteOpen || s.notes ? ' on' : '') + '" data-sc-act="note" title="メモ">📝</button>' +
-        '<button type="button" class="tclear" data-sc-act="clear" title="カードを空にする">🧹</button>' +
+        '<button type="button" class="tclear" data-sc-act="clear" title="' + (i >= SCALP_SLOT_COUNT ? 'このカードを消す（追加したカード）' : 'カードを空にする') + '">🧹</button>' +
         '<button type="button" class="go-btn sc-save" data-sc-act="save" title="保存">' + (s.editId ? '更新' : '💾') + '</button>' +
       '</div>' +
       /* S90: 「1H」「1M」は字面が似て見分けにくいので、文言と色を分けた（1時間＝青の塗り／1分＝橙の枠） */
@@ -6165,6 +6177,11 @@ function scalpPatchSlot(i) {
 }
 const scalpSlotIndex = el => Number(el.closest('[data-slot]').dataset.slot);
 
+document.getElementById('scalpAddCard').addEventListener('click', () => {
+  const i = scalpAddSlot();
+  const el = scalpSlotsEl.querySelector('[data-slot="' + i + '"]');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
 scalpSlotsEl.addEventListener('click', (e) => {
   const b = e.target.closest('[data-sc]');
   if (b) {
@@ -6187,6 +6204,13 @@ scalpSlotsEl.addEventListener('click', (e) => {
   if (act) {
     const i = scalpSlotIndex(act), s = scalpSlots[i], a = act.dataset.scAct;
     if (a === 'save') { scalpSaveSlot(i); return; }
+    if (a === 'clear' && i >= SCALP_SLOT_COUNT) {
+      /* S95: 追加したカード（6枚目以降）は🧹でカードごと消す。アップロード中は待つ */
+      if (scalpUploading[i] > 0) { showToast('⏳ 画像のアップロード完了を待ってください'); return; }
+      scalpSlots.splice(i, 1); scalpUploading.splice(i, 1);
+      scalpSaveSlots(); renderScalpSlots();
+      return;
+    }
     if (a === 'clear') scalpSlots[i] = scalpEmptySlot(s.editId ? '' : s.pair);
     if (a === 'note') s.noteOpen = !(s.noteOpen || s.notes);
     if (a === 'alert') {
@@ -6274,7 +6298,7 @@ function scalpSaveSlot(i) {
 function scalpLoadIntoSlot(t) {
   let i = scalpSlots.findIndex(s => s.editId === t.id);
   if (i < 0) i = scalpSlots.findIndex(scalpSlotIsBlank);
-  if (i < 0) { showToast('⚠ 空いているカードがありません（🧹で1枚空けてください）'); return; }
+  if (i < 0) i = scalpAddSlot();   /* S95: 空きが無ければ1枚足す */
   const sc = t.scalp || {};
   scalpSlots[i] = Object.assign(scalpEmptySlot(), {
     pair: t.pair || '', direction: t.direction || '', rci: Array.isArray(sc.rci) ? sc.rci.slice() : [],
@@ -6475,7 +6499,7 @@ scalpWatchEl.addEventListener('click', (e) => {
     if (!t) return;
     let i = scalpSlots.findIndex(s => !s.editId && s.pair === t.pair && scalpSlotIsBlank(s));
     if (i < 0) i = scalpSlots.findIndex(scalpSlotIsBlank);
-    if (i < 0) { showToast('⚠ 空いているカードがありません（🧹で1枚空けてください）'); return; }
+    if (i < 0) i = scalpAddSlot();   /* S95: 空きが無ければ1枚足す */
     /* 監視リストの RCI は短中長を区別しないのでカードへは運ばない（どの線かはカードで選ぶ）。MACD はそのまま懸念として運ぶ */
     scalpSlots[i] = Object.assign(scalpEmptySlot(t.pair), { macd: (t.ng || {}).macd ? '✖' : '', notes: t.notes || '' });
     scalpSaveSlots(); scalpPatchSlot(i);
