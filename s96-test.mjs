@@ -17,7 +17,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 const shown = () => page.$$eval('#scalpSlots [data-slot]', els => els.map(e => Number(e.dataset.slot)));
 const card = i => `#scalpSlots [data-slot="${i}"]`;
-const open = async () => { await page.click('.tab-btn[data-tab="scalp"]'); await page.click('[data-sc-pane="cards"]'); };
+const open = async () => { await page.click('.tab-btn[data-tab="scalp"]'); await page.click('#tabPanel-scalp [data-sc-pane="cards"]'); };
 
 await open();
 check('初期は5枚すべて表示', (await shown()).length === 5);

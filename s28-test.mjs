@@ -37,16 +37,20 @@ async function newPage() {
   ok('初回起動でプリセット28銘柄が生成される', before && before.pairs.length === 28, before && before.pairs.length);
   ok('破損バナーは出ていない', !(await page.locator('#fatalBanner.show').count()));
 
-  // 一覧タブでトレンドを1つ記録する（実際の書き込み経路を通す）
+  // 🔭記録カードでトレードを1件記録する（実際の書き込み経路を通す。S97で巡回一覧は撤去）
   await page.click('.tab-btn[data-tab="trend"]');
-  await page.waitForTimeout(300);
-  const btn = page.locator('.tstate-btn').first();
-  await btn.click();
+  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
+  const c = '#trendSlots [data-slot="0"] ';
+  await page.selectOption(c + '[data-sc-pair]', 'USDJPY');
+  await page.selectOption(c + '[data-sc-sel="tfHigher"]', '4時間足');
+  await page.selectOption(c + '[data-sc-sel="tfEntry"]', '5分足');
+  await page.click(c + '[data-sc="tradeType"][data-v="demo"]');
+  await page.click(c + '[data-sc="direction"][data-v="long"]');
+  await page.click(c + '[data-sc-act="save"]');
   await page.waitForTimeout(200);
-  const after = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  const recorded = after.pairs.some(p => Object.values(p.trend || {}).some(t => t.state));
-  ok('トレンド記録が localStorage に保存される', recorded);
-  ok('trendAt が入る', after.pairs.some(p => p.trendAt));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
+  ok('記録が localStorage に保存される', saved.length === 1 && saved[0].pair === 'USDJPY');
+  ok('createdAt / updatedAt が入る', !!(saved[0] && saved[0].createdAt && saved[0].updatedAt));
   ok('JSエラーなし', errors.length === 0, errors);
   await ctx.close();
 }
@@ -67,14 +71,10 @@ async function newPage() {
     Object.keys(localStorage).filter(k => /__corrupt_\d+$/.test(k)));
   ok('原文が __corrupt_* に退避される', corrupt.length === 1, corrupt);
 
-  // 全書き込み経路を叩いても上書きされないこと
-  // S51で環境ボード（#mvPairSelect）・S55で🎯タブ自体が撤去されたため、
-  // 一覧タブ内の書き込み経路（方向・ゾーン・アラート・根拠パネルの判定ボタン）だけを叩く。
+  // 画面の操作を一通り叩いても上書きされないこと（S97: 🔭は記録カードになり market を書く画面は無い）
   await page.click('.tab-btn[data-tab="trend"]');
-  await page.waitForTimeout(300);
-  const panelOpenBtn = page.locator('[data-trend-panel-open]').first();
-  if (await panelOpenBtn.count()) { await panelOpenBtn.click().catch(() => {}); await page.waitForTimeout(150); }
-  for (const sel of ['.tstate-btn', '.tzone-btn', '.mv-alert-badge', '.mv-judge-btn', '.mv-tfcheck-btn']) {
+  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
+  for (const sel of ['#trendSlots .tstate-btn', '#trendSlots .sc-btn', '#trendSlots [data-sc-act="save"]']) {
     const el = page.locator(sel).first();
     if (await el.count()) { await el.click().catch(() => {}); await page.waitForTimeout(80); }
   }
@@ -167,7 +167,7 @@ async function newPage() {
   // 記録を作る
   await page.click('.tab-btn[data-tab="trend"]');
   await page.waitForTimeout(300);
-  await page.locator('.tstate-btn').first().click();
+  await page.selectOption('#trendWatchAdd', 'USDJPY');   // S97: 巡回一覧の撤去に伴い、監視リストへの追加で記録を作る
   await page.waitForTimeout(200);
 
   const snapshot = await page.evaluate(() => {
@@ -292,73 +292,20 @@ async function newPage() {
   await page.goto(URL);
   await page.waitForTimeout(400);
 
-  // トレンド：時間足単位の at
+  // S97: 巡回一覧（trend/alerts/judge/checks をタップで書く画面）は撤去した。
+  // 端末間マージの時刻は記録単位の updatedAt で見るので、監視リストの更新で updatedAt が進むことを確かめる。
   await page.click('.tab-btn[data-tab="trend"]');
-  await page.waitForTimeout(300);
-  await page.locator('.tstate-btn').first().click();
-  await page.waitForTimeout(250);
-  let d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  const touched = d.pairs.find(p => Object.values(p.trend).some(t => t.at));
-  ok('trend[tf].at が入る', !!touched);
-  const stamped = Object.entries(touched.trend).filter(([, t]) => t.at);
-  ok('記録した足だけに at が付く（他の足は空のまま）', stamped.length === 1, stamped.map(x => x[0]));
-  ok('trendAt = その足の at', touched.trendAt === stamped[0][1].at);
-
-  // アラート：chAt が ON/OFF どちらでも入る。
-  // S71でバッジのタップは直接トグルではなく日時入力モーダル（#alertTimeModal）を開く方式になった。
-  await page.locator('.mv-alert-badge').first().click();
+  await page.selectOption('#trendWatchAdd', 'USDJPY');
   await page.waitForTimeout(150);
-  await page.click('#alertTimeSave');
-  await page.waitForTimeout(250);
-  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  let withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
-  ok('alerts[tf].chAt が入る（ON）', !!withAlert);
-  const onAt = Object.values(withAlert.alerts).find(a => a.chAt).chAt;
+  let d = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
+  const w0 = d.find(t => t.kind === 'trendwatch');
+  ok('監視リストに createdAt / updatedAt が入る', !!(w0 && w0.createdAt && w0.updatedAt));
   await page.waitForTimeout(1100);
-  await page.locator('.mv-alert-badge.on').first().click();
+  await page.click('#trendWatch [data-sw-ng="rci"]');
   await page.waitForTimeout(150);
-  await page.click('#alertTimeOff');
-  await page.waitForTimeout(250);
-  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  withAlert = d.pairs.find(p => Object.values(p.alerts || {}).some(a => a.chAt));
-  const offEntry = Object.values(withAlert.alerts).find(a => a.chAt);
-  ok('OFF にしても chAt が更新される（消した新しさが残る）',
-     offEntry.on === false && offEntry.at === '' && offEntry.chAt > onAt,
-     offEntry);
-
-  // S44以降、判定ボタン・根拠チェックボタンは行の🎯根拠パネル（[data-trend-panel-open]で開く）の中。
-  // S51で環境ボード（#mvPairSelect）、S55で🎯タブ自体が撤去されたため、パネルを開いてから叩く。
-  const panelBtn = page.locator('[data-trend-panel-open]').first();
-  await panelBtn.click();
-  await page.waitForTimeout(200);
-
-  // 判定：judgeAt
-  await page.locator('.mv-judge-btn').first().click();
-  await page.waitForTimeout(250);
-  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  ok('judgeAt が入る', d.pairs.some(p => p.judgeAt));
-  ok('judgeLog に記録される（統計が壊れていない）', d.judgeLog.length === 1, d.judgeLog.length);
-
-  // 根拠チェック：checksAt（項目単位）。パネルを開いた時点で tfHigher が固定されている前提。
-  await page.locator('.mv-tfcheck-btn').first().click();
-  await page.waitForTimeout(250);
-  d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-  const wc = d.pairs.find(p => p.checksAt && Object.keys(p.checksAt).length);
-  ok('checksAt が項目単位で入る', !!wc && Object.keys(wc.checksAt)[0].includes('.'),
-     wc && Object.keys(wc.checksAt));
-  ok('checksHigher の形は変わっていない（CSV スナップショット互換、S72で時間足キー単位の入れ子に）',
-     wc && typeof wc.checksHigher === 'object' && !Array.isArray(wc.checksHigher));
-
-  // 上位足は行の🎯根拠ボタンから固定される（S44）ので、別の足の根拠ボタンを押して tfAt を確認する。
-  const otherPanelBtn = page.locator('[data-trend-panel-open]').nth(1);
-  if (await otherPanelBtn.count()) {
-    await otherPanelBtn.click();
-    await page.waitForTimeout(250);
-    d = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), MARKET_KEY);
-    ok('tfAt が入る', d.pairs.some(p => p.tfAt));
-  } else {
-    ok('tfAt が入る（別の足のボタンが無いためスキップ）', true);
-  }
+  d = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
+  const w1 = d.find(t => t.kind === 'trendwatch');
+  ok('更新すると updatedAt が進む', w1.updatedAt > w0.updatedAt && w1.ng.rci === true);
 
   ok('JSエラーなし', errors.length === 0, errors);
   await ctx.close();

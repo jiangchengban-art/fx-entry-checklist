@@ -34,7 +34,7 @@ const isOn = (i, sel) => page.$eval(`${card(i)} ${sel}`, el => el.classList.cont
 
 // 1. タブとカード5枚
 await page.click('.tab-btn[data-tab="scalp"]');
-await page.click('[data-sc-pane="cards"]');
+await page.click('#tabPanel-scalp [data-sc-pane="cards"]');
 check('⚡タブが表示される', await page.isVisible('#tabPanel-scalp'));
 check('カードが5枚', await page.locator('#scalpSlots [data-slot]').count() === 5);
 check('空状態の表示', (await page.textContent('#scalpList')).includes('まだ記録がありません'));
@@ -82,7 +82,7 @@ check('カード1入力中もカード0の状態が残る', await isOn(0, '[data
 // 5. 再読み込みしても入力途中が残る
 await page.reload();
 await page.click('.tab-btn[data-tab="scalp"]');
-await page.click('[data-sc-pane="cards"]');
+await page.click('#tabPanel-scalp [data-sc-pane="cards"]');
 check('再読み込み後もカード0が残る', await isOn(0, '[data-sc="damashi"][data-v="●"]'));
 check('再読み込み後もメモが残る', (await page.inputValue(`${card(0)} [data-sc-note]`)) === 'テストメモ');
 

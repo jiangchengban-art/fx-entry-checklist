@@ -61,8 +61,8 @@ check('設定タブにログイン/接続先の入力欄が無い', await A.page
 check('起動時に全件 GET している', log.get.some(g => !g.filtered));
 
 // ① A が USDJPY 日足、B が（Aを取り込む前に）USDJPY 4H を記録
-await A.page.evaluate(() => { const w = loadMarket().pairs.find(p => p.pair === 'USDJPY'); mvWriteTrend(w.id, 'd', { state: 'up' }); });
-await B.page.evaluate(() => { const w = loadMarket().pairs.find(p => p.pair === 'USDJPY'); mvWriteTrend(w.id, 'h4', { state: 'down' }); });
+await A.page.evaluate(() => { /* S97: 巡回の画面は撤去したが、保存済みの w.trend は足単位で同期され続ける */ const d = loadMarket(); const w = d.pairs.find(p => p.pair === 'USDJPY'); w.trend['d'] = { state: 'up', zone: '', granville: '', wpos: '', at: new Date().toISOString() }; saveMarket(d); });
+await B.page.evaluate(() => { /* S97: 巡回の画面は撤去したが、保存済みの w.trend は足単位で同期され続ける */ const d = loadMarket(); const w = d.pairs.find(p => p.pair === 'USDJPY'); w.trend['h4'] = { state: 'down', zone: '', granville: '', wpos: '', at: new Date().toISOString() }; saveMarket(d); });
 await sync(A.page);
 check('A の送信で p:USDJPY 行ができる', table.has('p:USDJPY'));
 check('送信の Prefer が merge-duplicates', log.post.every(p => /resolution=merge-duplicates/.test(p.prefer)));

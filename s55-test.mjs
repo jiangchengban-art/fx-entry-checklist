@@ -1,4 +1,4 @@
-/* S55 スモークテスト：🎯タブ廃止・記録フォームのモーダル（S94から🔭一覧はモーダルを使わず根拠パネルの💾で記録） */
+/* S55 スモークテスト：🎯タブ廃止・記録フォームのモーダル（S97から新規記録は🔭カードの💾、モーダルは📚の✎編集用） */
 import { chromium } from 'playwright';
 import path from 'path';
 
@@ -11,28 +11,26 @@ const browser = await chromium.launch().catch(() =>
   chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
 const errors = [];
 
-const MARKET = 'mochipoyo_market_view_v1';
-const SELECTED = 'mochipoyo_market_view_selected';
-const mkPair = (id, pair, extra = {}) => ({
-  id, pair, tfHigher: '週足', tfEntry: '15分足', judge: 'entered', alerts: {},
-  checksHigher: {}, checksEntry: {}, ...extra,
-});
-
-async function newPage(seed) {
+async function newPage() {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(URL);
-  if (seed) {
-    await page.evaluate(s => {
-      for (const [k, v] of Object.entries(s)) {
-        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-      }
-    }, seed);
-    await page.reload();
-  }
   return page;
+}
+
+/* 🔭記録カードで💾まで済ませる（S97）。カード0に通貨・足・区分・方向を入れて保存 */
+async function recordViaCard(page, pair, dir) {
+  await page.click('.tab-btn[data-tab="trend"]');
+  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
+  const c = '#trendSlots [data-slot="0"] ';
+  await page.selectOption(c + '[data-sc-pair]', pair);
+  await page.selectOption(c + '[data-sc-sel="tfHigher"]', '4時間足');
+  await page.selectOption(c + '[data-sc-sel="tfEntry"]', '5分足');
+  await page.click(c + '[data-sc="tradeType"][data-v="demo"]');
+  await page.click(c + '[data-sc="direction"][data-v="' + dir + '"]');
+  await page.click(c + '[data-sc-act="save"]');
 }
 
 console.log('\n[①] 🎯タブが存在しない・既定タブは一覧');
@@ -44,75 +42,38 @@ console.log('\n[①] 🎯タブが存在しない・既定タブは一覧');
   await page.context().close();
 }
 
-/* 根拠パネルの記録欄で💾まで済ませる（S94）。ペアは judge='entered' で seed 済み */
-async function recordViaPanel(page, id, dir, tag, pnl) {
-  await page.click('[data-trend-goto-board="' + id + '"]');
-  await page.click('[data-tr-draft="' + id + '"][data-key="tradeType"][data-value="demo"]');
-  await page.click('[data-tr-draft="' + id + '"][data-key="direction"][data-value="' + dir + '"]');
-  await page.click('[data-tr-draft="' + id + '"][data-key="resultTag"][data-value="' + tag + '"]');
-  await page.fill('[data-tr-input="' + id + '"][data-key="pnl"]', pnl);
-  await page.click('[data-tr-act="save"][data-id="' + id + '"]');
-}
-
-console.log('\n[②] 根拠パネルの💾でモーダルを開かずに記録できる（S94）');
+console.log('\n[②] 🔭記録カードの💾でモーダルを開かずに記録できる（S97）');
 {
-  const page = await newPage({
-    [MARKET]: { pairs: [mkPair('w1', 'USDJPY')], snapshots: [], judgeLog: [] },
-    [SELECTED]: 'w1',
-  });
-  await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-panel-open="w1"]');
-  eq('📝記録フォームへボタンは無い', await page.locator('[data-trend-goto-form]').count(), 0);
-  await page.click('[data-trend-panel-open="w1"]');
-  await recordViaPanel(page, 'w1', 'long', 'reg', '12000');
+  const page = await newPage();
+  await recordViaCard(page, 'USDJPY', 'long');
   ok('モーダルは開かない', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
   ok('一覧タブはアクティブのまま', await page.locator('[data-tab="trend"]').evaluate(el => el.classList.contains('active')));
-
   await page.click('[data-tab="review"]');
-  const list = await page.textContent('#recordList');
-  ok('振り返りタブの履歴にUSDJPYが載る', list.includes('USDJPY'));
+  ok('振り返りタブの履歴にUSDJPYが載る', (await page.textContent('#recordList')).includes('USDJPY'));
   await page.context().close();
 }
 
-console.log('\n[③] ヘッダの「→」ボタンは根拠パネル（記録欄つき）を開く（S94）');
+console.log('\n[③] 編集ボタンでモーダルが開き、結果を後から入れられる');
 {
-  const page = await newPage({
-    [MARKET]: { pairs: [mkPair('w1', 'EURUSD')], snapshots: [], judgeLog: [] },
-    [SELECTED]: 'w1',
-  });
-  await page.click('[data-tab="trend"]');
-  await page.click('[data-trend-goto-board="w1"]');
-  ok('モーダルは開かない', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
-  eq('パネルが開く', await page.locator('[data-trend-item="w1"] .trend-panel').count(), 1);
-  await page.click('[data-trend-goto-board="w1"]');
-  eq('もう一度で閉じる', await page.locator('[data-trend-item="w1"] .trend-panel').count(), 0);
-  await page.context().close();
-}
-
-console.log('\n[④] 編集ボタンでモーダルが開く');
-{
-  const page = await newPage({
-    [MARKET]: { pairs: [mkPair('w1', 'GBPUSD')], snapshots: [], judgeLog: [] },
-    [SELECTED]: 'w1',
-  });
-  await page.click('[data-tab="trend"]');
-  await recordViaPanel(page, 'w1', 'short', 'max', '5000');
-
+  const page = await newPage();
+  await recordViaCard(page, 'GBPUSD', 'short');
   await page.click('[data-tab="review"]');
   await page.click('[data-edit]');
   ok('編集で再びモーダルが開く', await page.locator('#tradeModal').evaluate(el => el.classList.contains('show')));
   eq('編集バッジが出る', await page.locator('#editModeBadge').evaluate(el => el.classList.contains('hidden')), false);
+  ok('記録時の内容に上位足×エントリー足が出る', (await page.textContent('#formMarketSummary')).includes('4時間足'));
+  await page.click('#resultTagToggle [data-value="reg"]');
+  await page.fill('#fPnl', '12000');
+  await page.click('#formSubmitBtn');
+  const t = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1'))[0]);
+  ok('結果と損益が後から入る', t.resultTag === 'reg' && t.pnlAmount === 12000 && t.pair === 'GBPUSD' && t.tfHigher === '4時間足');
   await page.context().close();
 }
 
-console.log('\n[⑤] 背景クリック・Escapeで閉じる');
+console.log('\n[④] 背景クリック・Escapeで閉じる');
 {
-  const page = await newPage({
-    [MARKET]: { pairs: [mkPair('w1', 'AUDUSD')], snapshots: [], judgeLog: [] },
-    [SELECTED]: 'w1',
-  });
-  await page.click('[data-tab="trend"]');
-  await recordViaPanel(page, 'w1', 'long', 'reg', '1000');
+  const page = await newPage();
+  await recordViaCard(page, 'AUDUSD', 'long');
   await page.click('[data-tab="review"]');
   await page.click('[data-edit]');
   await page.locator('#tradeModal').click({ position: { x: 5, y: 5 } });

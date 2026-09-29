@@ -20,7 +20,7 @@ const slots = () => page.evaluate(() => JSON.parse(localStorage.getItem('mochipo
 const card = i => `#scalpSlots [data-slot="${i}"]`;
 
 await page.click('.tab-btn[data-tab="scalp"]');
-await page.click('[data-sc-pane="cards"]');
+await page.click('#tabPanel-scalp [data-sc-pane="cards"]');
 check('初期は5枚', await count() === 5);
 check('＋カードを追加ボタンがある', await page.isVisible('#scalpAddCard'));
 
@@ -33,7 +33,7 @@ await page.selectOption(card(6) + ' [data-sc-pair]', 'EURUSD');
 await page.click(card(6) + ' [data-sc="direction"][data-v="long"]');
 await page.reload();
 await page.click('.tab-btn[data-tab="scalp"]');
-await page.click('[data-sc-pane="cards"]');
+await page.click('#tabPanel-scalp [data-sc-pane="cards"]');
 check('再読み込み後も7枚', await count() === 7);
 check('7枚目の内容が残る', (await slots())[6].pair === 'EURUSD' && (await slots())[6].direction === 'long');
 
