@@ -680,6 +680,12 @@
   .sw-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
   .sw-tab.active[data-sw-group="entry"] { color: var(--good); }
   .sw-tab.active[data-sw-group="wait"] { color: var(--warn); }
+  .sw-note-text {
+    display: block; width: 100%; margin-top: 4px; padding: 2px 2px 0; border: none; background: none; text-align: left;
+    font-family: inherit; font-size: 11.5px; color: var(--ink-muted); cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sw-note-text::before { content: '📝 '; }
   .trend-help.sw-help { margin: 0 0 10px; }
   .trend-help-body {
     font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
@@ -3732,6 +3738,7 @@ function makeWatchList(cfg) {
   const listEl = document.getElementById(cfg.listId);
   const addEl = document.getElementById(cfg.addId);
   const noteTimers = {};
+  const noteOpen = new Set();
   let pendingRender = false;
   const isMine = t => !!t && t.kind === cfg.kind;
   const items = () => loadTrades().filter(isMine).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
@@ -3815,15 +3822,19 @@ function makeWatchList(cfg) {
           (allOk ? '<span class="sw-ok" title="グランビル・RCI・MACD がすべて✅">揃い</span>' : '') +
         '</div>' +
         '<div class="trend-tf">' +
-          '<input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ" value="' + esc(t.notes || '') + '">' +
+          '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ（タップで入力欄を開く）">📝</button>' +
           (multiTf
             ? '<span class="sw-bells" title="' + bellTitle + '"><span class="sw-bells-ic' + (pend.length ? ' on' : '') + '">🔔</span>' + tfs.map(f =>
                 '<button type="button" class="sw-tfb' + ((t.alerts || {})[f.k] ? ' on' : '') + '" data-sw-alert="' + f.k +
                 '" title="' + f.title + 'のアラート（タップで未確認に控える／もう一度で外す）">' + f.k + '</button>').join('') + '</span>'
             : '<button type="button" class="tgoto sw-bell' + (pend.length ? ' on' : '') + '" data-sw-bell title="' + bellTitle + '">🔔</button>') +
+          '<span class="spacer"></span>' +
           '<button type="button" class="tgoto sw-card" data-sw-card title="空いているカードにこの通貨を送る">→カード</button>' +
           '<button type="button" class="tclear" data-sw-del title="監視リストから消す">🗑</button>' +
         '</div>' +
+        (noteOpen.has(t.id)
+          ? '<div class="trend-tf"><input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ（欄を離れると閉じます）" value="' + esc(t.notes || '') + '" enterkeyhint="done"></div>'
+          : t.notes ? '<button type="button" class="sw-note-text" data-sw-note-open title="タップで編集">' + esc(t.notes) + '</button>' : '') +
       '</div>');
   };
   const toggleAlert = (id, k) => update(id, t => {
@@ -3924,7 +3935,25 @@ function makeWatchList(cfg) {
     if (e.target.closest('[data-sw-card]')) {
       const t = loadTrades().find(x => x.id === id);
       if (t) cfg.toCard(t);
+      return;
     }
+    if (e.target.closest('[data-sw-note-open]')) {
+      const open = row.querySelector('[data-sw-note]');
+      if (open) { open.blur(); return; }
+      noteOpen.add(id);
+      const t = loadTrades().find(x => x.id === id);
+      if (t) row.outerHTML = itemHtml(t);
+      const input = listEl.querySelector('[data-sw="' + id + '"] [data-sw-note]');
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }
+  });
+  /* 入力中に📝を押したとき、先にフォーカスが外れて閉じ→クリックで開き直す、とならないようにする */
+  listEl.addEventListener('mousedown', (e) => {
+    const b = e.target.closest('[data-sw-note-open]');
+    if (b && b.closest('[data-sw]').querySelector('[data-sw-note]')) e.preventDefault();
+  });
+  listEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('[data-sw-note]')) e.target.blur();
   });
   /* メモは打鍵ごとに保存すると同期の送信が細かく走るので、手が止まってから保存する */
   listEl.addEventListener('input', (e) => {
@@ -3943,7 +3972,13 @@ function makeWatchList(cfg) {
       const v = e.target.value;
       update(id, t => { t.notes = v; }, false);
     }
-    if (pendingRender) setTimeout(render, 0);
+    noteOpen.delete(id);
+    setTimeout(() => {
+      if (pendingRender) { render(); return; }
+      const r = listEl.querySelector('[data-sw="' + id + '"]');
+      const t = loadTrades().find(x => x.id === id);
+      if (r && t) r.outerHTML = itemHtml(t);
+    }, 0);
   });
   render();
   return { render };

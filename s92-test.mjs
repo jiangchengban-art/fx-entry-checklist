@@ -82,7 +82,12 @@ u = (await watch()).find(t => t.pair === 'USDJPY');
 check('3タップ目で未選択に戻る', u.ng.rci === false && !u.ok.rci);
 check('未選択は記号なし', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI');
 
-// 3. メモ（入力が止まってから保存）
+// 3. メモ（📝で欄を開く・入力が止まってから保存）
+check('メモ欄は最初は閉じている', await page.locator(`${row('GOLD')} [data-sw-note]`).count() === 0);
+check('2行目は1行（📝ボタン化）', await page.$$eval(`${row('GOLD')} .trend-tf > *`,
+  els => { const c = els.map(e => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; }); return Math.max(...c) - Math.min(...c) < 8; }));
+await page.click(`${row('GOLD')} .trend-tf [data-sw-note-open]`);
+check('📝で欄が開いてフォーカス', await page.evaluate(() => document.activeElement && document.activeElement.matches('[data-sw-note]')));
 await page.fill(`${row('GOLD')} [data-sw-note]`, 'NY時間に注目');
 await page.waitForTimeout(800);
 check('メモが保存される', (await watch()).find(t => t.pair === 'GOLD').notes === 'NY時間に注目');
@@ -95,6 +100,18 @@ check('入力中は描き直さない', await page.evaluate(() => document.activ
 await page.click('#tabPanel-scalp h2');
 await page.waitForTimeout(100);
 check('離れたら保存', (await watch()).find(t => t.pair === 'GOLD').notes === 'NY時間に注目！');
+check('離れたら欄が閉じる', await page.locator(`${row('GOLD')} [data-sw-note]`).count() === 0);
+check('メモは1行の文字で見える', (await page.textContent(`${row('GOLD')} .sw-note-text`)) === 'NY時間に注目！');
+check('メモありは📝が点灯', await page.$eval(`${row('GOLD')} .trend-tf [data-sw-note-open]`, el => el.classList.contains('on')));
+await page.click(`${row('GOLD')} .sw-note-text`);
+check('メモの文字をタップで再編集', await page.evaluate(() => document.activeElement && document.activeElement.matches('[data-sw-note]')));
+await page.keyboard.press('Enter');
+await page.waitForTimeout(50);
+check('Enterで閉じる', await page.locator(`${row('GOLD')} [data-sw-note]`).count() === 0);
+await page.click(`${row('GOLD')} .trend-tf [data-sw-note-open]`);
+await page.click(`${row('GOLD')} .trend-tf [data-sw-note-open]`);
+await page.waitForTimeout(50);
+check('入力中に📝を押すと閉じる', await page.locator(`${row('GOLD')} [data-sw-note]`).count() === 0);
 
 // 5. →カード
 await page.click(`${row('USDJPY')} [data-sw-card]`);
