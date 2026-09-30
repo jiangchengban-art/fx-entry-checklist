@@ -281,6 +281,38 @@
   .sw-ok { font-size: 11px; font-weight: 700; color: var(--good); padding: 2px 7px; border-radius: 999px; background: var(--good-soft); }
   .sw-item.ng { border-left: 3px solid var(--bad); }
   .sw-item.ok { border-left: 3px solid var(--good); }
+  .tgoto.sw-bell { width: auto; min-width: 26px; padding: 0 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .tgoto.sw-bell.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .sw-item.sw-flash { animation: swFlash 1.2s ease-out; }
+  @keyframes swFlash { from { box-shadow: 0 0 0 3px var(--warn); } to { box-shadow: 0 0 0 0 transparent; } }
+  /* 🔔 未確認アラート：条件待ちで後回しにしたアラートを古い順に並べて、確認漏れを防ぐ */
+  .sw-pend { margin-bottom: 10px; }
+  .sw-pend:empty { display: none; }
+  .sw-pend-head {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    font-size: 13px; font-weight: 700; color: var(--warn); margin-bottom: 6px;
+  }
+  .sw-pend-head span { font-size: 11px; font-weight: 400; color: var(--ink-muted); }
+  .sw-pend-row {
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin-bottom: 4px;
+    border: 1px solid var(--warn); border-left-width: 4px; border-radius: 8px; background: var(--warn-soft);
+    font-size: 12.5px;
+  }
+  .sw-pend-pair { border: none; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; flex: 0 0 auto; }
+  .sw-pend-tf { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; }
+  .sw-pend-age { font-weight: 700; color: var(--warn); white-space: nowrap; }
+  .sw-pend-ng { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .sw-pend-ng span { font-size: 11px; font-weight: 700; color: var(--bad); padding: 0 5px; border-radius: 999px; background: var(--bad-soft); }
+  .sw-pend-done {
+    flex: none; width: 30px; height: 26px; border-radius: 7px; border: 1px solid var(--good);
+    background: var(--surface); color: var(--good); font-weight: 700; cursor: pointer;
+  }
+  .tab-bar .tab-btn { position: relative; }
+  .tab-badge {
+    position: absolute; top: 3px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 999px; background: var(--bad); color: #fff; font-size: 10px; line-height: 16px; text-align: center;
+  }
+  .tab-badge:empty { display: none; }
   .tgoto.sw-card { width: auto; padding: 0 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
   .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
@@ -1036,7 +1068,7 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト（上位足）</h2>
-    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。3端末で同期されます。</div>
+    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔で時間足を選ぶ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -1081,7 +1113,7 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト</h2>
-    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。3端末で同期されます。</div>
+    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -3654,6 +3686,13 @@ const WATCH_NG = [
   { k: 'rci',       label: 'RCI',        title: 'RCIが不成立' },
   { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
 ];
+function watchElapsed(iso) {
+  const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 60) return m + '分';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + '時間' + (m % 60 ? (m % 60) + '分' : '');
+  return Math.floor(h / 24) + '日' + (h % 24 ? (h % 24) + '時間' : '');
+}
 function makeWatchList(cfg) {
   const listEl = document.getElementById(cfg.listId);
   const addEl = document.getElementById(cfg.addId);
@@ -3662,9 +3701,47 @@ function makeWatchList(cfg) {
   const isMine = t => !!t && t.kind === cfg.kind;
   const items = () => loadTrades().filter(isMine).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   const readyCount = list => list.filter(t => !WATCH_NG.some(c => (t.ng || {})[c.k])).length;
+  const tfs = cfg.alertTfs;
+  const multiTf = tfs.length > 1;
+  let pickOpen = null;
+  const pendEl = document.createElement('div');
+  pendEl.className = 'sw-pend';
+  listEl.before(pendEl);
+  const tabBtn = document.querySelector('.tab-btn[data-tab="' + cfg.tab + '"]');
+  const tabBadge = document.createElement('b');
+  tabBadge.className = 'tab-badge';
+  tabBtn.appendChild(tabBadge);
+  const pendTfs = t => tfs.filter(f => (t.alerts || {})[f.k]);
+  const pendings = list => {
+    const out = [];
+    list.forEach(t => pendTfs(t).forEach(f => out.push({ t, f, at: t.alerts[f.k] })));
+    return out.sort((a, b) => a.at.localeCompare(b.at));
+  };
+  const renderPend = () => {
+    const ps = pendings(items());
+    tabBadge.textContent = ps.length ? String(ps.length) : '';
+    pendEl.innerHTML = ps.length
+      ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）<span>古い順・条件を確認したら ✓</span></div>' +
+        ps.map(p => {
+          const ng = WATCH_NG.filter(c => (p.t.ng || {})[c.k]);
+          return '<div class="sw-pend-row" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
+            '<button type="button" class="sw-pend-pair" data-sw-goto title="監視リストのこの通貨へ">' + esc(p.t.pair) + '</button>' +
+            '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
+            '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
+            '<span class="sw-pend-ng">' + ng.map(c => '<span>' + c.label + '✖</span>').join('') + '</span>' +
+            '<button type="button" class="sw-pend-done" data-sw-done title="確認済みにする（未確認から外す）">✓</button>' +
+          '</div>';
+        }).join('')
+      : '';
+  };
   const itemHtml = t => {
     const ng = t.ng || {};
     const anyNg = WATCH_NG.some(c => ng[c.k]);
+    const pend = pendTfs(t);
+    const bellLabel = '🔔' + (multiTf ? pend.map(f => f.k).join('·') : '');
+    const bellTitle = multiTf
+      ? 'アラートが鳴ったが条件待ち → 時間足を選んで未確認に控える'
+      : '1時間足のアラートが鳴ったが条件待ち → 未確認に控える（もう一度で外す）';
     return (
       '<div class="trend-item sc-card sw-item ' + (anyNg ? 'ng' : 'ok') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
@@ -3678,11 +3755,22 @@ function makeWatchList(cfg) {
         '</div>' +
         '<div class="trend-tf">' +
           '<input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ" value="' + esc(t.notes || '') + '">' +
+          '<button type="button" class="tgoto sw-bell' + (pend.length ? ' on' : '') + '" data-sw-bell title="' + bellTitle + '">' + bellLabel + '</button>' +
           '<button type="button" class="tgoto sw-card" data-sw-card title="空いているカードにこの通貨を送る">→カード</button>' +
           '<button type="button" class="tclear" data-sw-del title="監視リストから消す">🗑</button>' +
         '</div>' +
+        (multiTf && pickOpen === t.id
+          ? '<div class="trend-tf sw-bell-pick"><span class="tf">🔔</span><span class="tgroup">' + tfs.map(f =>
+              '<button type="button" class="sc-btn warn' + ((t.alerts || {})[f.k] ? ' on' : '') + '" data-sw-alert="' + f.k +
+              '" title="' + f.title + 'のアラート（タップで未確認に控える／もう一度で外す）">' + f.k + '</button>').join('') +
+            '</span></div>'
+          : '') +
       '</div>');
   };
+  const toggleAlert = (id, k) => update(id, t => {
+    t.alerts = Object.assign({}, t.alerts);
+    if (t.alerts[k]) delete t.alerts[k]; else t.alerts[k] = new Date().toISOString();
+  }, true);
   const render = () => {
     /* メモを打っている最中に同期で描き直すとフォーカスと入力が飛ぶので、入力欄を離れるまで待つ */
     if (listEl.contains(document.activeElement) && document.activeElement.matches('[data-sw-note]')) {
@@ -3700,6 +3788,7 @@ function makeWatchList(cfg) {
     listEl.innerHTML = list.length
       ? list.map(itemHtml).join('')
       : '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>';
+    renderPend();
   };
   const update = (id, fn, rerender) => {
     const trades = loadTrades();
@@ -3713,8 +3802,23 @@ function makeWatchList(cfg) {
       if (row) row.outerHTML = itemHtml(t);
       const list = items();
       document.getElementById(cfg.countId).textContent = list.length + ' 通貨（揃い ' + readyCount(list) + '）';
+      renderPend();
     }
   };
+  pendEl.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-sw-pend]');
+    if (!row) return;
+    const id = row.dataset.swPend;
+    if (e.target.closest('[data-sw-done]')) { toggleAlert(id, row.dataset.tf); return; }
+    if (e.target.closest('[data-sw-goto]')) {
+      const item = listEl.querySelector('[data-sw="' + id + '"]');
+      if (!item) return;
+      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      item.classList.remove('sw-flash'); void item.offsetWidth; item.classList.add('sw-flash');
+    }
+  });
+  /* 経過時間を読み直すため、1分ごとに未確認欄だけ描き直す（入力欄は触らない） */
+  setInterval(() => { if (!document.hidden && pendEl.childElementCount) renderPend(); }, 60000);
   addEl.addEventListener('change', () => {
     const pair = addEl.value;
     if (!pair) return;
@@ -3736,6 +3840,20 @@ function makeWatchList(cfg) {
       update(id, t => { t.ng = Object.assign({}, t.ng); t.ng[k] = !t.ng[k]; }, true);
       return;
     }
+    if (e.target.closest('[data-sw-bell]')) {
+      if (!multiTf) { toggleAlert(id, tfs[0].k); return; }
+      const prev = pickOpen;
+      pickOpen = pickOpen === id ? null : id;
+      [prev, pickOpen].forEach(x => {
+        if (!x) return;
+        const r = listEl.querySelector('[data-sw="' + x + '"]');
+        const t = loadTrades().find(y => y.id === x);
+        if (r && t) r.outerHTML = itemHtml(t);
+      });
+      return;
+    }
+    const alertBtn = e.target.closest('[data-sw-alert]');
+    if (alertBtn) { pickOpen = null; toggleAlert(id, alertBtn.dataset.swAlert); return; }
     if (e.target.closest('[data-sw-del]')) {
       /* 条件が外れたら1タップで消す（メモ程度のものなので確認は出さない）。墓標で他端末からの復活を防ぐ */
       clearTimeout(noteTimers[id]);
@@ -4033,7 +4151,8 @@ document.getElementById('scalpList').addEventListener('click', (e) => {
 const setScalpPane = makePanes({ panelId: 'tabPanel-scalp', key: 'mochipoyo_scalp_pane' });
 const scalpWatch = makeWatchList({
   kind: 'scalpwatch', idPrefix: 'sw', listId: 'scalpWatch', addId: 'scalpWatchAdd',
-  countId: 'scalpWatchCount', segNId: 'scalpSegWatchN',
+  countId: 'scalpWatchCount', segNId: 'scalpSegWatchN', tab: 'scalp',
+  alertTfs: [{ k: '1H', title: '1時間足' }],
   toCard: t => {
     const i = scalpDeck.freeSlot(t.pair);
     /* 監視リストの RCI は短中長を区別しないのでカードへは運ばない（どの線かはカードで選ぶ）。MACD はそのまま懸念として運ぶ */
@@ -4173,7 +4292,8 @@ const trendDeck = makeCardDeck({
 const setTrendPane = makePanes({ panelId: 'tabPanel-trend', key: 'mochipoyo_trend_pane' });
 const trendWatch = makeWatchList({
   kind: 'trendwatch', idPrefix: 'tw', listId: 'trendWatch', addId: 'trendWatchAdd',
-  countId: 'trendWatchCount', segNId: 'trendSegWatchN',
+  countId: 'trendWatchCount', segNId: 'trendSegWatchN', tab: 'trend',
+  alertTfs: [{ k: '1H', title: '1時間足' }, { k: '4H', title: '4時間足' }, { k: 'D', title: '日足' }, { k: 'W', title: '週足' }],
   toCard: t => {
     const i = trendDeck.freeSlot(t.pair);
     const cur = trendDeck.slots[i];
