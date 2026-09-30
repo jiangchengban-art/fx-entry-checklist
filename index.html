@@ -671,6 +671,7 @@
   .trend-help summary::-webkit-details-marker { display: none; }
   .trend-help summary::before { content: '▸'; font-size: 10px; }
   .trend-help[open] summary::before { content: '▾'; }
+  .trend-help.sw-help { margin: 0 0 10px; }
   .trend-help-body {
     font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
     padding: 8px 2px 0;
@@ -1079,7 +1080,10 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト（上位足）</h2>
-    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    <details class="trend-help sw-help">
+      <summary>📖 使い方</summary>
+      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -1124,7 +1128,10 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト</h2>
-    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    <details class="trend-help sw-help">
+      <summary>📖 使い方</summary>
+      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
