@@ -32,6 +32,7 @@ check('監視リストに追加', await page.locator('#trendWatch [data-sw]').co
 check('切替ボタンに件数', (await page.textContent('#trendSegWatchN')) === '1');
 await page.click('#trendWatch [data-sw-ng="macd"]');
 await page.click('#trendWatch [data-sw-ng="macd"]');
+await page.click('#trendWatch [data-sw-ng="macd"]');
 const tw = (await trades()).find(t => t.kind === 'trendwatch');
 check('kind:trendwatch で trades に入る', tw && tw.pair === 'EURUSD' && tw.ng.macd === true);
 check('⚡の監視リストには出ない', await page.evaluate(() => document.querySelectorAll('#scalpWatch [data-sw]').length) === 0);
@@ -39,10 +40,13 @@ await page.click('[data-tab="review"]');
 check('📚の履歴に監視リストは混ざらない', !(await page.textContent('#recordList')).includes('EURUSD'));
 await page.click('[data-tab="trend"]');
 
-// →カード
-await page.click('#trendWatch [data-sw-card]');
-check('→カードで記録画面へ', await page.isVisible('#trendSlots'));
-check('通貨とMACD懸念がカードへ', await page.$eval(card(0) + '[data-sc-pair]', el => el.value) === 'EURUSD' &&
+// S105: →カードは撤去
+check('→カードボタンは無い', await page.locator('#trendWatch [data-sw-card]').count() === 0);
+await page.click(P + '[data-sc-pane="cards"]');
+check('切替ボタンで記録画面へ', await page.isVisible('#trendSlots'));
+await page.selectOption(card(0) + '[data-sc-pair]', 'EURUSD');
+await page.click(card(0) + '[data-sc="ng"][data-v="macd"]');
+check('カードに通貨とMACD懸念', await page.$eval(card(0) + '[data-sc-pair]', el => el.value) === 'EURUSD' &&
   await page.$eval(card(0) + '[data-sc="ng"][data-v="macd"]', el => el.classList.contains('on')));
 
 // 3. カード

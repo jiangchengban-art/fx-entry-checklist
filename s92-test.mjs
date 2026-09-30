@@ -63,7 +63,7 @@ check('2通貨追加', w.length === 2 && w.map(t => t.pair).join() === 'USDJPY,G
 check('追加済みの通貨は候補から消える', await page.locator('#scalpWatchAdd option[value="USDJPY"]').count() === 0);
 check('追加直後は揃いにならない（未選択）', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
 
-// 2. ✅成立 → ✖不成立 → 未選択
+// 2. ✅成立 → ▲微妙 → ✖不成立 → 未選択（S104で▲を追加）
 const tap = k => page.click(`${row('USDJPY')} [data-sw-ng="${k}"]`);
 await tap('granville'); await tap('rci'); await tap('macd');
 let u = (await watch()).find(t => t.pair === 'USDJPY');
@@ -73,13 +73,19 @@ check('3つとも✅で揃い', await page.locator(`${row('USDJPY')} .sw-ok`).co
 check('件数表示（揃い 1）', (await page.textContent('#scalpWatchCount')).includes('2 通貨（揃い 1）'));
 await tap('rci'); await tap('macd');
 u = (await watch()).find(t => t.pair === 'USDJPY');
-check('2タップ目で✖不成立', u.ng.rci === true && u.ng.macd === true && !u.ok.rci && u.ng.granville === false);
+check('2タップ目で▲微妙', u.mid.rci === true && u.mid.macd === true && !u.ok.rci && !u.ng.rci);
+check('ボタンに▲が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI▲');
+check('▲では揃いにならない', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
+await tap('rci'); await tap('macd');
+u = (await watch()).find(t => t.pair === 'USDJPY');
+check('3タップ目で✖不成立', u.ng.rci === true && u.ng.macd === true && !u.ok.rci && u.ng.granville === false);
+check('✖では▲が外れる', !u.mid.rci);
 check('ボタンに✖が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI✖');
 check('不成立があると揃いが消える', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
 check('件数表示（揃い 0）', (await page.textContent('#scalpWatchCount')).includes('2 通貨（揃い 0）'));
 await tap('rci');
 u = (await watch()).find(t => t.pair === 'USDJPY');
-check('3タップ目で未選択に戻る', u.ng.rci === false && !u.ok.rci);
+check('4タップ目で未選択に戻る', u.ng.rci === false && !u.ok.rci && !u.mid.rci);
 check('未選択は記号なし', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI');
 
 // 3. メモ（📝で欄を開く・入力が止まってから保存）
@@ -113,13 +119,29 @@ await page.click(`${row('GOLD')} .trend-tf [data-sw-note-open]`);
 await page.waitForTimeout(50);
 check('入力中に📝を押すと閉じる', await page.locator(`${row('GOLD')} [data-sw-note]`).count() === 0);
 
-// 5. →カード
-await page.click(`${row('USDJPY')} [data-sw-card]`);
-const slot = await page.evaluate(() => scalpSlots.find(s => s.pair === 'USDJPY'));
-check('→カードで通貨とMACD懸念が空きカードへ', slot && slot.macd === '✖' && slot.rci.length === 0);
-check('→カードで⚡記録の画面に切り替わる', await page.isVisible('#scalpSlots'));
+// 5. 勝ち／負け（S105：→カードは撤去）
+check('→カードボタンは無い', await page.locator('#scalpWatch [data-sw-card]').count() === 0);
+check('勝敗の記録は最初は出ない', (await page.textContent('#tabPanel-scalp .sw-log')) === '');
+await page.click(`${row('USDJPY')} [data-sw-res="win"]`);
+await tap('rci'); await tap('rci');   // RCI ▲
+await page.click(`${row('USDJPY')} [data-sw-res="loss"]`);
+const logs = await page.evaluate(() => loadTrades().filter(t => t.kind === 'watchlog'));
+check('勝・負で kind:watchlog が2件', logs.length === 2 && logs.map(t => t.outcome).sort().join() === 'loss,win');
+const lw = logs.find(t => t.outcome === 'win'), ll = logs.find(t => t.outcome === 'loss');
+check('記録に通貨・出元・時刻', lw.pair === 'USDJPY' && lw.src === 'scalpwatch' && !!lw.datetime && !!lw.updatedAt);
+check('記録時の条件を残す', lw.cond.granville === 'ok' && lw.cond.rci === '' && lw.cond.macd === 'ng' && ll.cond.rci === 'mid');
+check('監視リストの通貨は残る', (await watch()).some(t => t.pair === 'USDJPY'));
+const logText = await page.textContent('#tabPanel-scalp .sw-log');
+check('集計（勝1・負1・勝率50%）', logText.includes('勝1・負1（勝率50%）'));
+check('条件別（▲あり）', logText.includes('▲あり 勝0・負1'));
+check('直近の記録が2行', await page.locator('#tabPanel-scalp .sw-log-row').count() === 2);
+check('🔭の勝敗には出ない', await page.locator('#tabPanel-trend .sw-log-row').count() === 0);
+check('mainTrades から除外（勝敗）', await page.evaluate(() => mainTrades().length === 0));
+await page.locator('#tabPanel-scalp .sw-log-row [data-sw-log-del]').first().click();
+check('🗑で記録を取り消し', await page.evaluate(() => loadTrades().filter(t => t.kind === 'watchlog').length) === 1);
+check('取り消しは墓標付き', await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('mochipoyo_tombstones_v1') || '{}').trades || {}).length >= 1));
+await tap('rci'); await tap('rci');   // RCI ▲→✖→未選択 に戻す
 check('切替ボタンに監視数', (await page.textContent('#scalpSegWatchN')) === '2');
-await page.click('#tabPanel-scalp [data-sc-pane="watch"]');
 
 // 6. 振り返り・CSV・スキャル記録一覧には出ない
 check('mainTrades から除外', await page.evaluate(() => mainTrades().length === 0));

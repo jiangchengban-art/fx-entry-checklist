@@ -305,7 +305,7 @@ async function newPage() {
   await page.waitForTimeout(150);
   d = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
   const w1 = d.find(t => t.kind === 'trendwatch');
-  ok('更新すると updatedAt が進む', w1.updatedAt > w0.updatedAt && w1.ng.rci === true);
+  ok('更新すると updatedAt が進む', w1.updatedAt > w0.updatedAt && w1.ok.rci === true);
 
   ok('JSエラーなし', errors.length === 0, errors);
   await ctx.close();

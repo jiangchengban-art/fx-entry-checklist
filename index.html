@@ -265,7 +265,7 @@
   @keyframes scPaneLeft  { from { transform: translateX(-28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
   .sc-swipe-hint { margin-top: 10px; font-size: 11px; color: var(--ink-muted); }
   @media (prefers-reduced-motion: reduce) { .sc-pane.from-right, .sc-pane.from-left { animation: none; } }
-  /* S92: 👀 監視リスト。1段目＝通貨と1時間足の不成立3つ、2段目＝メモ・→カード・🗑 */
+  /* S92: 👀 監視リスト。1段目＝通貨と1時間足の条件3つ、2段目＝メモ・🔔・勝負・🗑（S105で→カードを撤去） */
   .sw-add { width: auto; min-width: 150px; font-weight: 400; }
   .sc-tfsel {
     flex: none; width: 68px; font-size: 11px; font-weight: 700; font-family: inherit;
@@ -327,7 +327,30 @@
     border-radius: 999px; background: var(--bad); color: #fff; font-size: 10px; line-height: 16px; text-align: center;
   }
   .tab-badge:empty { display: none; }
-  .tgoto.sw-card { width: auto; padding: 0 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  /* S105: 監視リストから勝ち／負けを1タップで記録 */
+  .sw-res {
+    flex: none; height: 26px; min-width: 30px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    border-radius: 7px; background: var(--surface);
+  }
+  .sw-res.win  { color: var(--good); border: 1px solid var(--good); }
+  .sw-res.loss { color: var(--bad);  border: 1px solid var(--bad); }
+  .sw-item.mid { border-left: 3px solid var(--warn); }
+  .sc-btn.on.mid { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .sw-pend-ng span.mid { color: var(--warn); background: var(--warn-soft); }
+  .sw-log { margin-top: 14px; }
+  .sw-log:empty { display: none; }
+  .sw-log-head { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .sw-log-sum { font-size: 11.5px; color: var(--ink-muted); margin-bottom: 6px; }
+  .sw-log-row {
+    display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .sw-log-time { color: var(--ink-muted); white-space: nowrap; }
+  .sw-log-pair { font-weight: 700; }
+  .sw-log-res { font-weight: 700; padding: 0 6px; border-radius: 999px; }
+  .sw-log-res.win  { color: var(--good); background: var(--good-soft); }
+  .sw-log-res.loss { color: var(--bad);  background: var(--bad-soft); }
+  .sw-log-cond { flex: 1; min-width: 0; color: var(--ink-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sw-log-del { flex: none; border: none; background: none; cursor: pointer; font-size: 13px; padding: 0 2px; }
   .scalp-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .scalp-flag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
   .scalp-flag.warn { border-color: var(--warn); color: var(--warn); font-weight: 700; }
@@ -1100,7 +1123,7 @@
     <h2>👀 監視リスト（上位足）</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 4H/D/W のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
+      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で3つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 4H/D/W のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -1148,7 +1171,7 @@
     <h2>👀 監視リスト</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 1H のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
+      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で3つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 1H のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -2320,7 +2343,9 @@ function isScalpTrade(t) { return !!t && t.kind === 'scalp'; }
    トレードではないので、統計・履歴・CSV からはスキャル記録と同じく外す。 */
 function isScalpWatch(t) { return !!t && t.kind === 'scalpwatch'; }
 function isTrendWatch(t) { return !!t && t.kind === 'trendwatch'; }
-function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t)); }
+/* S105: 監視リストの勝ち／負け（kind:'watchlog'）。📚の統計・履歴・CSV には混ぜない */
+function isWatchLog(t) { return !!t && t.kind === 'watchlog'; }
+function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t) && !isWatchLog(t)); }
 function filterByType(trades) {
   if (typeFilter === 'all') return trades;
   return trades.filter(t => getTradeType(t) === typeFilter);
@@ -3722,14 +3747,20 @@ const WATCH_NG = [
   { k: 'rci',       label: 'RCI',        title: 'RCIが不成立' },
   { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
 ];
-const watchAllOk = t => WATCH_NG.every(c => (t.ok || {})[c.k] && !(t.ng || {})[c.k]);
-/* 振り分け：✖が1つでも→待ち、3つとも✅→エントリー、それ以外（未選択が残る）→すべてにだけ出る */
+/* S105: 各条件は ✅成立 / ▲微妙 / ✖不成立 / 未選択 の4状態。ng・mid・ok の3つの真偽マップで持ち、排他（ng が最優先） */
+const watchState = (t, k) => (t.ng || {})[k] ? 'ng' : (t.mid || {})[k] ? 'mid' : (t.ok || {})[k] ? 'ok' : '';
+const WATCH_MARK = { ok: '✅', mid: '▲', ng: '✖' };
+const watchAllOk = t => WATCH_NG.every(c => watchState(t, c.k) === 'ok');
+/* ✖が無く3つとも選択済み（✅か▲）＝エントリー候補 */
+const watchEnterable = t => WATCH_NG.every(c => ['ok', 'mid'].includes(watchState(t, c.k)));
+/* 振り分け：✖が1つでも→待ち、✅か▲で3つ埋まる→エントリー、それ以外（未選択が残る）→すべてにだけ出る */
 const WATCH_GROUPS = [
   { k: 'all',   label: 'すべて' },
   { k: 'entry', label: '✅ エントリー' },
   { k: 'wait',  label: '⏳ 待ち' },
 ];
-const watchGroupOf = t => WATCH_NG.some(c => (t.ng || {})[c.k]) ? 'wait' : watchAllOk(t) ? 'entry' : '';
+const watchGroupOf = t => WATCH_NG.some(c => (t.ng || {})[c.k]) ? 'wait' : watchEnterable(t) ? 'entry' : '';
+const watchCondText = cond => WATCH_NG.map(c => cond[c.k] ? c.label + WATCH_MARK[cond[c.k]] : '').filter(Boolean).join(' ');
 function watchElapsed(iso) {
   const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 60) return m + '分';
@@ -3775,6 +3806,44 @@ function makeWatchList(cfg) {
     const b = e.target.closest('[data-sw-group]');
     if (b) setGroup(b.dataset.swGroup);
   });
+  /* S105: 勝ち／負けの記録。監視リストの下に集計と直近の記録を出す（誤タップは🗑で取り消す） */
+  const logEl = document.createElement('div');
+  logEl.className = 'sw-log';
+  listEl.after(logEl);
+  const logs = () => loadTrades().filter(t => isWatchLog(t) && t.src === cfg.kind)
+    .sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+  const rate = list => {
+    const w = list.filter(t => t.outcome === 'win').length;
+    return list.length ? '勝' + w + '・負' + (list.length - w) + '（勝率' + Math.round(w * 100 / list.length) + '%）' : '';
+  };
+  const renderLog = () => {
+    const list = logs();
+    if (!list.length) { logEl.innerHTML = ''; return; }
+    const allOkL = list.filter(t => WATCH_NG.every(c => (t.cond || {})[c.k] === 'ok'));
+    const midL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'mid'));
+    const ngL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'ng'));
+    logEl.innerHTML =
+      '<div class="sw-log-head">📒 勝敗の記録　' + rate(list) + '</div>' +
+      '<div class="sw-log-sum">' + [['✅揃い', allOkL], ['▲あり', midL], ['✖あり', ngL]]
+        .filter(x => x[1].length).map(x => x[0] + ' ' + rate(x[1])).join('　') + '</div>' +
+      list.slice(0, 20).map(t =>
+        '<div class="sw-log-row" data-sw-log="' + esc(t.id) + '">' +
+          '<span class="sw-log-time">' + fmtDatetime(t.datetime) + '</span>' +
+          '<span class="sw-log-pair">' + esc(t.pair) + '</span>' +
+          '<span class="sw-log-res ' + t.outcome + '">' + (t.outcome === 'win' ? '勝' : '負') + '</span>' +
+          '<span class="sw-log-cond">' + esc(watchCondText(t.cond || {})) + '</span>' +
+          '<button type="button" class="sw-log-del" data-sw-log-del title="この記録を取り消す">🗑</button>' +
+        '</div>').join('') +
+      (list.length > 20 ? '<div class="sw-log-sum">ほか ' + (list.length - 20) + ' 件</div>' : '');
+  };
+  logEl.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-sw-log-del]')) return;
+    const id = e.target.closest('[data-sw-log]').dataset.swLog;
+    markDeleted('trades', id);
+    saveTrades(loadTrades().filter(t => t.id !== id));
+    renderLog();
+    showToast('記録を取り消しました');
+  });
   const tabBtn = document.querySelector('.tab-btn[data-tab="' + cfg.tab + '"]');
   const tabBadge = document.createElement('b');
   tabBadge.className = 'tab-badge';
@@ -3791,36 +3860,36 @@ function makeWatchList(cfg) {
     pendEl.innerHTML = ps.length
       ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）<span>古い順・条件を確認したら ✓</span></div>' +
         ps.map(p => {
-          const ng = WATCH_NG.filter(c => (p.t.ng || {})[c.k]);
+          const ng = WATCH_NG.filter(c => ['ng', 'mid'].includes(watchState(p.t, c.k)));
           return '<div class="sw-pend-row" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
             '<button type="button" class="sw-pend-pair" data-sw-goto title="監視リストのこの通貨へ">' + esc(p.t.pair) + '</button>' +
             '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
             (side => side === 'long' ? '<span class="sw-pend-side up" title="TradingView: long sign">▲</span>'
                    : side === 'short' ? '<span class="sw-pend-side down" title="TradingView: short sign">▼</span>' : '')((p.t.alertSide || {})[p.f.k]) +
             '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
-            '<span class="sw-pend-ng">' + ng.map(c => '<span>' + c.label + '✖</span>').join('') + '</span>' +
+            '<span class="sw-pend-ng">' + ng.map(c => { const st = watchState(p.t, c.k);
+              return '<span class="' + st + '">' + c.label + WATCH_MARK[st] + '</span>'; }).join('') + '</span>' +
             '<button type="button" class="sw-pend-done" data-sw-done title="確認済みにする（未確認から外す）">✓</button>' +
           '</div>';
         }).join('')
       : '';
   };
   const itemHtml = t => {
-    const ng = t.ng || {};
-    const ok = t.ok || {};
-    const anyNg = WATCH_NG.some(c => ng[c.k]);
+    const anyNg = WATCH_NG.some(c => watchState(t, c.k) === 'ng');
     const allOk = watchAllOk(t);
+    const anyMid = !anyNg && !allOk && watchEnterable(t);
     const pend = pendTfs(t);
     const bellTitle = multiTf
       ? 'アラートが鳴ったが条件待ち → 鳴った時間足をタップして未確認に控える（もう一度で外す）'
       : '1時間足のアラートが鳴ったが条件待ち → 未確認に控える（もう一度で外す）';
     return (
-      '<div class="trend-item sc-card sw-item' + (anyNg ? ' ng' : allOk ? ' ok' : '') + '" data-sw="' + esc(t.id) + '">' +
+      '<div class="trend-item sc-card sw-item' + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
           '<span class="sw-pair">' + esc(t.pair) + '</span>' +
           '<span class="tgroup">' + WATCH_NG.map(c => {
-            const st = ng[c.k] ? 'ng' : ok[c.k] ? 'ok' : '';
+            const st = watchState(t, c.k);
             return '<button type="button" class="sc-btn ' + (st || 'ng') + (st ? ' on' : '') + '" data-sw-ng="' + c.k +
-              '" title="' + c.label + '（タップで✅成立→✖不成立→解除）">' + c.label + (st ? '<span class="sw-mark">' + (st === 'ng' ? '✖' : '✅') + '</span>' : '') + '</button>';
+              '" title="' + c.label + '（タップで✅成立→▲微妙→✖不成立→解除）">' + c.label + (st ? '<span class="sw-mark">' + WATCH_MARK[st] + '</span>' : '') + '</button>';
           }).join('') +
           '</span>' +
           '<span class="spacer"></span>' +
@@ -3834,7 +3903,8 @@ function makeWatchList(cfg) {
                 '" title="' + f.title + 'のアラート（タップで未確認に控える／もう一度で外す）">' + f.k + '</button>').join('') + '</span>'
             : '<button type="button" class="tgoto sw-bell' + (pend.length ? ' on' : '') + '" data-sw-bell title="' + bellTitle + '">🔔</button>') +
           '<span class="spacer"></span>' +
-          '<button type="button" class="tgoto sw-card" data-sw-card title="空いているカードにこの通貨を送る">→カード</button>' +
+          '<button type="button" class="sw-res win" data-sw-res="win" title="この通貨で入って勝ち → 記録する">勝</button>' +
+          '<button type="button" class="sw-res loss" data-sw-res="loss" title="この通貨で入って負け → 記録する">負</button>' +
           '<button type="button" class="tclear" data-sw-del title="監視リストから消す">🗑</button>' +
         '</div>' +
         (noteOpen.has(t.id)
@@ -3868,8 +3938,9 @@ function makeWatchList(cfg) {
     listEl.innerHTML = !list.length
       ? '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>'
       : shown.length ? shown.map(itemHtml).join('')
-      : '<div class="empty-state">' + (group === 'entry' ? '3つとも ✅ の通貨はまだありません。' : '✖ が付いている通貨はありません。') + '</div>';
+      : '<div class="empty-state">' + (group === 'entry' ? '✖ が無く3つとも ✅／▲ の通貨はまだありません。' : '✖ が付いている通貨はありません。') + '</div>';
     renderPend();
+    renderLog();
   };
   const update = (id, fn, rerender) => {
     const trades = loadTrades();
@@ -3908,6 +3979,7 @@ function makeWatchList(cfg) {
     if (trades.some(t => isMine(t) && t.pair === pair)) { render(); return; }
     const now = new Date().toISOString();
     trades.push({ id: mvGenId(cfg.idPrefix), kind: cfg.kind, pair, ng: { granville: false, rci: false, macd: false },
+                  mid: { granville: false, rci: false, macd: false },
                   ok: { granville: false, rci: false, macd: false }, notes: '', createdAt: now, updatedAt: now });
     if (!saveTrades(trades)) return;
     if (group !== 'all') setGroup('all'); else render();
@@ -3919,13 +3991,12 @@ function makeWatchList(cfg) {
     const ngBtn = e.target.closest('[data-sw-ng]');
     if (ngBtn) {
       const k = ngBtn.dataset.swNg;
-      /* 未選択 → ✅成立 → ✖不成立 → 未選択 の順に回す */
+      /* 未選択 → ✅成立 → ▲微妙 → ✖不成立 → 未選択 の順に回す（S105で▲を追加） */
       update(id, t => {
-        t.ng = Object.assign({}, t.ng);
-        t.ok = Object.assign({}, t.ok);
-        if (t.ng[k]) { t.ng[k] = false; t.ok[k] = false; }
-        else if (t.ok[k]) { t.ok[k] = false; t.ng[k] = true; }
-        else t.ok[k] = true;
+        const next = { '': 'ok', ok: 'mid', mid: 'ng', ng: '' }[watchState(t, k)];
+        t.ng = Object.assign({}, t.ng, { [k]: next === 'ng' });
+        t.mid = Object.assign({}, t.mid, { [k]: next === 'mid' });
+        t.ok = Object.assign({}, t.ok, { [k]: next === 'ok' });
       }, true);
       return;
     }
@@ -3940,9 +4011,22 @@ function makeWatchList(cfg) {
       render();
       return;
     }
-    if (e.target.closest('[data-sw-card]')) {
-      const t = loadTrades().find(x => x.id === id);
-      if (t) cfg.toCard(t);
+    const resBtn = e.target.closest('[data-sw-res]');
+    if (resBtn) {
+      /* S105: 記録を簡略化するため、→カードをやめて監視リストから勝ち／負けだけを記録する。
+         そのときの条件（✅/▲/✖）も一緒に残し、下の集計で「▲ありで入ったときの勝率」を見られるようにする */
+      const trades = loadTrades();
+      const w = trades.find(x => x.id === id);
+      if (!w) return;
+      const now = new Date().toISOString();
+      const cond = {};
+      WATCH_NG.forEach(c => { cond[c.k] = watchState(w, c.k); });
+      const outcome = resBtn.dataset.swRes;
+      trades.push({ id: mvGenId('wl'), kind: 'watchlog', src: cfg.kind, pair: w.pair, outcome, cond,
+                    notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now });
+      if (!saveTrades(trades)) return;
+      renderLog();
+      showToast('記録しました：' + w.pair + ' ' + (outcome === 'win' ? '勝ち' : '負け'));
       return;
     }
     if (e.target.closest('[data-sw-note-open]')) {
@@ -4250,19 +4334,11 @@ document.getElementById('scalpList').addEventListener('click', (e) => {
   }
 });
 
-const setScalpPane = makePanes({ panelId: 'tabPanel-scalp', key: 'mochipoyo_scalp_pane' });
+makePanes({ panelId: 'tabPanel-scalp', key: 'mochipoyo_scalp_pane' });
 const scalpWatch = makeWatchList({
   kind: 'scalpwatch', idPrefix: 'sw', listId: 'scalpWatch', addId: 'scalpWatchAdd',
   countId: 'scalpWatchCount', segNId: 'scalpSegWatchN', tab: 'scalp',
   alertTfs: [{ k: '1H', title: '1時間足' }],
-  toCard: t => {
-    const i = scalpDeck.freeSlot(t.pair);
-    /* 監視リストの RCI は短中長を区別しないのでカードへは運ばない（どの線かはカードで選ぶ）。MACD はそのまま懸念として運ぶ */
-    scalpSlots[i] = scalpEmptySlot({ pair: t.pair, macd: (t.ng || {}).macd ? '✖' : '', notes: t.notes || '' });
-    scalpDeck.save(); scalpDeck.patch(i);
-    setScalpPane('cards', true);
-    scalpDeck.flash(i);
-  },
 });
 
 /* ============ 🔭 上位足1時間足以上のトレード記録（S97） ============
@@ -4391,20 +4467,11 @@ const trendDeck = makeCardDeck({
   },
   save: trendSaveRecord,
 });
-const setTrendPane = makePanes({ panelId: 'tabPanel-trend', key: 'mochipoyo_trend_pane' });
+makePanes({ panelId: 'tabPanel-trend', key: 'mochipoyo_trend_pane' });
 const trendWatch = makeWatchList({
   kind: 'trendwatch', idPrefix: 'tw', listId: 'trendWatch', addId: 'trendWatchAdd',
   countId: 'trendWatchCount', segNId: 'trendSegWatchN', tab: 'trend',
   alertTfs: [{ k: '1H', title: '1時間足' }, { k: '4H', title: '4時間足' }, { k: 'D', title: '日足' }, { k: 'W', title: '週足' }],
-  toCard: t => {
-    const i = trendDeck.freeSlot(t.pair);
-    const cur = trendDeck.slots[i];
-    trendDeck.slots[i] = trendEmptySlot({ pair: t.pair, tradeType: cur.tradeType, tfHigher: cur.tfHigher, tfEntry: cur.tfEntry,
-                                          ng: (t.ng || {}).macd ? ['macd'] : [], notes: t.notes || '' });
-    trendDeck.save(); trendDeck.patch(i);
-    setTrendPane('cards', true);
-    trendDeck.flash(i);
-  },
 });
 
 /* ============ タブ切替 ============ */

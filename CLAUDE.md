@@ -558,7 +558,9 @@ function gvEntryDistance(x, y) { … }         // 最寄りのエントリーア
 - **3端末同期**：`trades` 配列に `{ kind:'scalpwatch', pair, ng:{ granville, rci, macd }, notes, createdAt, updatedAt }` で置き、同期（`t:` 行・`updatedAt` の新しい方が勝つ）と削除の墓標（`markDeleted('trades', id)`）を流用。同期コードは無改修
 - ⚠️ `mainTrades()` は `isScalpTrade` と `isScalpWatch` の両方を除外する。新しい `kind` を trades に足すときは必ずここにも足すこと（統計・履歴・CSV に混ざる）
 - メモは打鍵ごとに保存せず、入力が600ms止まったとき／欄を離れたときに保存（同期の送信を細かく走らせないため）。入力中に同期で `renderAll()` が来ても描き直さず、欄を離れてから描き直す（フォーカスと入力が飛ぶのを防ぐ）
-- →カード：通貨と MACD の懸念（✖）・メモを空いているカードへ送る。監視リストの RCI は短中長を区別しないのでカードへは運ばない
+- ~~→カード~~：**S105で撤去**（記録の簡略化）。代わりに2行目の **勝／負** ボタンで1タップ記録する
+- **▲微妙（S105）**：条件は ✅成立 → ▲微妙 → ✖不成立 → 未選択 の4状態（`watchState()`、データは `ng`/`mid`/`ok` の排他な真偽マップ）。▲は「微妙に成立していないが他が良ければ入る」。「揃い」は3つとも✅のときだけ、振り分けの✅エントリーは✖が無く✅か▲で3つ埋まったもの（`watchEnterable()`）
+- **勝／負の記録（S105）**：タップで trades に `{ kind:'watchlog', src:'scalpwatch'|'trendwatch', pair, outcome:'win'|'loss', cond:{granville,rci,macd: 'ok'|'mid'|'ng'|''}, notes, datetime }` を追加（監視アイテムは残る）。監視リストの下の「📒 勝敗の記録」に全体と条件別（✅揃い／▲あり／✖あり）の勝率、直近20件、🗑で取り消し（墓標）。`mainTrades()` で📚・CSVから除外
 - **振り分けタブ（S102）**：見出しの直下に「すべて｜✅ エントリー｜⏳ 待ち」（`.sw-tabs`・`WATCH_GROUPS`・`watchGroupOf()`）。✖が1つでも→待ち、3つとも✅→エントリー、未選択が残るものは「すべて」にだけ出る。選んだタブは端末ローカル `mochipoyo_<kind>_group`。⚠️ タップで状態が変わっても行はその場に残し（`update()` は行の差し替えとタブの件数だけ）、次の全描画（タブを押す・同期など）で移す。通貨を追加したら「すべて」に戻す（新しい通貨は未選択で、絞り込み中だと見えないため）。🔔未確認アラートは絞り込みの対象外
 - **🔔 未確認アラート（S98）**：アラートが鳴ったが条件待ちで後回しにする通貨を控え、確認漏れを防ぐ。監視リストの各行の🔔（⚡は1Hのみ＝1タップ、🔭はカード2行目に常時並ぶ 1H/4H/D/W ボタンを直接タップ。S99で選択行を開く方式から変更）で `alerts[tf] = タップ時刻` を監視アイテムに書く。リスト上部の「🔔 未確認アラート」に**古い順**で1足1行（通貨・時間足・⏰経過時間・懸念✖だけ）、✓で外す（🔔再タップでも外れる）。下部タブの⚡/🔭に未確認件数の赤バッジ（`.tab-badge`）。経過時間は1分ごとに未確認欄だけ描き直す。データは監視アイテムの中なので同期・墓標は無改修（🗑で未確認も消える）
 - **TradingView からの自動記録（S104）**：Supabase Edge Function `tradingview-alert` が Webhook を受けて、監視アイテムの `t:` 行に `alerts[tf]` と `alertSide[tf]`（`'long'|'short'`）を書く（60→⚡`scalpwatch` 1H、240/1D/1W→🔭`trendwatch`。無ければ `sw_tv_<PAIR>`/`tw_tv_<PAIR>` で自動追加、クラウドに残る削除済み行は `tomb` で除外）。アプリは同期で受けるだけ。🔔未確認欄に ▲/▼ を出し、✓・🔔再タップで `alertSide[tf]` も消す。⚠️ `mergeTrades` はアイテム丸ごと後勝ちなので、発火の数秒以内に同じ通貨をタップしていた場合はどちらかが負ける（許容。実害が出たら `a:` 追記行方式へ）。設計・手順は `docs/TRADINGVIEW_ALERT_DESIGN.md` / `docs/TRADINGVIEW_ALERT_SETUP.md`
@@ -578,7 +580,7 @@ function gvEntryDistance(x, y) { … }         // 最寄りのエントリーア
 - **保存**（`trendSaveRecord()`）：通常の trades（kind 無し）に `result:'entered'`、`mvChecks.higher` は懸念＝`'❌'`／無し＝`''`（キーは `MV_TF_CHECKS` と同じ）、`mvChecks.entry` は `necklineForm/maBreak/rollReversal/entryOrderType/entryFibo`。⏰は `manualAlertAt`（datetime-local 形）・`manualAlertTf`＝上位足。`resultTag` などは空で、📚の ✎ で入れる。📚の統計・CSV・確度帯別の成績にそのまま乗る
 - **共通部品**：⚡と🔭のカード・監視リスト・画面切替は `makeCardDeck()` / `makeWatchList()` / `makePanes()` の1か所にまとめた（S97）。⚡は `scalpDeck`（`scalpSlots` はその配列）、🔭は `trendDeck`。カード内の data 属性（`data-sc` 等）はデッキごとに受けるので同名で混ざらない
 - ⚠️ ⚡と🔭の両方に `[data-sc-pane]` があるので、テストでは `#tabPanel-scalp` / `#tabPanel-trend` で絞ること
-- ⚠️ `mainTrades()` は `scalp` / `scalpwatch` / `trendwatch` を除外する
+- ⚠️ `mainTrades()` は `scalp` / `scalpwatch` / `trendwatch` / `watchlog`（S105）を除外する
 - **撤去したもの**：巡回一覧・根拠パネル・S94の記録欄・🗺波マップ・グランビルピッカー・アラート日時モーダル・ペア削除モーダルと、それらだけが使っていた関数・定数・CSS。**残したもの**：`checkConfidence()`（📚の確度帯別の成績）、`WM_KIND`/`wmDayKey`/`wmPrune`（保存時の容量対策と同期のマージで古い波マップ記録を刈る）、market_view の読み込み・マージ一式（既存データを壊さないため）。新規の judgeLog は増えなくなる（アラート発生足別の判定統計は過去分のまま）
 - 記録フォーム（`#tradeModal`）は📚の ✎ 編集専用になった（新規記録の入口は🔭・⚡のカード）
 
@@ -612,6 +614,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
 | セッション | 主な変更 | 日付 |
+| 105 | ▲ **監視リストに「▲微妙」判定・勝／負の1タップ記録、→カード撤去**。ユーザー要望「グランビル/RCI/MACDは微妙に成立していなくても他が良ければエントリーするので▲を追加」「記録を簡略化する為→カードは無くし、監視リストのカードに勝ちか負けかタップするマークで対応」。タップ順は ✅→▲→✖→未選択、✅エントリーのタブは✖無しで✅か▲が3つ。勝／負は `kind:'watchlog'`（その時の条件つき）で trades に入れ同期・墓標を流用、監視リスト下に条件別の勝率。⚡・🔭共通。s92-test.mjs 65項目、s28/s97/s98/s102を新しいタップ順に更新、既存スイート通過。sw.js: v75→v76 | 2026-09-30 |
 | 104 | 📡 **TradingView アラート → 👀監視リスト 自動連携（設計＋Edge Function 実装。deploy はネットワーク許可待ち）**。`docs/TRADINGVIEW_ALERT_HANDOFF.md` を受けて事実確認（plot_2=long/plot_3=short、アクティブ162本、`WTICOUSD→OIL` 以外は ticker がそのまま通貨名）。設計は `docs/TRADINGVIEW_ALERT_DESIGN.md`、手順は `docs/TRADINGVIEW_ALERT_SETUP.md`。Webhook → Supabase Edge Function `supabase/functions/tradingview-alert/`（`core.mjs` 純関数＋`index.ts`、`?key=` 認証・`verify_jwt=false`）が監視アイテムの `t:` 行に `alerts[tf]`／新設 `alertSide[tf]` を書く（墓標を見て、無ければ `sw_tv_<PAIR>`/`tw_tv_<PAIR>` で自動追加。60→⚡1H、240/1D/1W→🔭）。アプリ側は🔔未確認欄に ▲long／▼short を表示し、✓で `alertSide` も消す。同期コードは無改修。新設 tv-alert-test.mjs 34項目（Node）、s98 35項目に4項目追加、s92/s102/s97 通過。sw.js: v74→v75 | 2026-09-30 |
 | 103 | 📝 **監視リストのメモ欄を📝ボタン化**。ユーザー要望「メモの欄が枠を広く取りすぎているのでコンパクトに」（📝ボタン化をユーザーが選択）。2行目はボタンだけにし、📝で入力欄を開く・離れる/Enter/📝で閉じる、メモは1行の省略表示でタップすると再編集。s92-test.mjs 50項目、既存スイート通過。sw.js: v73→v74 | 2026-09-30 |
 | 102 | 🗂 **監視リストに振り分けタブ（すべて／✅エントリー／⏳待ち）**。ユーザー要望「✅がタップされたらエントリー、✖が入ったら待ちで振り分け、👀監視リストの下にタブで切り替え」。3つとも✅＝エントリー、✖が1つでも＝待ち。件数つき、選んだタブは端末に記憶、追加時は「すべて」へ。⚡・🔭共通。新設s102-test.mjs 20項目、既存スイート通過。sw.js: v72→v73 | 2026-09-30 |
@@ -671,7 +674,7 @@ node s98-test.mjs      # S98: 🔔未確認アラート（30項目・file:// で
 node s97-test.mjs      # S97: 🔭一覧タブ（👀監視リスト・記録カード・巡回の撤去）（38項目・file:// で完結）
 node s96-test.mjs      # S96: ⚡「入力中のみ」表示切替（16項目・file:// で完結）
 node s95-test.mjs      # S95: ⚡カードの追加・追加分の削除（15項目・file:// で完結）
-node s92-test.mjs      # S92/S93: 👀 監視リスト・⚡タブの2画面切替（35項目・file:// で完結）
+node s92-test.mjs      # S92/S93/S105: 👀 監視リスト・⚡タブの2画面切替・▲・勝／負（65項目・file:// で完結）
 node s88-test.mjs      # S88〜S90: ⚡1分足スキャル（カード5枚・⏰アラート、53項目・file:// で完結）
 node s80-test.mjs      # S80: 確度%帯別/根拠項目別の成績・リスク額+R倍率・見送りの振り返り・CSV往復（19項目・file:// で完結）
 node s78-sync-test.mjs # S78: 端末間同期（2端末モック、17項目・file:// で完結）
