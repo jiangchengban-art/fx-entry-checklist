@@ -283,6 +283,14 @@
   .sw-item.ok { border-left: 3px solid var(--good); }
   .tgoto.sw-bell { width: auto; min-width: 26px; padding: 0 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
   .tgoto.sw-bell.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .sw-bells { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+  .sw-bells-ic { font-size: 12px; opacity: 0.45; }
+  .sw-bells-ic.on { opacity: 1; }
+  .sw-tfb {
+    height: 26px; min-width: 24px; padding: 0 3px; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--ink-muted);
+  }
+  .sw-tfb.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .sw-item.sw-flash { animation: swFlash 1.2s ease-out; }
   @keyframes swFlash { from { box-shadow: 0 0 0 3px var(--warn); } to { box-shadow: 0 0 0 0 transparent; } }
   /* 🔔 未確認アラート：条件待ちで後回しにしたアラートを古い順に並べて、確認漏れを防ぐ */
@@ -1068,7 +1076,7 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト（上位足）</h2>
-    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔で時間足を選ぶ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -3703,7 +3711,6 @@ function makeWatchList(cfg) {
   const readyCount = list => list.filter(t => !WATCH_NG.some(c => (t.ng || {})[c.k])).length;
   const tfs = cfg.alertTfs;
   const multiTf = tfs.length > 1;
-  let pickOpen = null;
   const pendEl = document.createElement('div');
   pendEl.className = 'sw-pend';
   listEl.before(pendEl);
@@ -3738,9 +3745,8 @@ function makeWatchList(cfg) {
     const ng = t.ng || {};
     const anyNg = WATCH_NG.some(c => ng[c.k]);
     const pend = pendTfs(t);
-    const bellLabel = '🔔' + (multiTf ? pend.map(f => f.k).join('·') : '');
     const bellTitle = multiTf
-      ? 'アラートが鳴ったが条件待ち → 時間足を選んで未確認に控える'
+      ? 'アラートが鳴ったが条件待ち → 鳴った時間足をタップして未確認に控える（もう一度で外す）'
       : '1時間足のアラートが鳴ったが条件待ち → 未確認に控える（もう一度で外す）';
     return (
       '<div class="trend-item sc-card sw-item ' + (anyNg ? 'ng' : 'ok') + '" data-sw="' + esc(t.id) + '">' +
@@ -3755,16 +3761,14 @@ function makeWatchList(cfg) {
         '</div>' +
         '<div class="trend-tf">' +
           '<input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ" value="' + esc(t.notes || '') + '">' +
-          '<button type="button" class="tgoto sw-bell' + (pend.length ? ' on' : '') + '" data-sw-bell title="' + bellTitle + '">' + bellLabel + '</button>' +
+          (multiTf
+            ? '<span class="sw-bells" title="' + bellTitle + '"><span class="sw-bells-ic' + (pend.length ? ' on' : '') + '">🔔</span>' + tfs.map(f =>
+                '<button type="button" class="sw-tfb' + ((t.alerts || {})[f.k] ? ' on' : '') + '" data-sw-alert="' + f.k +
+                '" title="' + f.title + 'のアラート（タップで未確認に控える／もう一度で外す）">' + f.k + '</button>').join('') + '</span>'
+            : '<button type="button" class="tgoto sw-bell' + (pend.length ? ' on' : '') + '" data-sw-bell title="' + bellTitle + '">🔔</button>') +
           '<button type="button" class="tgoto sw-card" data-sw-card title="空いているカードにこの通貨を送る">→カード</button>' +
           '<button type="button" class="tclear" data-sw-del title="監視リストから消す">🗑</button>' +
         '</div>' +
-        (multiTf && pickOpen === t.id
-          ? '<div class="trend-tf sw-bell-pick"><span class="tf">🔔</span><span class="tgroup">' + tfs.map(f =>
-              '<button type="button" class="sc-btn warn' + ((t.alerts || {})[f.k] ? ' on' : '') + '" data-sw-alert="' + f.k +
-              '" title="' + f.title + 'のアラート（タップで未確認に控える／もう一度で外す）">' + f.k + '</button>').join('') +
-            '</span></div>'
-          : '') +
       '</div>');
   };
   const toggleAlert = (id, k) => update(id, t => {
@@ -3840,20 +3844,9 @@ function makeWatchList(cfg) {
       update(id, t => { t.ng = Object.assign({}, t.ng); t.ng[k] = !t.ng[k]; }, true);
       return;
     }
-    if (e.target.closest('[data-sw-bell]')) {
-      if (!multiTf) { toggleAlert(id, tfs[0].k); return; }
-      const prev = pickOpen;
-      pickOpen = pickOpen === id ? null : id;
-      [prev, pickOpen].forEach(x => {
-        if (!x) return;
-        const r = listEl.querySelector('[data-sw="' + x + '"]');
-        const t = loadTrades().find(y => y.id === x);
-        if (r && t) r.outerHTML = itemHtml(t);
-      });
-      return;
-    }
+    if (e.target.closest('[data-sw-bell]')) { toggleAlert(id, tfs[0].k); return; }
     const alertBtn = e.target.closest('[data-sw-alert]');
-    if (alertBtn) { pickOpen = null; toggleAlert(id, alertBtn.dataset.swAlert); return; }
+    if (alertBtn) { toggleAlert(id, alertBtn.dataset.swAlert); return; }
     if (e.target.closest('[data-sw-del]')) {
       /* 条件が外れたら1タップで消す（メモ程度のものなので確認は出さない）。墓標で他端末からの復活を防ぐ */
       clearTimeout(noteTimers[id]);

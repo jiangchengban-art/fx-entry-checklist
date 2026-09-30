@@ -79,16 +79,16 @@ check('🔔再タップで外れる', !(await page.isVisible('#tabPanel-scalp .s
 await page.click('.tab-btn[data-tab="trend"]');
 await page.click('#tabPanel-trend [data-sc-pane="watch"]');
 await page.selectOption('#trendWatchAdd', 'EURUSD');
-await page.click(trow('EURUSD') + ' [data-sw-bell]');
-check('🔭は🔔で時間足の選択が開く', await page.locator(trow('EURUSD') + ' [data-sw-alert]').count() === 4);
+check('🔭は時間足ボタンがカード内に常時並ぶ', await page.locator(trow('EURUSD') + ' .trend-tf [data-sw-alert]').count() === 4);
+check('別の行（選択欄）は無い', await page.locator(trow('EURUSD') + ' .trend-tf').count() === 1);
 await page.click(trow('EURUSD') + ' [data-sw-alert="4H"]');
-check('選ぶと選択が閉じる', await page.locator(trow('EURUSD') + ' [data-sw-alert]').count() === 0);
-await page.click(trow('EURUSD') + ' [data-sw-bell]');
 await page.click(trow('EURUSD') + ' [data-sw-alert="D"]');
 w = (await byKind('trendwatch')).find(t => t.pair === 'EURUSD');
 check('4HとDが両方控えられる', !!w.alerts['4H'] && !!w.alerts['D']);
 check('時間足ごとに1行', await page.locator('#tabPanel-trend .sw-pend-row').count() === 2);
-check('🔔ボタンに足名', (await page.textContent(trow('EURUSD') + ' [data-sw-bell]')).includes('4H·D'));
+check('控えた足のボタンが点灯', (await page.$$eval(trow('EURUSD') + ' .sw-tfb.on', els => els.map(e => e.textContent))).join() === '4H,D');
+check('🔭のカード2行目が1行に収まる', await page.$$eval(trow('EURUSD') + ' .trend-tf > *',
+  els => { const c = els.map(e => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; }); return Math.max(...c) - Math.min(...c) < 8; }));
 check('🔭タブのバッジ', (await badge('trend')) === '2');
 check('⚡タブのバッジは別', (await badge('scalp')) === '');
 // 通貨名タップで該当行へ
