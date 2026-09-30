@@ -311,6 +311,9 @@
   }
   .sw-pend-pair { border: none; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; flex: 0 0 auto; }
   .sw-pend-tf { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; }
+  .sw-pend-side { font-size: 11px; font-weight: 700; }
+  .sw-pend-side.up { color: var(--good); }
+  .sw-pend-side.down { color: var(--bad); }
   .sw-pend-age { font-weight: 700; color: var(--warn); white-space: nowrap; }
   .sw-pend-ng { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
   .sw-pend-ng span { font-size: 11px; font-weight: 700; color: var(--bad); padding: 0 5px; border-radius: 999px; background: var(--bad-soft); }
@@ -1097,7 +1100,7 @@
     <h2>👀 監視リスト（上位足）</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 4H/D/W のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -1145,7 +1148,7 @@
     <h2>👀 監視リスト</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 1H のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -3792,6 +3795,8 @@ function makeWatchList(cfg) {
           return '<div class="sw-pend-row" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
             '<button type="button" class="sw-pend-pair" data-sw-goto title="監視リストのこの通貨へ">' + esc(p.t.pair) + '</button>' +
             '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
+            (side => side === 'long' ? '<span class="sw-pend-side up" title="TradingView: long sign">▲</span>'
+                   : side === 'short' ? '<span class="sw-pend-side down" title="TradingView: short sign">▼</span>' : '')((p.t.alertSide || {})[p.f.k]) +
             '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
             '<span class="sw-pend-ng">' + ng.map(c => '<span>' + c.label + '✖</span>').join('') + '</span>' +
             '<button type="button" class="sw-pend-done" data-sw-done title="確認済みにする（未確認から外す）">✓</button>' +
@@ -3839,7 +3844,10 @@ function makeWatchList(cfg) {
   };
   const toggleAlert = (id, k) => update(id, t => {
     t.alerts = Object.assign({}, t.alerts);
-    if (t.alerts[k]) delete t.alerts[k]; else t.alerts[k] = new Date().toISOString();
+    if (t.alerts[k]) {
+      delete t.alerts[k];
+      if (t.alertSide) { t.alertSide = Object.assign({}, t.alertSide); delete t.alertSide[k]; }
+    } else t.alerts[k] = new Date().toISOString();
   }, true);
   const render = () => {
     /* メモを打っている最中に同期で描き直すとフォーカスと入力が飛ぶので、入力欄を離れるまで待つ */

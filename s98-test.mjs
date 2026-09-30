@@ -101,12 +101,20 @@ await page.evaluate(() => {
   const ts = JSON.parse(localStorage.getItem('mochipoyo_trades_v1'));
   const now = new Date().toISOString();
   ts.push({ id: 'tw_remote', kind: 'trendwatch', pair: 'GBPJPY', ng: { granville: true, rci: false, macd: false },
-            alerts: { W: now }, notes: '', createdAt: now, updatedAt: now });
+            alerts: { W: now }, alertSide: { W: 'short' }, notes: '', createdAt: now, updatedAt: now });
   localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
   renderAll();
 });
 check('他端末の未確認も出る', (await page.textContent('#tabPanel-trend .sw-pend')).includes('GBPJPY'));
 check('懸念グランビル✖', (await page.textContent('#tabPanel-trend .sw-pend')).includes('グランビル✖'));
+// S104: TradingView から入ったアラートは向き（▲long／▼short）が付く。手動の🔔には付かない
+const gbpRow = '#tabPanel-trend .sw-pend-row:has(.sw-pend-pair:text-is("GBPJPY"))';
+check('TradingView 由来は ▼short が付く', (await page.textContent(gbpRow + ' .sw-pend-side')) === '▼');
+check('手動の🔔には向きが付かない', await page.locator('#tabPanel-trend .sw-pend-row:has(.sw-pend-pair:text-is("EURUSD")) .sw-pend-side').count() === 0);
+await page.click(gbpRow + ' [data-sw-done]');
+check('✓で向きも消える', await page.evaluate(() => { const t = JSON.parse(localStorage.getItem('mochipoyo_trades_v1')).find(x => x.id === 'tw_remote'); return !t.alerts.W && !(t.alertSide || {}).W; }));
+await page.click(trow('GBPJPY') + ' [data-sw-alert="W"]');
+check('手動で🔔し直すと向きなし', await page.locator(gbpRow + ' .sw-pend-side').count() === 0);
 await page.click(trow('GBPJPY') + ' [data-sw-del]');
 check('🗑で未確認からも消える', !(await page.textContent('#tabPanel-trend .sw-pend')).includes('GBPJPY'));
 

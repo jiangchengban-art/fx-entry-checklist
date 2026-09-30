@@ -24,3 +24,7 @@ debug-*.png
 # Temp files
 *.tmp
 .env.local
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/

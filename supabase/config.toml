@@ -1,0 +1,5 @@
+project_id = "inqvrsfzskjusmbwlimx"
+
+# TradingView は Authorization ヘッダを付けないので JWT 検証を切る（?key= で認証）
+[functions.tradingview-alert]
+verify_jwt = false
