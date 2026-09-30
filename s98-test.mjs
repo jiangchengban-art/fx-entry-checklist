@@ -41,6 +41,7 @@ await page.selectOption('#scalpWatchAdd', 'GOLD');
 check('未確認が無いときは欄が出ない', !(await page.isVisible('#tabPanel-scalp .sw-pend-head')));
 check('未確認が無いときはタブバッジが空', (await badge('scalp')) === '');
 await page.click(srow('USDJPY') + ' [data-sw-ng="macd"]');
+await page.click(srow('USDJPY') + ' [data-sw-ng="macd"]');
 await page.click(srow('USDJPY') + ' [data-sw-bell]');
 let w = (await byKind('scalpwatch')).find(t => t.pair === 'USDJPY');
 check('🔔で1Hの時刻が記録される', !!(w.alerts && w.alerts['1H']));

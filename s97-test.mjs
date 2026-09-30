@@ -31,6 +31,7 @@ await page.selectOption('#trendWatchAdd', 'EURUSD');
 check('監視リストに追加', await page.locator('#trendWatch [data-sw]').count() === 1);
 check('切替ボタンに件数', (await page.textContent('#trendSegWatchN')) === '1');
 await page.click('#trendWatch [data-sw-ng="macd"]');
+await page.click('#trendWatch [data-sw-ng="macd"]');
 const tw = (await trades()).find(t => t.kind === 'trendwatch');
 check('kind:trendwatch で trades に入る', tw && tw.pair === 'EURUSD' && tw.ng.macd === true);
 check('⚡の監視リストには出ない', await page.evaluate(() => document.querySelectorAll('#scalpWatch [data-sw]').length) === 0);

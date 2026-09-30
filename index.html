@@ -276,7 +276,10 @@
   .sc-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .sc-filter-count { font-size: 12px; color: var(--ink-muted); }
   .sc-add-card { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
-  .sw-item .sw-pair { flex: 0 0 72px; font-size: 13px; font-weight: 700; }
+  .sw-item .sw-pair { flex: 0 0 66px; font-size: 13px; font-weight: 700; }
+  .sw-item .trend-head .sc-btn { padding: 0 4px; font-size: 11.5px; }
+  .sw-item .trend-head .tgroup { gap: 3px; }
+  .sw-mark { font-size: 10px; margin-left: 1px; }
   .sw-item .trend-head .spacer { flex-basis: 0 !important; }
   .sw-ok { font-size: 11px; font-weight: 700; color: var(--good); padding: 2px 7px; border-radius: 999px; background: var(--good-soft); }
   .sw-item.ng { border-left: 3px solid var(--bad); }
@@ -1076,7 +1079,7 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト（上位足）</h2>
-    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    <div class="section-note">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -1121,7 +1124,7 @@
   <div class="sc-pane" data-pane="watch">
   <section class="card">
     <h2>👀 監視リスト</h2>
-    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。<strong>不成立の条件だけ</strong>タップ（✖）、何も付いていなければ条件が揃っています。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+    <div class="section-note">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
       <span class="spacer"></span>
@@ -3694,6 +3697,7 @@ const WATCH_NG = [
   { k: 'rci',       label: 'RCI',        title: 'RCIが不成立' },
   { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
 ];
+const watchAllOk = t => WATCH_NG.every(c => (t.ok || {})[c.k] && !(t.ng || {})[c.k]);
 function watchElapsed(iso) {
   const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 60) return m + '分';
@@ -3708,7 +3712,7 @@ function makeWatchList(cfg) {
   let pendingRender = false;
   const isMine = t => !!t && t.kind === cfg.kind;
   const items = () => loadTrades().filter(isMine).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  const readyCount = list => list.filter(t => !WATCH_NG.some(c => (t.ng || {})[c.k])).length;
+  const readyCount = list => list.filter(watchAllOk).length;
   const tfs = cfg.alertTfs;
   const multiTf = tfs.length > 1;
   const pendEl = document.createElement('div');
@@ -3743,21 +3747,25 @@ function makeWatchList(cfg) {
   };
   const itemHtml = t => {
     const ng = t.ng || {};
+    const ok = t.ok || {};
     const anyNg = WATCH_NG.some(c => ng[c.k]);
+    const allOk = watchAllOk(t);
     const pend = pendTfs(t);
     const bellTitle = multiTf
       ? 'アラートが鳴ったが条件待ち → 鳴った時間足をタップして未確認に控える（もう一度で外す）'
       : '1時間足のアラートが鳴ったが条件待ち → 未確認に控える（もう一度で外す）';
     return (
-      '<div class="trend-item sc-card sw-item ' + (anyNg ? 'ng' : 'ok') + '" data-sw="' + esc(t.id) + '">' +
+      '<div class="trend-item sc-card sw-item' + (anyNg ? ' ng' : allOk ? ' ok' : '') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
           '<span class="sw-pair">' + esc(t.pair) + '</span>' +
-          '<span class="tgroup">' + WATCH_NG.map(c =>
-            '<button type="button" class="sc-btn ng' + (ng[c.k] ? ' on' : '') + '" data-sw-ng="' + c.k +
-            '" title="' + c.title + '（タップで✖／もう一度で解除）">' + c.label + (ng[c.k] ? '✖' : '') + '</button>').join('') +
+          '<span class="tgroup">' + WATCH_NG.map(c => {
+            const st = ng[c.k] ? 'ng' : ok[c.k] ? 'ok' : '';
+            return '<button type="button" class="sc-btn ' + (st || 'ng') + (st ? ' on' : '') + '" data-sw-ng="' + c.k +
+              '" title="' + c.label + '（タップで✅成立→✖不成立→解除）">' + c.label + (st ? '<span class="sw-mark">' + (st === 'ng' ? '✖' : '✅') + '</span>' : '') + '</button>';
+          }).join('') +
           '</span>' +
           '<span class="spacer"></span>' +
-          (anyNg ? '' : '<span class="sw-ok" title="グランビル・RCI・MACD がすべて成立">✅揃い</span>') +
+          (allOk ? '<span class="sw-ok" title="グランビル・RCI・MACD がすべて✅">揃い</span>' : '') +
         '</div>' +
         '<div class="trend-tf">' +
           '<input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ" value="' + esc(t.notes || '') + '">' +
@@ -3830,7 +3838,7 @@ function makeWatchList(cfg) {
     if (trades.some(t => isMine(t) && t.pair === pair)) { render(); return; }
     const now = new Date().toISOString();
     trades.push({ id: mvGenId(cfg.idPrefix), kind: cfg.kind, pair, ng: { granville: false, rci: false, macd: false },
-                  notes: '', createdAt: now, updatedAt: now });
+                  ok: { granville: false, rci: false, macd: false }, notes: '', createdAt: now, updatedAt: now });
     if (!saveTrades(trades)) return;
     render();
   });
@@ -3841,7 +3849,14 @@ function makeWatchList(cfg) {
     const ngBtn = e.target.closest('[data-sw-ng]');
     if (ngBtn) {
       const k = ngBtn.dataset.swNg;
-      update(id, t => { t.ng = Object.assign({}, t.ng); t.ng[k] = !t.ng[k]; }, true);
+      /* 未選択 → ✅成立 → ✖不成立 → 未選択 の順に回す */
+      update(id, t => {
+        t.ng = Object.assign({}, t.ng);
+        t.ok = Object.assign({}, t.ok);
+        if (t.ng[k]) { t.ng[k] = false; t.ok[k] = false; }
+        else if (t.ok[k]) { t.ok[k] = false; t.ng[k] = true; }
+        else t.ok[k] = true;
+      }, true);
       return;
     }
     if (e.target.closest('[data-sw-bell]')) { toggleAlert(id, tfs[0].k); return; }

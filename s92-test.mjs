@@ -61,19 +61,26 @@ await page.selectOption('#scalpWatchAdd', 'GOLD');
 let w = await watch();
 check('2通貨追加', w.length === 2 && w.map(t => t.pair).join() === 'USDJPY,GOLD');
 check('追加済みの通貨は候補から消える', await page.locator('#scalpWatchAdd option[value="USDJPY"]').count() === 0);
-check('追加直後は✅揃い', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
+check('追加直後は揃いにならない（未選択）', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
 
-// 2. 不成立チェック
-await page.click(`${row('USDJPY')} [data-sw-ng="rci"]`);
-await page.click(`${row('USDJPY')} [data-sw-ng="macd"]`);
-w = await watch();
-const u = w.find(t => t.pair === 'USDJPY');
-check('RCI・MACDが不成立として保存', u.ng.rci === true && u.ng.macd === true && u.ng.granville === false);
-check('ボタンに✖が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI✖');
-check('不成立があると✅揃いが消える', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
+// 2. ✅成立 → ✖不成立 → 未選択
+const tap = k => page.click(`${row('USDJPY')} [data-sw-ng="${k}"]`);
+await tap('granville'); await tap('rci'); await tap('macd');
+let u = (await watch()).find(t => t.pair === 'USDJPY');
+check('1タップで✅成立として保存', u.ok.granville && u.ok.rci && u.ok.macd && !u.ng.rci);
+check('ボタンに✅が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI✅');
+check('3つとも✅で揃い', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
 check('件数表示（揃い 1）', (await page.textContent('#scalpWatchCount')).includes('2 通貨（揃い 1）'));
-await page.click(`${row('USDJPY')} [data-sw-ng="rci"]`);
-check('再タップで解除', (await watch()).find(t => t.pair === 'USDJPY').ng.rci === false);
+await tap('rci'); await tap('macd');
+u = (await watch()).find(t => t.pair === 'USDJPY');
+check('2タップ目で✖不成立', u.ng.rci === true && u.ng.macd === true && !u.ok.rci && u.ng.granville === false);
+check('ボタンに✖が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI✖');
+check('不成立があると揃いが消える', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 0);
+check('件数表示（揃い 0）', (await page.textContent('#scalpWatchCount')).includes('2 通貨（揃い 0）'));
+await tap('rci');
+u = (await watch()).find(t => t.pair === 'USDJPY');
+check('3タップ目で未選択に戻る', u.ng.rci === false && !u.ok.rci);
+check('未選択は記号なし', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI');
 
 // 3. メモ（入力が止まってから保存）
 await page.fill(`${row('GOLD')} [data-sw-note]`, 'NY時間に注目');
@@ -133,6 +140,10 @@ await page.click('.tab-btn[data-tab="scalp"]');
 await page.click('#tabPanel-scalp [data-sc-pane="watch"]');
 check('再読み込み後も残る', await page.locator('#scalpWatch [data-sw]').count() === 1);
 check('375pxで横スクロールなし', await page.evaluate(() => document.documentElement.scrollWidth <= 375));
+await page.click(`${row('USDJPY')} [data-sw-ng="rci"]`);
+await page.click(`${row('USDJPY')} [data-sw-ng="macd"]`);
+await page.click(`${row('USDJPY')} [data-sw-ng="macd"]`);
+check('3つとも✅で揃い表示', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
 check('1行目（通貨＋3条件）が1行に収まる', await page.$$eval('#scalpWatch [data-sw] .trend-head > :not(.spacer)',
   els => { const c = els.map(e => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; }); return Math.max(...c) - Math.min(...c) < 8; }));
 
