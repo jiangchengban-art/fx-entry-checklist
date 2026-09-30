@@ -671,6 +671,15 @@
   .trend-help summary::-webkit-details-marker { display: none; }
   .trend-help summary::before { content: '▸'; font-size: 10px; }
   .trend-help[open] summary::before { content: '▾'; }
+  .sw-tabs { display: flex; gap: 4px; margin: -4px 0 10px; padding: 3px; border-radius: 10px; background: var(--surface-2); }
+  .sw-tab {
+    flex: 1; border: none; border-radius: 8px; padding: 7px 0; font-family: inherit; font-size: 12.5px; font-weight: 700;
+    background: transparent; color: var(--ink-muted); cursor: pointer; white-space: nowrap;
+  }
+  .sw-tab b { margin-left: 4px; font-size: 11px; font-weight: 700; opacity: 0.8; }
+  .sw-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+  .sw-tab.active[data-sw-group="entry"] { color: var(--good); }
+  .sw-tab.active[data-sw-group="wait"] { color: var(--warn); }
   .trend-help.sw-help { margin: 0 0 10px; }
   .trend-help-body {
     font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
@@ -1082,7 +1091,7 @@
     <h2>👀 監視リスト（上位足）</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -1130,7 +1139,7 @@
     <h2>👀 監視リスト</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
+      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。上のタブで <strong>✅ エントリー</strong>（3つとも✅）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -3705,6 +3714,13 @@ const WATCH_NG = [
   { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
 ];
 const watchAllOk = t => WATCH_NG.every(c => (t.ok || {})[c.k] && !(t.ng || {})[c.k]);
+/* 振り分け：✖が1つでも→待ち、3つとも✅→エントリー、それ以外（未選択が残る）→すべてにだけ出る */
+const WATCH_GROUPS = [
+  { k: 'all',   label: 'すべて' },
+  { k: 'entry', label: '✅ エントリー' },
+  { k: 'wait',  label: '⏳ 待ち' },
+];
+const watchGroupOf = t => WATCH_NG.some(c => (t.ng || {})[c.k]) ? 'wait' : watchAllOk(t) ? 'entry' : '';
 function watchElapsed(iso) {
   const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 60) return m + '分';
@@ -3725,6 +3741,30 @@ function makeWatchList(cfg) {
   const pendEl = document.createElement('div');
   pendEl.className = 'sw-pend';
   listEl.before(pendEl);
+  const groupKey = 'mochipoyo_' + cfg.kind + '_group';
+  let group = 'all';
+  try { const g = localStorage.getItem(groupKey); if (WATCH_GROUPS.some(x => x.k === g)) group = g; } catch (e) {}
+  const tabsEl = document.createElement('div');
+  tabsEl.className = 'sw-tabs';
+  tabsEl.setAttribute('role', 'tablist');
+  listEl.closest('section').querySelector('h2').after(tabsEl);
+  const inGroup = t => group === 'all' || watchGroupOf(t) === group;
+  const renderTabs = list => {
+    tabsEl.innerHTML = WATCH_GROUPS.map(g => {
+      const n = g.k === 'all' ? list.length : list.filter(t => watchGroupOf(t) === g.k).length;
+      return '<button type="button" class="sw-tab' + (g.k === group ? ' active' : '') + '" role="tab" data-sw-group="' + g.k + '">' +
+        g.label + '<b>' + n + '</b></button>';
+    }).join('');
+  };
+  const setGroup = g => {
+    group = g;
+    try { localStorage.setItem(groupKey, g); } catch (e) {}
+    render();
+  };
+  tabsEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-sw-group]');
+    if (b) setGroup(b.dataset.swGroup);
+  });
   const tabBtn = document.querySelector('.tab-btn[data-tab="' + cfg.tab + '"]');
   const tabBadge = document.createElement('b');
   tabBadge.className = 'tab-badge';
@@ -3804,9 +3844,12 @@ function makeWatchList(cfg) {
         '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
     document.getElementById(cfg.countId).textContent = list.length ? list.length + ' 通貨（揃い ' + readyCount(list) + '）' : '';
     document.getElementById(cfg.segNId).textContent = list.length ? String(list.length) : '';
-    listEl.innerHTML = list.length
-      ? list.map(itemHtml).join('')
-      : '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>';
+    renderTabs(list);
+    const shown = list.filter(inGroup);
+    listEl.innerHTML = !list.length
+      ? '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>'
+      : shown.length ? shown.map(itemHtml).join('')
+      : '<div class="empty-state">' + (group === 'entry' ? '3つとも ✅ の通貨はまだありません。' : '✖ が付いている通貨はありません。') + '</div>';
     renderPend();
   };
   const update = (id, fn, rerender) => {
@@ -3821,6 +3864,7 @@ function makeWatchList(cfg) {
       if (row) row.outerHTML = itemHtml(t);
       const list = items();
       document.getElementById(cfg.countId).textContent = list.length + ' 通貨（揃い ' + readyCount(list) + '）';
+      renderTabs(list);
       renderPend();
     }
   };
@@ -3847,7 +3891,7 @@ function makeWatchList(cfg) {
     trades.push({ id: mvGenId(cfg.idPrefix), kind: cfg.kind, pair, ng: { granville: false, rci: false, macd: false },
                   ok: { granville: false, rci: false, macd: false }, notes: '', createdAt: now, updatedAt: now });
     if (!saveTrades(trades)) return;
-    render();
+    if (group !== 'all') setGroup('all'); else render();
   });
   listEl.addEventListener('click', (e) => {
     const row = e.target.closest('[data-sw]');
