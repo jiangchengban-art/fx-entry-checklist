@@ -28,7 +28,7 @@ curl -sS -X POST "https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingv
 
 ## C. アラートのメッセージを一括設定（開発側が MCP で実施・Webhook を貼る **前**）
 
-162本すべてを次の形にする（左半分は今の文面、右に解析用の3語）：
+156本全体を次の形にする（左半分は今の文面、右に解析用の3語）：
 ```
 ❶ short sign {{close}} | {{ticker}} {{interval}} {{timenow}}
 ```
@@ -46,7 +46,7 @@ https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingview-alert?key=<TV_
 
 1. TradingView 右パネルの **アラート** 一覧 → 対象アラートの ✎（編集）
 2. **通知** タブ → **Webhook URL** にチェック → 上の URL を貼る → 保存
-3. まず **60（1時間足）の48本**だけ行う。1〜2日運用して問題なければ 240 → 1D → 1W（計114本）
+3. まず **60（1時間足）の28本**だけ行う。1〜2日運用して問題なければ 240 → 1D → 1W（計128本）
 
 ⚠️ Webhook を入れたアラートは MCP から編集できなくなる（メッセージ変更も手作業）。だから C を先に。
 

@@ -11,7 +11,7 @@
 | `w.alerts[tf] = { on, at }`（tf = h1/h4/d/w）に書く | それは旧🔭巡回一覧（market_view）のモデルで、S97で画面ごと撤去済み。**今の書き込み先は👀監視リストのアイテム**：`trades` 配列の `{ kind:'scalpwatch'｜'trendwatch', pair, ng, ok, notes, alerts:{ '1H': ISO, '4H': ISO, 'D': ISO, 'W': ISO }, createdAt, updatedAt }` |
 | Supabase の行 id は `p:<PAIR>` | 監視アイテムは **`t:<id>` 行**（id は `sw_…`/`tw_…`）。`data` にアイテム丸ごと、マージは `updatedAt` の新しい方が**アイテム単位**で勝つ（`mergeTrades`）。削除は `tomb` 行の `trades[id] = 時刻` |
 | plot_2 / plot_3 がエントリー系（要再確認） | **確認済み**：`plot_2`=long sign、`plot_3`=short sign（エントリー）、`plot_0`=LONG EXIT、`plot_1`=SHORT EXIT |
-| 約170本 | アクティブ 162本＝1W 34 / 60 48 / 240 48 / 1D 32。**すべて銘柄×足につき long+short の2本**（直近3日のログにも EXIT の発火は無し）→ エグジット系アラートは現状存在しない模様 |
+| 156本 | アクティブ 156本＝1W 48 / 60 28 / 240 48 / 1D 32。**すべて銘柄×足につき long+short の2本**（直近3日のログにも EXIT の発火は無し）→ エグジット系アラートは現状存在しない模様 |
 
 - 監視アイテムの `alerts[tf]` は「鳴った時刻の ISO 文字列」だけ（ON/OFF は キーの有無）。🔔未確認欄はこれを古い順に並べ、✓で消す。**この形に書けば、アプリ側は同期で受けるだけで自動表示される**
 - アプリは表示中30秒ごとに差分取得している（`syncPullIfVisible`）ので、クラウドに書けば最大30秒＋αで端末に届く。定期取得の追加は不要
@@ -112,14 +112,14 @@ CSV・統計・`mainTrades()`・同期コードは無変更。
 ## 6. 導入の順番（1H から）
 
 1. Edge Function を deploy（§2 の対処A or B）、secrets に `TV_WEBHOOK_KEY`、curl で疎通
-2. **MCP で 60 のアラート48本のメッセージを §3.1 の形に一括更新**（Webhook を入れる前に！入れた後は MCP から触れない）
-3. 将成さんが TradingView で48本に Webhook URL（`https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingview-alert?key=…`）を貼る。前提：有料プラン＋2FA 有効
+2. **MCP で 60 のアラート28本のメッセージを §3.1 の形に一括更新**（Webhook を入れる前に！入れた後は MCP から触れない）
+3. 将成さんが TradingView で28本に Webhook URL（`https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingview-alert?key=…`）を貼る。前提：有料プラン＋2FA 有効
 4. 次の発火で ⚡👀監視リストの🔔未確認に出るか確認（alerts log の `webhook` 列でも）
 5. 問題なければ 240 → 1D → 1W（計114本）へ拡大
 
 ## 7. 決定（2026-09-30、将成さん確認済み）
 
 1. **方式**：Webhook＋Edge Function で進める
-2. **メッセージ**：§3.1 の時刻付きの形。162本すべてを MCP で書き換える（Webhook を貼る前に）
+2. **メッセージ**：§3.1 の時刻付きの形。156本全体を MCP で書き換える（Webhook を貼る前に）
 3. **1H は ⚡だけ**に入れる
 4. **deploy**：環境のネットワーク許可（`inqvrsfzskjusmbwlimx.supabase.co`・`api.supabase.com`）＋環境シークレット `SUPABASE_ACCESS_TOKEN` で、開発セッションから `npx supabase functions deploy`
