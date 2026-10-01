@@ -81,5 +81,13 @@ const p2 = planUpdate({ rows: [{ data: p1.item }], tomb: {}, target, parsed, now
 const strip = o => { const c = Object.assign({}, o); delete c.updatedAt; return JSON.stringify(c); };
 check('同じ発火の再送は updatedAt 以外同じ（冪等）', strip(p1.item) === strip(p2.item));
 
+// S106: 鳴った価格（{{close}}）を alertPrice に控える
+p = parseMessage('❶ short sign 188.337 | CHFJPY 60 2026-09-30T11:00:00Z');
+check('価格を読む', p.price === 188.337);
+check('価格の無い本文は null', parseMessage('Ⓓ LONG EXIT | USDJPY 1D 2026-09-29T21:00:00Z').price === null);
+check('置換されていない {{close}} は null', parseMessage('❶ short sign {{close}} | CHFJPY 60 2026-09-30T11:00:00Z').price === null);
+plan = planUpdate({ rows: [], tomb: {}, target: scalp, parsed: parseMessage('❶ long sign 157.95 | USDJPY 60 2026-09-30T11:00:00Z'), now: NOW });
+check('alertPrice[tf] に入る', plan.item.alertPrice && plan.item.alertPrice['1H'] === 157.95);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

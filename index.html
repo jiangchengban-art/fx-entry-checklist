@@ -321,6 +321,42 @@
     flex: none; width: 30px; height: 26px; border-radius: 7px; border: 1px solid var(--good);
     background: var(--surface); color: var(--good); font-weight: 700; cursor: pointer;
   }
+  /* S106: 📍 ネックラインゾーン */
+  .zone-badge {
+    font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; white-space: nowrap;
+    color: var(--accent); background: var(--surface); border: 1px solid var(--accent);
+  }
+  .zone-badge.multi { color: #fff; background: var(--accent); }
+  .sw-pend-row.zone { border-color: var(--accent); border-left-color: var(--accent); }
+  .sw-pend-zn { font-size: 11px; color: var(--accent); }
+  .sw-zones { margin-bottom: 8px; }
+  .sw-zones > summary { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .sw-zones-at { font-size: 11px; font-weight: 400; color: var(--ink-muted); margin-left: 6px; }
+  .sw-zones-body { padding-top: 6px; }
+  .sw-zone-row {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--hairline);
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+  }
+  .sw-zone-row.multi .sw-zone-conf { color: #fff; background: var(--accent); }
+  .sw-zone-pair { font-weight: 700; min-width: 64px; }
+  .sw-zone-side { font-weight: 700; width: 12px; text-align: center; }
+  .sw-zone-side.up { color: var(--bad); }
+  .sw-zone-side.down { color: var(--good); }
+  .sw-zone-range { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw-zone-conf { font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; color: var(--accent); border: 1px solid var(--accent); white-space: nowrap; }
+  .sw-zone-touch { font-size: 11px; color: var(--ink-muted); }
+  .sw-zone-in { font-size: 10.5px; color: var(--ink-muted); white-space: nowrap; }
+  .sw-zone-add {
+    flex: none; width: 26px; height: 24px; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--surface); color: var(--accent); font-weight: 700; cursor: pointer;
+  }
+  .sw-zones-note { font-size: 11px; color: var(--ink-muted); padding: 6px 2px 0; }
+  .sw-zone-line {
+    display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 4px 0; font-size: 11.5px;
+    color: var(--ink-muted); font-variant-numeric: tabular-nums;
+  }
+  .sw-zone-line span.multi b { color: var(--accent); }
+  .sw-zone-line b { font-weight: 700; }
   .tab-bar .tab-btn { position: relative; }
   .tab-badge {
     position: absolute; top: 3px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px;
@@ -2932,7 +2968,7 @@ function csvField(v) {
 const BACKUP_PREFIX = 'mochipoyo_';
 /* 退避用の派生キーに加え、ログイン情報（他人に渡してはいけない）と
    同期の巻き戻し用スナップショット（重いだけで復元に要らない）を除く。 */
-const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$|^mochipoyo_sync_(auth|lastpush|pushed)_v1$|^mochipoyo_firebase_auth_v1$/;
+const BACKUP_SKIP = /__corrupt_\d+$|__bak$|__preimport_\d+$|^mochipoyo_sync_(auth|lastpush|pushed)_v1$|^mochipoyo_firebase_auth_v1$|^mochipoyo_zones_cache_v1$/;
 const BACKUP_SCHEMA = 1;
 
 function backupKeys() {
@@ -3768,6 +3804,89 @@ function watchElapsed(iso) {
   if (h < 24) return h + '時間' + (m % 60 ? (m % 60) + '分' : '');
   return Math.floor(h / 24) + '日' + (h % 24 ? (h % 24) + '時間' : '');
 }
+/* ============ 📍 ネックラインゾーン（S106） ============
+   1日4回、Claude の定期実行（Routine）が TradingView の 1H/4H/D のローソク足から「何度も反発している水平線」を
+   ゾーンとして計算し（tools/zones/zones.mjs）、ブランチ zones-data の zones.json に置く。アプリはそれを読むだけ。
+   - 🔔未確認アラートの行：鳴った価格（無ければ分析時の価格）がゾーン付近なら 📍 と時間足を出す
+   - 監視リストの各通貨：今の価格の近くにあるゾーンを1行で出す
+   - 勝／負の記録：その時のゾーン情報を一緒に残す（ゾーン付近で入ったときの勝率を見るため）
+   端末ローカルにキャッシュするだけで同期はしない（全端末が同じ URL を読むので要らない）。 */
+const ZONES_URL = 'https://raw.githubusercontent.com/jiangchengban-art/fx-entry-checklist/zones-data/zones.json';
+const ZONES_CACHE_KEY = 'mochipoyo_zones_cache_v1';
+const ZONES_REFETCH_MS = 10 * 60 * 1000;
+const ZONE_TF_ORDER = { '1H': 0, '4H': 1, 'D': 2 };
+let zonesDoc = null;
+let zonesFetchedAt = 0;
+try { zonesDoc = JSON.parse(localStorage.getItem(ZONES_CACHE_KEY) || 'null'); } catch (e) { zonesDoc = null; }
+const zonesListeners = [];
+async function fetchZones(force) {
+  /* file:// と localhost では本番の URL を読まない（テストは __ZONES_URL を渡すか、キャッシュを仕込む） */
+  const url = window.__ZONES_URL || (/^(file:|http:\/\/(localhost|127\.0\.0\.1))/.test(location.href) ? '' : ZONES_URL);
+  if (!url || (!force && Date.now() - zonesFetchedAt < ZONES_REFETCH_MS)) return;
+  zonesFetchedAt = Date.now();
+  try {
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
+    if (!res.ok) return;
+    const doc = await res.json();
+    if (!doc || !doc.pairs) return;
+    if (zonesDoc && zonesDoc.generatedAt === doc.generatedAt) return;
+    zonesDoc = doc;
+    try { localStorage.setItem(ZONES_CACHE_KEY, JSON.stringify(doc)); } catch (e) {}
+    zonesListeners.forEach(fn => fn());
+  } catch (e) { /* オフラインなどは前回のキャッシュで続ける */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchZones(false); });
+const zoneOverlap = (a, b) => a.lo <= b.hi && b.lo <= a.hi;
+/* その通貨の各足の上・下・内側のゾーンのうち、price から「付近」（1時間足の ATR 基準）にあるものを、
+   重なるものどうし1つにまとめて返す。price を省くと分析時の価格で見る */
+function zoneHits(pair, price) {
+  const r = zonesDoc && zonesDoc.pairs && zonesDoc.pairs[pair];
+  if (!r) return [];
+  const p = Number.isFinite(price) ? price : r.price;
+  const unit = r.nearUnit || 0;
+  const out = [];
+  Object.keys(r.tfs || {}).forEach(tf => ['inside', 'up', 'down'].forEach(side => {
+    const z = r.tfs[tf][side];
+    if (!z || z.weak) return;
+    const dist = z.lo > p ? z.lo - p : z.hi < p ? p - z.hi : 0;
+    if (dist > unit) return;
+    const conf = z.conf || [tf];
+    const same = out.find(h => zoneOverlap(h, z));
+    if (same) {
+      conf.forEach(c => { if (!same.conf.includes(c)) same.conf.push(c); });
+      same.touches = Math.max(same.touches, z.touches || 0);
+      same.dist = Math.min(same.dist, dist);
+      return;
+    }
+    out.push({ lo: z.lo, hi: z.hi, conf: conf.slice(), touches: z.touches || 0, dist });
+  }));
+  out.forEach(h => {
+    h.conf.sort((a, b) => ZONE_TF_ORDER[a] - ZONE_TF_ORDER[b]);
+    h.side = h.lo > p ? 'up' : h.hi < p ? 'down' : 'inside';
+  });
+  return out.sort((a, b) => b.conf.length - a.conf.length || a.dist - b.dist);
+}
+const zoneConfText = conf => conf.join('·');
+const zoneRangeText = h => h.lo + '–' + h.hi;
+function zoneUpdatedText() {
+  if (!zonesDoc || !zonesDoc.generatedAt) return '';
+  return fmtDatetime(zonesDoc.generatedAt) + ' 時点';
+}
+/* 1つのアラートに付ける 📍。複数足で重なるほど強く見せる */
+function zoneBadgeHtml(hits, priceNote) {
+  if (!hits.length) return '';
+  const h = hits[0];
+  return '<span class="zone-badge' + (h.conf.length >= 2 ? ' multi' : '') + '" title="' +
+    esc('ネックラインゾーン ' + zoneRangeText(h) + '（' + h.conf.join('・') + ' / 反発' + h.touches + '回）' + (priceNote || '')) + '">📍' +
+    esc(zoneConfText(h.conf)) + '</span>';
+}
+/* 勝／負の記録に残すゾーンの控え（記録時点の情報なので、あとで zones.json が変わっても残る） */
+function zoneSnapshot(pair, price) {
+  const hits = zoneHits(pair, price);
+  if (!hits.length) return null;
+  const h = hits[0];
+  return { lo: h.lo, hi: h.hi, conf: h.conf.slice(), touches: h.touches, at: zonesDoc.generatedAt || '' };
+}
 function makeWatchList(cfg) {
   const listEl = document.getElementById(cfg.listId);
   const addEl = document.getElementById(cfg.addId);
@@ -3782,6 +3901,57 @@ function makeWatchList(cfg) {
   const pendEl = document.createElement('div');
   pendEl.className = 'sw-pend';
   listEl.before(pendEl);
+  /* S106: 📍 今ゾーン付近にある通貨の一覧（Claude の定期分析）。＋で監視リストに足せる */
+  const zoneEl = document.createElement('details');
+  zoneEl.className = 'trend-help sw-zones';
+  pendEl.before(zoneEl);
+  const zoneOpenKey = 'mochipoyo_' + cfg.kind + '_zones_open';
+  try { zoneEl.open = localStorage.getItem(zoneOpenKey) === '1'; } catch (e) {}
+  zoneEl.addEventListener('toggle', () => { try { localStorage.setItem(zoneOpenKey, zoneEl.open ? '1' : '0'); } catch (e) {} });
+  const zoneRows = () => {
+    if (!zonesDoc || !zonesDoc.pairs) return [];
+    const rows = [];
+    Object.keys(zonesDoc.pairs).forEach(pair => zoneHits(pair).forEach(h => {
+      if (h.conf.some(c => c !== '1H')) rows.push(Object.assign({ pair }, h));
+    }));
+    return rows.sort((a, b) => b.conf.length - a.conf.length || a.dist - b.dist).slice(0, 20);
+  };
+  const renderZones = list => {
+    const rows = zoneRows();
+    if (!zonesDoc) { zoneEl.innerHTML = ''; zoneEl.hidden = true; return; }
+    zoneEl.hidden = false;
+    const watched = new Set(list.map(t => t.pair));
+    const sideMark = { up: '↑', down: '↓', inside: '◆' };
+    zoneEl.innerHTML =
+      '<summary>📍 ゾーン付近の通貨（' + rows.length + '）<span class="sw-zones-at">' + esc(zoneUpdatedText()) + '</span></summary>' +
+      '<div class="sw-zones-body">' +
+      (rows.length ? rows.map(r =>
+        '<div class="sw-zone-row' + (r.conf.length >= 2 ? ' multi' : '') + '">' +
+          '<span class="sw-zone-pair">' + esc(r.pair) + '</span>' +
+          '<span class="sw-zone-side ' + r.side + '" title="' + (r.side === 'up' ? '上のゾーンに接近' : r.side === 'down' ? '下のゾーンに接近' : '今ゾーンの中') + '">' + sideMark[r.side] + '</span>' +
+          '<span class="sw-zone-range">' + esc(zoneRangeText(r)) + '</span>' +
+          '<span class="sw-zone-conf">' + esc(zoneConfText(r.conf)) + '</span>' +
+          '<span class="sw-zone-touch" title="反発回数">×' + r.touches + '</span>' +
+          (watched.has(r.pair)
+            ? '<span class="sw-zone-in">監視中</span>'
+            : '<button type="button" class="sw-zone-add" data-sw-zone-add="' + esc(r.pair) + '" title="監視リストに追加">＋</button>') +
+        '</div>').join('')
+        : '<div class="sw-zones-note">いまゾーン付近の通貨はありません。</div>') +
+      '<div class="sw-zones-note">↑上のゾーン接近 ↓下のゾーン接近 ◆ゾーンの中。1H·4H·D は複数の時間足で意識されている水準。×は反発回数。1日4回（7・13・17・21時）更新。</div>' +
+      '</div>';
+  };
+  zoneEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-sw-zone-add]');
+    if (!b) return;
+    addEl.value = b.dataset.swZoneAdd;
+    if (addEl.value !== b.dataset.swZoneAdd) {
+      /* 候補に無い（＝もう監視中）ときは何もしない */
+      render();
+      return;
+    }
+    addEl.dispatchEvent(new Event('change'));
+    showToast(b.dataset.swZoneAdd + ' を監視リストに追加しました');
+  });
   const groupKey = 'mochipoyo_' + cfg.kind + '_group';
   let group = 'all';
   try { const g = localStorage.getItem(groupKey); if (WATCH_GROUPS.some(x => x.k === g)) group = g; } catch (e) {}
@@ -3822,16 +3992,20 @@ function makeWatchList(cfg) {
     const allOkL = list.filter(t => WATCH_NG.every(c => (t.cond || {})[c.k] === 'ok'));
     const midL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'mid'));
     const ngL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'ng'));
+    const zoneL = list.filter(t => t.zone);
     logEl.innerHTML =
       '<div class="sw-log-head">📒 勝敗の記録　' + rate(list) + '</div>' +
       '<div class="sw-log-sum">' + [['✅揃い', allOkL], ['▲あり', midL], ['✖あり', ngL]]
         .filter(x => x[1].length).map(x => x[0] + ' ' + rate(x[1])).join('　') + '</div>' +
+      (zoneL.length ? '<div class="sw-log-sum">📍ゾーン付近 ' + rate(zoneL) + (zoneL.length < list.length ? '　ゾーン外 ' + rate(list.filter(t => !t.zone)) : '') + '</div>' : '') +
       list.slice(0, 20).map(t =>
         '<div class="sw-log-row" data-sw-log="' + esc(t.id) + '">' +
           '<span class="sw-log-time">' + fmtDatetime(t.datetime) + '</span>' +
           '<span class="sw-log-pair">' + esc(t.pair) + '</span>' +
           '<span class="sw-log-res ' + t.outcome + '">' + (t.outcome === 'win' ? '勝' : '負') + '</span>' +
-          '<span class="sw-log-cond">' + esc(watchCondText(t.cond || {})) + '</span>' +
+          '<span class="sw-log-cond">' + esc(watchCondText(t.cond || {})) +
+            (t.alert ? ' ' + esc(t.alert.tf) + (t.alert.side === 'long' ? '▲' : t.alert.side === 'short' ? '▼' : '') : '') +
+            (t.zone ? ' 📍' + esc(zoneConfText(t.zone.conf)) : '') + '</span>' +
           '<button type="button" class="sw-log-del" data-sw-log-del title="この記録を取り消す">🗑</button>' +
         '</div>').join('') +
       (list.length > 20 ? '<div class="sw-log-sum">ほか ' + (list.length - 20) + ' 件</div>' : '');
@@ -3857,15 +4031,24 @@ function makeWatchList(cfg) {
   const renderPend = () => {
     const ps = pendings(items());
     tabBadge.textContent = ps.length ? String(ps.length) : '';
+    /* S106: 鳴った価格（TradingView から届いたもの。無ければ分析時の価格）がネックラインゾーン付近か */
+    ps.forEach(p => {
+      const price = Number((p.t.alertPrice || {})[p.f.k]);
+      p.zone = zoneHits(p.t.pair, Number.isFinite(price) && price > 0 ? price : undefined);
+      p.zoneNote = Number.isFinite(price) && price > 0 ? '・鳴った価格 ' + price : '・分析時の価格で判定';
+    });
+    const nZone = ps.filter(p => p.zone.length).length;
     pendEl.innerHTML = ps.length
-      ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）<span>古い順・条件を確認したら ✓</span></div>' +
+      ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）' + (nZone ? '<b class="sw-pend-zn">📍ゾーン付近 ' + nZone + '</b>' : '') +
+        '<span>古い順・条件を確認したら ✓</span></div>' +
         ps.map(p => {
           const ng = WATCH_NG.filter(c => ['ng', 'mid'].includes(watchState(p.t, c.k)));
-          return '<div class="sw-pend-row" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
+          return '<div class="sw-pend-row' + (p.zone.length ? ' zone' : '') + '" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
             '<button type="button" class="sw-pend-pair" data-sw-goto title="監視リストのこの通貨へ">' + esc(p.t.pair) + '</button>' +
             '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
             (side => side === 'long' ? '<span class="sw-pend-side up" title="TradingView: long sign">▲</span>'
                    : side === 'short' ? '<span class="sw-pend-side down" title="TradingView: short sign">▼</span>' : '')((p.t.alertSide || {})[p.f.k]) +
+            zoneBadgeHtml(p.zone, p.zoneNote) +
             '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
             '<span class="sw-pend-ng">' + ng.map(c => { const st = watchState(p.t, c.k);
               return '<span class="' + st + '">' + c.label + WATCH_MARK[st] + '</span>'; }).join('') + '</span>' +
@@ -3895,6 +4078,7 @@ function makeWatchList(cfg) {
           '<span class="spacer"></span>' +
           (allOk ? '<span class="sw-ok" title="グランビル・RCI・MACD がすべて✅">揃い</span>' : '') +
         '</div>' +
+        zoneLineHtml(t.pair) +
         '<div class="trend-tf">' +
           '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ（タップで入力欄を開く）">📝</button>' +
           (multiTf
@@ -3912,11 +4096,21 @@ function makeWatchList(cfg) {
           : t.notes ? '<button type="button" class="sw-note-text" data-sw-note-open title="タップで編集">' + esc(t.notes) + '</button>' : '') +
       '</div>');
   };
+  /* S106: その通貨の今の価格の近くにあるゾーンを1行で（無ければ出さない） */
+  const zoneLineHtml = pair => {
+    const hits = zoneHits(pair);
+    if (!hits.length) return '';
+    const sideMark = { up: '↑', down: '↓', inside: '◆' };
+    return '<div class="sw-zone-line" title="ネックラインゾーン（' + esc(zoneUpdatedText()) + '）">📍' + hits.slice(0, 2).map(h =>
+      '<span class="' + (h.conf.length >= 2 ? 'multi' : '') + '">' + sideMark[h.side] + esc(zoneRangeText(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
+      '</div>';
+  };
   const toggleAlert = (id, k) => update(id, t => {
     t.alerts = Object.assign({}, t.alerts);
     if (t.alerts[k]) {
       delete t.alerts[k];
       if (t.alertSide) { t.alertSide = Object.assign({}, t.alertSide); delete t.alertSide[k]; }
+      if (t.alertPrice) { t.alertPrice = Object.assign({}, t.alertPrice); delete t.alertPrice[k]; }
     } else t.alerts[k] = new Date().toISOString();
   }, true);
   const render = () => {
@@ -3934,6 +4128,7 @@ function makeWatchList(cfg) {
     document.getElementById(cfg.countId).textContent = list.length ? list.length + ' 通貨（揃い ' + readyCount(list) + '）' : '';
     document.getElementById(cfg.segNId).textContent = list.length ? String(list.length) : '';
     renderTabs(list);
+    renderZones(list);
     const shown = list.filter(inGroup);
     listEl.innerHTML = !list.length
       ? '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>'
@@ -4022,8 +4217,18 @@ function makeWatchList(cfg) {
       const cond = {};
       WATCH_NG.forEach(c => { cond[c.k] = watchState(w, c.k); });
       const outcome = resBtn.dataset.swRes;
-      trades.push({ id: mvGenId('wl'), kind: 'watchlog', src: cfg.kind, pair: w.pair, outcome, cond,
-                    notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now });
+      const log = { id: mvGenId('wl'), kind: 'watchlog', src: cfg.kind, pair: w.pair, outcome, cond,
+                    notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now };
+      /* S106: 入力を増やさずに残せるものは自動で残す：直近のアラート（足・時刻・▲▼・価格）とゾーン */
+      const lastTf = Object.keys(w.alerts || {}).sort((a, b) => (w.alerts[b] || '').localeCompare(w.alerts[a] || ''))[0];
+      if (lastTf) {
+        log.alert = { tf: lastTf, at: w.alerts[lastTf], side: (w.alertSide || {})[lastTf] || '' };
+        const ap = Number((w.alertPrice || {})[lastTf]);
+        if (Number.isFinite(ap) && ap > 0) log.alert.price = ap;
+      }
+      const zs = zoneSnapshot(w.pair, log.alert && log.alert.price);
+      if (zs) log.zone = zs;
+      trades.push(log);
       if (!saveTrades(trades)) return;
       renderLog();
       showToast('記録しました：' + w.pair + ' ' + (outcome === 'win' ? '勝ち' : '負け'));
@@ -4072,6 +4277,7 @@ function makeWatchList(cfg) {
       if (r && t) r.outerHTML = itemHtml(t);
     }, 0);
   });
+  zonesListeners.push(() => render());
   render();
   return { render };
 }
@@ -4473,6 +4679,8 @@ const trendWatch = makeWatchList({
   countId: 'trendWatchCount', segNId: 'trendSegWatchN', tab: 'trend',
   alertTfs: [{ k: '1H', title: '1時間足' }, { k: '4H', title: '4時間足' }, { k: 'D', title: '日足' }, { k: 'W', title: '週足' }],
 });
+/* S106: 📍 ネックラインゾーンを読み込む（起動時と、画面に戻ったとき10分おき） */
+fetchZones(true);
 
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';

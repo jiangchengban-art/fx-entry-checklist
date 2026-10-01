@@ -565,6 +565,20 @@ function gvEntryDistance(x, y) { … }         // 最寄りのエントリーア
 - **🔔 未確認アラート（S98）**：アラートが鳴ったが条件待ちで後回しにする通貨を控え、確認漏れを防ぐ。監視リストの各行の🔔（⚡は1Hのみ＝1タップ、🔭はカード2行目に常時並ぶ 1H/4H/D/W ボタンを直接タップ。S99で選択行を開く方式から変更）で `alerts[tf] = タップ時刻` を監視アイテムに書く。リスト上部の「🔔 未確認アラート」に**古い順**で1足1行（通貨・時間足・⏰経過時間・懸念✖だけ）、✓で外す（🔔再タップでも外れる）。下部タブの⚡/🔭に未確認件数の赤バッジ（`.tab-badge`）。経過時間は1分ごとに未確認欄だけ描き直す。データは監視アイテムの中なので同期・墓標は無改修（🗑で未確認も消える）
 - **TradingView からの自動記録（S104）**：Supabase Edge Function `tradingview-alert` が Webhook を受けて、監視アイテムの `t:` 行に `alerts[tf]` と `alertSide[tf]`（`'long'|'short'`）を書く（60→⚡`scalpwatch` 1H、240/1D/1W→🔭`trendwatch`。無ければ `sw_tv_<PAIR>`/`tw_tv_<PAIR>` で自動追加、クラウドに残る削除済み行は `tomb` で除外）。アプリは同期で受けるだけ。🔔未確認欄に ▲/▼ を出し、✓・🔔再タップで `alertSide[tf]` も消す。⚠️ `mergeTrades` はアイテム丸ごと後勝ちなので、発火の数秒以内に同じ通貨をタップしていた場合はどちらかが負ける（許容。実害が出たら `a:` 追記行方式へ）。設計・手順は `docs/TRADINGVIEW_ALERT_DESIGN.md` / `docs/TRADINGVIEW_ALERT_SETUP.md`
 
+### 16c. 📍 ネックラインゾーン（セッション106で追加）
+
+**ユースケース**: ユーザー要望「1時間足・4時間足・日足のネックラインを現在の価格から上下1本ずつ、1日4回分析して。アラートが鳴った通貨と突き合わせて通知してくれれば、ネックライン付近のアラートの通貨を狙える。入力箇所を減らしたい」。ラインではなく**ゾーン**（狭すぎ・広すぎもダメ）、**何度も反発している水平線を優先**、**複数の時間足で意識されていればそれも知らせる**（いずれもユーザー指定）。
+
+- **分析**：Claude の Routine が1日4回（JST 7/13/17/21時）、TradingView MCP の `get-ohlcv` で28銘柄×1H/4H/D を `count:1500` で取得（大きい結果は `tool-results/` にファイル保存される＝会話に載らない）→ `node tools/zones/zones.mjs <tool-results…>` が symbol/interval から自動で振り分けて計算 → ブランチ **`zones-data`** の `zones.json` を1コミットで上書き push → 最後の返信（通知文）がスマホに届く。手順は `tools/zones/ROUTINE.md`
+- **計算**（`tools/zones/zones.mjs`、純関数）：左右3本のスイング高値・安値を集め、近いものを1ゾーンにまとめる（まとまった数＝反発回数）。幅はその足の ATR × `minW`〜`maxSpan`。上・下それぞれ反発2回以上で一番近いものを1つ（無ければ1回のものを `weak`）。複数足の重なりは**実際の山・谷の範囲（`clo`〜`chi`）どうし**で、1H の ATR × `confTol1h` 以内（表示幅で比べると日足の太いゾーンが何とでも重なる）。「付近」の物差しはどの足でも**1H の ATR × `nearAtr1h`**（日足の ATR で測ると1日分が付近になる）。通知（`hot`）は 4H か D を含むものだけ（1H だけのゾーンはどこにでもある）。調整は `PARAMS` だけ
+- **銘柄**：インジケーターのアラートと同じ銘柄（`SYMBOLS`。指数は CAPITALCOM/FOREXCOM/FX/GOMARKETS、金銀は TVC、原油 OANDA:WTICOUSD、仮想通貨 BINANCE、FX は OANDA）
+- **アプリ**（👀監視リスト、⚡・🔭共通。`fetchZones()`/`zoneHits()`）：`raw.githubusercontent.com/.../zones-data/zones.json` を起動時と復帰時（10分おき）に読み、端末ローカルにキャッシュ（`mochipoyo_zones_cache_v1`、同期しない・バックアップ対象外）。⚠️ file:// と localhost では本番 URL を読まない（テストは `window.__ZONES_URL` かキャッシュを仕込む）
+  - 「📍 ゾーン付近の通貨」折りたたみ一覧（4H/D を含むものだけ・複数足が上）。＋で監視リストに追加
+  - 監視リストの各通貨に、今の価格の近くのゾーンを1行（`.sw-zone-line`）
+  - 🔔未確認アラートの行に `📍4H·D`（`.zone-badge`）。**鳴った価格**（Edge Function が `{{close}}` から `alertPrice[tf]` に書く）で判定し、無ければ分析時の価格。✓で `alertPrice` も消す
+  - 勝／負の記録（`watchlog`）に、直近のアラート（`alert:{tf,at,side,price}`）とゾーン（`zone:{lo,hi,conf,touches,at}`）を**自動で**残す。📒に「📍ゾーン付近 / ゾーン外」の勝率
+- テスト：`zones-test.mjs`（計算 20項目・Node）、`s106-test.mjs`（アプリ 29項目）、`tv-alert-test.mjs` に価格の4項目
+
 ### 17. 🔭一覧タブ＝上位足1時間足以上の記録（セッション97で作り直し）
 
 **ユースケース**: ユーザー要望「一覧タブは1分足のタブと同じ作りにして良い。一覧タブは上位足が1時間足以上の取引の際に記録していく」。巡回一覧は撤去（ユーザー選択）、カードは今の根拠項目を懸念形式で（ユーザー選択）、💾はエントリーの記録だけで結果は後から（ユーザー選択）。
@@ -614,6 +628,7 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 **S1-27 の詳細**: `memory/sessions/` 内の個別ファイルおよび `docs/SESSIONS_14_TO_18_ARCHIVE.md` / `docs/CHANGELOG_ARCHIVE.md` を参照。初期実装（S1-13）→ 環境ボード刷新（S14-18）→ 環境ボード仕様最適化（S19-21）→ 3分割エントリー・トレンド一覧追加（S22-25）→ ファイル最適化・UI改善（S26-27）
 
 | セッション | 主な変更 | 日付 |
+| 106 | 📍 **ネックラインゾーンの定期分析とアラートの突き合わせ**。ユーザー要望「1H・4H・日足のネックラインを上下1本ずつ1日4回分析、アラートと整合性を合わせて通知、入力を減らしたい」（ゾーンで・何度も反発している水平線優先・複数足の重なりも通知、をユーザー指定）。`tools/zones/zones.mjs`（スイング→クラスタ→ATR幅のゾーン、上下1つずつ、複数足の重なり）＋手順書 `tools/zones/ROUTINE.md`。結果はブランチ `zones-data` の `zones.json`。アプリは👀監視リストに「📍ゾーン付近の通貨」一覧（＋で追加）・各通貨のゾーン行・🔔未確認アラートの📍（鳴った価格で判定）、勝／負の記録にアラートとゾーンを自動で控え📒にゾーン内外の勝率。Edge Function は `{{close}}` を `alertPrice[tf]` に書くよう拡張（再 deploy 要）。新設 zones-test.mjs 20項目・s106-test.mjs 29項目、tv-alert-test 38項目、既存スイート通過。sw.js: v76→v77 | 2026-10-01 |
 | 105 | ▲ **監視リストに「▲微妙」判定・勝／負の1タップ記録、→カード撤去**。ユーザー要望「グランビル/RCI/MACDは微妙に成立していなくても他が良ければエントリーするので▲を追加」「記録を簡略化する為→カードは無くし、監視リストのカードに勝ちか負けかタップするマークで対応」。タップ順は ✅→▲→✖→未選択、✅エントリーのタブは✖無しで✅か▲が3つ。勝／負は `kind:'watchlog'`（その時の条件つき）で trades に入れ同期・墓標を流用、監視リスト下に条件別の勝率。⚡・🔭共通。s92-test.mjs 65項目、s28/s97/s98/s102を新しいタップ順に更新、既存スイート通過。sw.js: v75→v76 | 2026-09-30 |
 | 104 | 📡 **TradingView アラート → 👀監視リスト 自動連携（設計＋Edge Function 実装。deploy はネットワーク許可待ち）**。`docs/TRADINGVIEW_ALERT_HANDOFF.md` を受けて事実確認（plot_2=long/plot_3=short、アクティブ162本、`WTICOUSD→OIL` 以外は ticker がそのまま通貨名）。設計は `docs/TRADINGVIEW_ALERT_DESIGN.md`、手順は `docs/TRADINGVIEW_ALERT_SETUP.md`。Webhook → Supabase Edge Function `supabase/functions/tradingview-alert/`（`core.mjs` 純関数＋`index.ts`、`?key=` 認証・`verify_jwt=false`）が監視アイテムの `t:` 行に `alerts[tf]`／新設 `alertSide[tf]` を書く（墓標を見て、無ければ `sw_tv_<PAIR>`/`tw_tv_<PAIR>` で自動追加。60→⚡1H、240/1D/1W→🔭）。アプリ側は🔔未確認欄に ▲long／▼short を表示し、✓で `alertSide` も消す。同期コードは無改修。新設 tv-alert-test.mjs 34項目（Node）、s98 35項目に4項目追加、s92/s102/s97 通過。sw.js: v74→v75 | 2026-09-30 |
 | 103 | 📝 **監視リストのメモ欄を📝ボタン化**。ユーザー要望「メモの欄が枠を広く取りすぎているのでコンパクトに」（📝ボタン化をユーザーが選択）。2行目はボタンだけにし、📝で入力欄を開く・離れる/Enter/📝で閉じる、メモは1行の省略表示でタップすると再編集。s92-test.mjs 50項目、既存スイート通過。sw.js: v73→v74 | 2026-09-30 |
@@ -668,6 +683,8 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 ### Playwright テストの走らせ方（S80で全件グリーンに整理）
 ```bash
 npm install
+node zones-test.mjs    # S106: ネックラインゾーンの計算（20項目・ブラウザ不要）
+node s106-test.mjs     # S106: 📍ゾーンの表示・未確認アラートの📍・勝敗記録への控え（29項目・file:// で完結）
 node tv-alert-test.mjs # S104: TradingView アラート → 監視リスト行更新の純関数（34項目・ブラウザ不要）
 node s102-test.mjs     # S102: 👀監視リストの振り分けタブ（20項目・file:// で完結）
 node s98-test.mjs      # S98: 🔔未確認アラート（30項目・file:// で完結）

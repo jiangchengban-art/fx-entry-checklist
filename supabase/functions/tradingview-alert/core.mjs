@@ -19,7 +19,11 @@ export function parseMessage(text) {
   if (!m) return null;
   const head = m[1];
   const side = /long/i.test(head) ? 'long' : /short/i.test(head) ? 'short' : '';
+  /* S106: 左側の {{close}}（鳴った価格）。アプリがネックラインゾーンとの距離を測るのに使う */
+  const pm = /(-?\d+(?:\.\d+)?)\s*$/.exec(head.trim());
+  const price = pm ? Number(pm[1]) : null;
   return {
+    price: Number.isFinite(price) && price > 0 ? price : null,
     ticker: m[2].toUpperCase(),
     interval: m[3].toUpperCase(),
     at: ts(m[4]) ? new Date(ts(m[4])).toISOString() : null,
@@ -59,6 +63,7 @@ export function planUpdate({ rows, tomb, target, parsed, now }) {
   };
   item.alerts = Object.assign({}, item.alerts, { [target.tf]: at });
   if (parsed.side) item.alertSide = Object.assign({}, item.alertSide, { [target.tf]: parsed.side });
+  if (parsed.price) item.alertPrice = Object.assign({}, item.alertPrice, { [target.tf]: parsed.price });
   item.updatedAt = now;
   return { created: !live, item, row: { id: 't:' + item.id, data: item, updated_at: now } };
 }
