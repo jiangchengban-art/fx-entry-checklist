@@ -73,7 +73,50 @@ export function pickLive(rows, tomb) {
   return best;
 }
 
-export function planUpdate({ rows, tomb, target, parsed, now }) {
+/* S106: 🎯狙い目の判定。鳴った価格がネックラインゾーン（zones.json）の付近で、方向も合っているか。
+   付近＝1時間足の ATR（nearUnit）以内。方向：long はゾーンが下か内側（支え）、short は上か内側（抵抗）。
+   アプリの zoneHits() と同じ考え方（ゾーンは各足の上・下・内側の weak でないもの、重なるものは1つにまとめる）。 */
+export function zoneMatch(doc, pair, price, side) {
+  const r = doc && doc.pairs && doc.pairs[pair];
+  if (!r || !(price > 0)) return null;
+  const unit = r.nearUnit || 0;
+  const hits = [];
+  for (const tf of Object.keys(r.tfs || {})) {
+    for (const k of ['inside', 'up', 'down']) {
+      const z = r.tfs[tf][k];
+      if (!z || z.weak) continue;
+      const dist = z.lo > price ? z.lo - price : z.hi < price ? price - z.hi : 0;
+      if (dist > unit) continue;
+      const same = hits.find(h => h.lo <= z.hi && z.lo <= h.hi);
+      if (same) {
+        (z.conf || [tf]).forEach(c => { if (!same.conf.includes(c)) same.conf.push(c); });
+        same.touches = Math.max(same.touches, z.touches || 0);
+        continue;
+      }
+      hits.push({ lo: z.lo, hi: z.hi, conf: (z.conf || [tf]).slice(), touches: z.touches || 0 });
+    }
+  }
+  const order = { '1H': 0, '4H': 1, 'D': 2 };
+  const ok = hits.map(h => Object.assign(h, {
+    conf: h.conf.sort((a, b) => order[a] - order[b]),
+    side: h.lo > price ? 'up' : h.hi < price ? 'down' : 'inside',
+  })).filter(h => h.side === 'inside' || (side === 'long' ? h.side === 'down' : side === 'short' ? h.side === 'up' : true));
+  if (!ok.length) return null;
+  ok.sort((a, b) => b.conf.length - a.conf.length || b.touches - a.touches);
+  return Object.assign(ok[0], { zonesAt: doc.generatedAt || '' });
+}
+
+/* 通知の文面（iPhone のロック画面で読める短さに） */
+export function aimMessage(target, parsed, hit) {
+  const sideJa = parsed.side === 'long' ? '🟢買い' : parsed.side === 'short' ? '🔴売り' : '';
+  const where = { inside: 'ゾーン内', up: '上のゾーン手前', down: '下のゾーン手前' }[hit.side];
+  return {
+    title: '🎯 ' + target.pair + ' ' + target.tf + ' ' + sideJa,
+    body: (parsed.price || '') + ' ／ ' + where + ' ' + hit.lo + '–' + hit.hi + '（' + hit.conf.join('・') + ' 反発' + hit.touches + '回）',
+  };
+}
+
+export function planUpdate({ rows, tomb, target, parsed, now, zone }) {
   const live = pickLive(rows, tomb);
   const at = parsed.at || now;
   const item = live ? JSON.parse(JSON.stringify(live)) : {
@@ -84,6 +127,10 @@ export function planUpdate({ rows, tomb, target, parsed, now }) {
   item.alerts = Object.assign({}, item.alerts, { [target.tf]: at });
   if (parsed.side) item.alertSide = Object.assign({}, item.alertSide, { [target.tf]: parsed.side });
   if (parsed.price) item.alertPrice = Object.assign({}, item.alertPrice, { [target.tf]: parsed.price });
+  /* 🎯狙い目：その足のアラートに印を付ける（✓で外すときにアプリが一緒に消す）。条件が揃わなければ古い印を消す */
+  item.aim = Object.assign({}, item.aim);
+  if (zone) item.aim[target.tf] = { lo: zone.lo, hi: zone.hi, conf: zone.conf, touches: zone.touches, side: zone.side, zonesAt: zone.zonesAt };
+  else delete item.aim[target.tf];
   item.updatedAt = now;
   return { created: !live, item, row: { id: 't:' + item.id, data: item, updated_at: now } };
 }

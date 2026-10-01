@@ -577,7 +577,8 @@ function gvEntryDistance(x, y) { … }         // 最寄りのエントリーア
   - 監視リストの各通貨に、今の価格の近くのゾーンを1行（`.sw-zone-line`）
   - 🔔未確認アラートの行に `📍4H·D`（`.zone-badge`）。**鳴った価格**（Edge Function が `{{close}}` から `alertPrice[tf]` に書く）で判定し、無ければ分析時の価格。✓で `alertPrice` も消す
   - 勝／負の記録（`watchlog`）に、直近のアラート（`alert:{tf,at,side,price}`）とゾーン（`zone:{lo,hi,conf,touches,at}`）を**自動で**残す。📒に「📍ゾーン付近 / ゾーン外」の勝率
-- テスト：`zones-test.mjs`（計算 20項目・Node）、`s106-test.mjs`（アプリ 29項目）、`tv-alert-test.mjs` に価格の4項目
+- **🎯狙い目（自動）**：ユーザー要望「タップを省きたい。アラートが鳴ったのとネックライン付近の条件が揃った通貨に自動でチェックして通知で知らせて」。Edge Function がアラート受信時に zones.json（10分キャッシュ）と `zoneMatch()` で突き合わせ、**ゾーン付近（1H ATR 以内）かつ方向が合う**（long はゾーンが下か内側、short は上か内側）なら監視アイテムに `aim[tf]` を書き、ntfy（環境変数 `NTFY_TOPIC`、未設定なら送らない。タップで記録ツールを開く）で通知。揃わないアラートが来たら `aim[tf]` を消す。アプリは `aimOf()`（受信側の `aim` 優先、無ければ手元の zones と `alertPrice`/`alertSide` で同じ判定）で🔔未確認の行に `🎯1H·4H·D`（緑で強調・上に並べる）、振り分けタブに「🎯 狙い目」（`WATCH_GROUPS` の4つ目）。✓で `aim[tf]` も消す
+- テスト：`zones-test.mjs`（計算 20項目・Node）、`s106-test.mjs`（アプリ 40項目）、`tv-alert-test.mjs`（57項目：価格・【時間足】形式・🎯判定）
 
 ### 17. 🔭一覧タブ＝上位足1時間足以上の記録（セッション97で作り直し）
 
@@ -684,8 +685,8 @@ dataviz スキル準拠。ライト/ダーク両モード対応。
 ```bash
 npm install
 node zones-test.mjs    # S106: ネックラインゾーンの計算（20項目・ブラウザ不要）
-node s106-test.mjs     # S106: 📍ゾーンの表示・未確認アラートの📍・勝敗記録への控え（29項目・file:// で完結）
-node tv-alert-test.mjs # S104: TradingView アラート → 監視リスト行更新の純関数（34項目・ブラウザ不要）
+node s106-test.mjs     # S106: 📍ゾーンの表示・🎯狙い目・未確認アラートの📍・勝敗記録への控え（40項目・file:// で完結）
+node tv-alert-test.mjs # S104/S106: TradingView アラート → 監視リスト行更新・🎯判定の純関数（57項目・ブラウザ不要）
 node s102-test.mjs     # S102: 👀監視リストの振り分けタブ（20項目・file:// で完結）
 node s98-test.mjs      # S98: 🔔未確認アラート（30項目・file:// で完結）
 node s97-test.mjs      # S97: 🔭一覧タブ（👀監視リスト・記録カード・巡回の撤去）（38項目・file:// で完結）

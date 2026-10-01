@@ -98,9 +98,9 @@ await page.evaluate(() => {
   localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
   renderAll();
 });
-check('鳴った価格が遠ければ📍なし', await page.locator(pend('USDJPY') + ' .zone-badge').count() === 0);
-check('鳴った価格がゾーン内なら📍', await page.locator(pend('GOLD') + ' .zone-badge').count() === 1);
-check('📍の説明に鳴った価格', (await page.getAttribute(pend('GOLD') + ' .zone-badge', 'title')).includes('4201'));
+check('鳴った価格が遠ければ📍なし', await page.locator(pend('USDJPY') + ' .zone-badge, ' + pend('USDJPY') + ' .aim-badge').count() === 0);
+check('鳴った価格がゾーン内なら印（ゾーン内は🎯狙い目）', await page.locator(pend('GOLD') + ' .aim-badge').count() === 1);
+check('印の説明にゾーンの範囲', (await page.getAttribute(pend('GOLD') + ' .aim-badge', 'title')).includes('4200'));
 
 // 4. 勝／負の記録にアラートとゾーンを自動で残す
 await page.click(srow('GOLD') + ' [data-sw-res="win"]');
@@ -114,6 +114,51 @@ check('ゾーン付近の勝率を出す', (await page.textContent('#tabPanel-sc
 await page.click(pend('GOLD') + ' [data-sw-done]');
 const g = (await byKind('scalpwatch')).find(t => t.pair === 'GOLD');
 check('✓で alertPrice も消す', !(g.alertPrice || {})['1H'] && !(g.alerts || {})['1H']);
+
+// 4b. 🎯狙い目（ゾーン付近＋方向が合う）は自動で印が付き、上に並ぶ
+await page.evaluate(() => {
+  const ts = JSON.parse(localStorage.getItem('mochipoyo_trades_v1'));
+  const u = ts.find(t => t.kind === 'scalpwatch' && t.pair === 'USDJPY');
+  u.alertPrice = { '1H': 157.97 }; u.alertSide = { '1H': 'short' };   // 上のゾーン手前で short
+  const g = ts.find(t => t.kind === 'scalpwatch' && t.pair === 'GOLD');
+  g.alerts = { '1H': new Date(Date.now() - 3600000).toISOString() }; g.alertPrice = { '1H': 4300 }; g.alertSide = { '1H': 'long' };
+  localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
+  renderAll();
+});
+check('short・上のゾーン手前 → 🎯', await page.locator(pend('USDJPY') + ' .aim-badge').count() === 1);
+check('🎯の行は強調', await page.$eval(pend('USDJPY'), el => el.classList.contains('aim')));
+check('🎯が古いアラートより上', (await page.$$eval('#tabPanel-scalp .sw-pend-row .sw-pend-pair', els => els.map(e => e.textContent))).join(',') === 'USDJPY,GOLD');
+await page.evaluate(() => {
+  const ts = JSON.parse(localStorage.getItem('mochipoyo_trades_v1'));
+  ts.find(t => t.kind === 'scalpwatch' && t.pair === 'GOLD').alertPrice = { '1H': 4201 };
+  localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
+  renderAll();
+});
+check('ゾーン内は long でも 🎯', await page.locator(pend('GOLD') + ' .aim-badge').count() === 1);
+check('見出しに🎯の件数', (await page.textContent('#tabPanel-scalp .sw-pend-head')).includes('🎯狙い目 2'));
+await page.evaluate(() => {
+  const ts = JSON.parse(localStorage.getItem('mochipoyo_trades_v1'));
+  ts.find(t => t.kind === 'scalpwatch' && t.pair === 'USDJPY').alertSide = { '1H': 'long' };   // 抵抗に向かう long
+  localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
+  renderAll();
+});
+check('long で上のゾーン手前は 🎯 にしない（📍だけ）', await page.locator(pend('USDJPY') + ' .aim-badge').count() === 0 && await page.locator(pend('USDJPY') + ' .zone-badge').count() === 1);
+await page.evaluate(() => {
+  const ts = JSON.parse(localStorage.getItem('mochipoyo_trades_v1'));
+  ts.find(t => t.kind === 'scalpwatch' && t.pair === 'USDJPY').aim = { '1H': { lo: 158, hi: 158.04, conf: ['1H', '4H'], touches: 3, side: 'up' } };
+  localStorage.setItem('mochipoyo_trades_v1', JSON.stringify(ts));
+  renderAll();
+});
+check('受信側が付けた aim はそのまま 🎯', await page.locator(pend('USDJPY') + ' .aim-badge').count() === 1);
+await page.click('#tabPanel-scalp [data-sw-group="aim"]');
+const aimPairs = await page.$$eval('#scalpWatch [data-sw] .sw-pair', els => els.map(e => e.textContent));
+check('🎯狙い目タブに自動で入る', aimPairs.includes('USDJPY') && aimPairs.includes('GOLD'));
+check('タブに件数', (await page.textContent('#tabPanel-scalp [data-sw-group="aim"]')).includes('2'));
+await page.click(pend('USDJPY') + ' [data-sw-done]');
+check('✓で aim も消える', !((await byKind('scalpwatch')).find(t => t.pair === 'USDJPY').aim || {})['1H']);
+await page.click('#tabPanel-scalp [data-sw-group="all"]');
+const overflowTabs = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+check('タブが4つでも 375px に収まる', !overflowTabs);
 
 // 5. 新しい zones.json を読んだら描き直す
 await page.route('https://zones.test/zones.json*', route => route.fulfill({

@@ -41,6 +41,16 @@ S106 時点でもちぽよのアラートは全部 Webhook 付きなので **MCP
 - Edge Function（`core.mjs` の `parseMessage`）は 【…】 の時間足・ticker・long/short・最後の価格を読む。**`long`/`short` の英語と、最後の価格（{{close}}）は消さないこと**（買い／売りの文字だけでも読めるが、価格が最後に無いとゾーンとの突き合わせができない）
 - 旧形式 `❶ short sign {{close}} | {{ticker}} {{interval}} {{timenow}}` も引き続き読める
 
+## C2. 🎯狙い目の iPhone 通知（ntfy・S106）
+
+アラートがネックラインゾーン付近で方向も合っていたとき、Edge Function が ntfy に通知を送る（タップで記録ツールが開く）。
+
+1. iPhone に App Store の **ntfy** アプリを入れる
+2. アプリで「＋」→ トピック名に**他人に推測されない名前**（例 `mochipoyo-aim-` のあとに英数字ランダム8文字）を入れて購読
+3. Supabase ダッシュボード → Edge Functions → Secrets に `NTFY_TOPIC` = 同じトピック名 を追加（再 deploy 不要）
+
+未設定なら通知は送らず、記録ツールの🎯表示だけが動く。
+
 ## D. Webhook URL を貼る（将成さんの手作業・TradingView の画面で）
 
 前提：有料プラン（Essential 以上）で **2段階認証が有効**であること。

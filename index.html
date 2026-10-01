@@ -329,6 +329,9 @@
   .zone-badge.multi { color: #fff; background: var(--accent); }
   .sw-pend-row.zone { border-color: var(--accent); border-left-color: var(--accent); }
   .sw-pend-zn { font-size: 11px; color: var(--accent); }
+  .sw-pend-aim { font-size: 11px; color: var(--good); }
+  .sw-pend-row.aim { border-color: var(--good); border-left-color: var(--good); background: var(--good-soft); }
+  .aim-badge { font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; white-space: nowrap; color: #fff; background: var(--good); }
   .sw-zones { margin-bottom: 8px; }
   .sw-zones > summary { font-size: 13px; font-weight: 700; color: var(--accent); }
   .sw-zones-at { font-size: 11px; font-weight: 400; color: var(--ink-muted); margin-left: 6px; }
@@ -3792,6 +3795,7 @@ const watchEnterable = t => WATCH_NG.every(c => ['ok', 'mid'].includes(watchStat
 /* 振り分け：✖が1つでも→待ち、✅か▲で3つ埋まる→エントリー、それ以外（未選択が残る）→すべてにだけ出る */
 const WATCH_GROUPS = [
   { k: 'all',   label: 'すべて' },
+  { k: 'aim',   label: '🎯 狙い目' },
   { k: 'entry', label: '✅ エントリー' },
   { k: 'wait',  label: '⏳ 待ち' },
 ];
@@ -3881,6 +3885,19 @@ function zoneBadgeHtml(hits, priceNote) {
     esc(zoneConfText(h.conf)) + '</span>';
 }
 /* 勝／負の記録に残すゾーンの控え（記録時点の情報なので、あとで zones.json が変わっても残る） */
+/* S106: 🎯狙い目＝未確認のアラートが、ネックラインゾーン付近で方向も合っている（long は下か内側のゾーン、short は上か内側）。
+   受信側（Edge Function）が付けた aim[tf] を優先し、無ければ手元の zones と鳴った価格で同じ判定をする */
+function aimOf(t, tf) {
+  if (!(t.alerts || {})[tf]) return null;
+  const srv = (t.aim || {})[tf];
+  if (srv) return srv;
+  const price = Number((t.alertPrice || {})[tf]);
+  if (!(price > 0)) return null;
+  const side = (t.alertSide || {})[tf] || '';
+  return zoneHits(t.pair, price).find(h => h.side === 'inside' ||
+    (side === 'long' ? h.side === 'down' : side === 'short' ? h.side === 'up' : true)) || null;
+}
+const watchAimTfs = t => Object.keys(t.alerts || {}).filter(tf => aimOf(t, tf));
 function zoneSnapshot(pair, price) {
   const hits = zoneHits(pair, price);
   if (!hits.length) return null;
@@ -3959,10 +3976,11 @@ function makeWatchList(cfg) {
   tabsEl.className = 'sw-tabs';
   tabsEl.setAttribute('role', 'tablist');
   listEl.closest('section').querySelector('h2').after(tabsEl);
-  const inGroup = t => group === 'all' || watchGroupOf(t) === group;
+  const inGroupK = (t, k) => k === 'all' || (k === 'aim' ? watchAimTfs(t).length > 0 : watchGroupOf(t) === k);
+  const inGroup = t => inGroupK(t, group);
   const renderTabs = list => {
     tabsEl.innerHTML = WATCH_GROUPS.map(g => {
-      const n = g.k === 'all' ? list.length : list.filter(t => watchGroupOf(t) === g.k).length;
+      const n = list.filter(t => inGroupK(t, g.k)).length;
       return '<button type="button" class="sw-tab' + (g.k === group ? ' active' : '') + '" role="tab" data-sw-group="' + g.k + '">' +
         g.label + '<b>' + n + '</b></button>';
     }).join('');
@@ -4037,18 +4055,22 @@ function makeWatchList(cfg) {
       p.zone = zoneHits(p.t.pair, Number.isFinite(price) && price > 0 ? price : undefined);
       p.zoneNote = Number.isFinite(price) && price > 0 ? '・鳴った価格 ' + price : '・分析時の価格で判定';
     });
+    ps.forEach(p => { p.aim = aimOf(p.t, p.f.k); });
+    /* 🎯狙い目を上に（その中と残りはそれぞれ古い順のまま） */
+    ps.sort((a, b) => (b.aim ? 1 : 0) - (a.aim ? 1 : 0));
     const nZone = ps.filter(p => p.zone.length).length;
+    const nAim = ps.filter(p => p.aim).length;
     pendEl.innerHTML = ps.length
-      ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）' + (nZone ? '<b class="sw-pend-zn">📍ゾーン付近 ' + nZone + '</b>' : '') +
+      ? '<div class="sw-pend-head">🔔 未確認アラート（' + ps.length + '）' + (nAim ? '<b class="sw-pend-aim">🎯狙い目 ' + nAim + '</b>' : '') + (nZone ? '<b class="sw-pend-zn">📍ゾーン付近 ' + nZone + '</b>' : '') +
         '<span>古い順・条件を確認したら ✓</span></div>' +
         ps.map(p => {
           const ng = WATCH_NG.filter(c => ['ng', 'mid'].includes(watchState(p.t, c.k)));
-          return '<div class="sw-pend-row' + (p.zone.length ? ' zone' : '') + '" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
+          return '<div class="sw-pend-row' + (p.aim ? ' aim' : p.zone.length ? ' zone' : '') + '" data-sw-pend="' + esc(p.t.id) + '" data-tf="' + p.f.k + '">' +
             '<button type="button" class="sw-pend-pair" data-sw-goto title="監視リストのこの通貨へ">' + esc(p.t.pair) + '</button>' +
             '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
             (side => side === 'long' ? '<span class="sw-pend-side up" title="TradingView: long sign">▲</span>'
                    : side === 'short' ? '<span class="sw-pend-side down" title="TradingView: short sign">▼</span>' : '')((p.t.alertSide || {})[p.f.k]) +
-            zoneBadgeHtml(p.zone, p.zoneNote) +
+            (p.aim ? '<span class="aim-badge" title="' + esc('ネックラインゾーン ' + p.aim.lo + '–' + p.aim.hi + '（' + (p.aim.conf || []).join('・') + '）付近で、方向も合っている') + '">🎯' + esc((p.aim.conf || []).join('·')) + '</span>' : zoneBadgeHtml(p.zone, p.zoneNote)) +
             '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
             '<span class="sw-pend-ng">' + ng.map(c => { const st = watchState(p.t, c.k);
               return '<span class="' + st + '">' + c.label + WATCH_MARK[st] + '</span>'; }).join('') + '</span>' +
@@ -4111,6 +4133,7 @@ function makeWatchList(cfg) {
       delete t.alerts[k];
       if (t.alertSide) { t.alertSide = Object.assign({}, t.alertSide); delete t.alertSide[k]; }
       if (t.alertPrice) { t.alertPrice = Object.assign({}, t.alertPrice); delete t.alertPrice[k]; }
+      if (t.aim) { t.aim = Object.assign({}, t.aim); delete t.aim[k]; }
     } else t.alerts[k] = new Date().toISOString();
   }, true);
   const render = () => {
@@ -4133,7 +4156,9 @@ function makeWatchList(cfg) {
     listEl.innerHTML = !list.length
       ? '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>'
       : shown.length ? shown.map(itemHtml).join('')
-      : '<div class="empty-state">' + (group === 'entry' ? '✖ が無く3つとも ✅／▲ の通貨はまだありません。' : '✖ が付いている通貨はありません。') + '</div>';
+      : '<div class="empty-state">' + (group === 'entry' ? '✖ が無く3つとも ✅／▲ の通貨はまだありません。'
+        : group === 'aim' ? 'ネックラインゾーン付近で方向の合うアラートが鳴った通貨は、ここに自動で入ります。'
+        : '✖ が付いている通貨はありません。') + '</div>';
     renderPend();
     renderLog();
   };

@@ -36,7 +36,7 @@ const selectGroup = g => page.click(`${P} [data-sw-group="${g}"]`);
 
 await page.click('.tab-btn[data-tab="trend"]');
 await page.click(`${P} [data-sc-pane="watch"]`);
-check('見出しの下に3つのタブ', await page.locator(`${P} .sw-tabs [data-sw-group]`).count() === 3);
+check('見出しの下に4つのタブ（S106で🎯狙い目）', await page.locator(`${P} .sw-tabs [data-sw-group]`).count() === 4);
 check('タブは見出しの直後', await page.$eval(`${P} .sw-tabs`, el => el.previousElementSibling.tagName === 'H2'));
 check('既定は「すべて」', await page.$eval(`${P} [data-sw-group="all"]`, el => el.classList.contains('active')));
 
@@ -83,7 +83,7 @@ check('追加した通貨が見える', (await shownPairs()).includes('GBPJPY'))
 // ⚡タブも同じ・別々に記憶
 await page.click('.tab-btn[data-tab="scalp"]');
 await page.click('#tabPanel-scalp [data-sc-pane="watch"]');
-check('⚡にもタブ', await page.locator('#tabPanel-scalp .sw-tabs [data-sw-group]').count() === 3);
+check('⚡にもタブ', await page.locator('#tabPanel-scalp .sw-tabs [data-sw-group]').count() === 4);
 check('⚡は🔭と別に「すべて」', await page.$eval('#tabPanel-scalp [data-sw-group="all"]', el => el.classList.contains('active')));
 
 check('375pxで横スクロールしない', await page.evaluate(() => document.documentElement.scrollWidth <= 375));

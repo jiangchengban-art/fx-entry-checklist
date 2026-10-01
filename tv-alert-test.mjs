@@ -1,5 +1,5 @@
 /* S104: TradingView アラート → 監視リスト行更新（Edge Function の純関数部分） */
-import { parseMessage, resolveTarget, pickLive, planUpdate } from './supabase/functions/tradingview-alert/core.mjs';
+import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage } from './supabase/functions/tradingview-alert/core.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -101,6 +101,30 @@ plan = planUpdate({ rows: [], tomb: {}, target: resolveTarget(parseMessage('【4
                     parsed: parseMessage('【4時間足】GBPJPY 🔴売り short 209.034'), now: NOW });
 check('ラベル形式で 🔭 に short と価格・受信時刻', plan.item.kind === 'trendwatch' && plan.item.alertSide['4H'] === 'short' && plan.item.alertPrice['4H'] === 209.034 && plan.item.alerts['4H'] === NOW);
 check('知らないラベルは null', parseMessage('【15分足】USDJPY long 1') === null);
+
+// S106: 🎯狙い目（ゾーン付近＋方向が合う）
+const Z = { generatedAt: '2026-10-01T22:00:00Z', pairs: { GBPJPY: { nearUnit: 0.2, tfs: {
+  '1H': { up: { lo: 209.20, hi: 209.25, touches: 3, conf: ['1H', '4H'] }, down: { lo: 208.70, hi: 208.75, touches: 2, conf: ['1H'] } },
+  '4H': { up: { lo: 209.18, hi: 209.30, touches: 4, conf: ['1H', '4H', 'D'] }, down: { lo: 207.0, hi: 207.2, touches: 3, conf: ['4H'], weak: true } },
+} } } };
+let zm = zoneMatch(Z, 'GBPJPY', 209.10, 'short');
+check('short で上のゾーン手前 → 狙い目', zm && zm.side === 'up' && zm.conf.join(',') === '1H,4H,D' && zm.zonesAt === Z.generatedAt);
+check('long で上のゾーン手前（抵抗に向かう）→ 狙い目にしない', zoneMatch(Z, 'GBPJPY', 209.10, 'long') === null);
+check('long で下のゾーン手前 → 狙い目', zoneMatch(Z, 'GBPJPY', 208.85, 'long').side === 'down');
+check('ゾーン内はどちら向きでも狙い目', zoneMatch(Z, 'GBPJPY', 209.22, 'long').side === 'inside');
+check('遠ければ null', zoneMatch(Z, 'GBPJPY', 208.0, 'long') === null);
+check('weak のゾーンは使わない', zoneMatch(Z, 'GBPJPY', 207.1, 'long') === null);
+check('価格が無ければ null', zoneMatch(Z, 'GBPJPY', null, 'long') === null);
+check('zones が無ければ null', zoneMatch(null, 'GBPJPY', 209.1, 'short') === null);
+const gp = parseMessage('【4時間足】GBPJPY 🔴売り short 209.10');
+const gt = resolveTarget(gp);
+plan = planUpdate({ rows: [], tomb: {}, target: gt, parsed: gp, now: NOW, zone: zoneMatch(Z, 'GBPJPY', 209.10, 'short') });
+check('狙い目なら aim[tf] に印', plan.item.aim && plan.item.aim['4H'] && plan.item.aim['4H'].conf.length === 3);
+plan = planUpdate({ rows: [{ data: plan.item }], tomb: {}, target: gt, parsed: parseMessage('【4時間足】GBPJPY 🟢買い long 209.10'), now: NOW, zone: null });
+check('次に揃わないアラートが来たら印を外す', !plan.item.aim['4H']);
+const am = aimMessage(gt, gp, zoneMatch(Z, 'GBPJPY', 209.10, 'short'));
+check('通知の見出しに 通貨・足・売買', am.title === '🎯 GBPJPY 4H 🔴売り');
+check('通知の本文に価格・ゾーン・時間足', am.body.includes('209.1') && am.body.includes('上のゾーン手前') && am.body.includes('1H・4H・D'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
