@@ -26,14 +26,20 @@ curl -sS -X POST "https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingv
 ```
 → `{"ok":true,"pair":"CHFJPY","tf":"1H","side":"short",...}` が返り、30秒以内に ⚡👀監視リストの「🔔 未確認アラート」に `CHFJPY 1H ▼` が出れば OK（無ければ自動追加される）。確認したら ✓ で消す。
 
-## C. アラートのメッセージを一括設定（開発側が MCP で実施・Webhook を貼る **前**）
+## C. アラートのメッセージ（S106で変更：通知で時間足が分かる形）
 
-156本全体を次の形にする（左半分は今の文面、右に解析用の3語）：
-```
-❶ short sign {{close}} | {{ticker}} {{interval}} {{timenow}}
-```
-印：60→❶、240→④、1D→Ⓓ、1W→Ⓦ。long/short はアラートの条件（plot_2=long / plot_3=short）から入れる。
-push 通知の文面は `❶ short sign 188.337 | CHFJPY 60 2026-09-30T11:00:00Z` のようになる。
+S106 時点でもちぽよのアラートは全部 Webhook 付きなので **MCP からは変更できない**。TradingView の画面で、各アラートの「メッセージ」欄を次のどれかに**貼り替える**（時間足 × long/short の8通り。`{{ticker}}` `{{close}}` は TradingView が発火時に置き換える）：
+
+| 時間足 | long sign（plot_2）のアラート | short sign（plot_3）のアラート |
+|---|---|---|
+| 1時間足 | `【1時間足】{{ticker}} 🟢買い long {{close}}` | `【1時間足】{{ticker}} 🔴売り short {{close}}` |
+| 4時間足 | `【4時間足】{{ticker}} 🟢買い long {{close}}` | `【4時間足】{{ticker}} 🔴売り short {{close}}` |
+| 日足 | `【日足】{{ticker}} 🟢買い long {{close}}` | `【日足】{{ticker}} 🔴売り short {{close}}` |
+| 週足 | `【週足】{{ticker}} 🟢買い long {{close}}` | `【週足】{{ticker}} 🔴売り short {{close}}` |
+
+- iPhone の通知は `【4時間足】GBPJPY 🔴売り short 209.034` のように**先頭に時間足**が出る
+- Edge Function（`core.mjs` の `parseMessage`）は 【…】 の時間足・ticker・long/short・最後の価格を読む。**`long`/`short` の英語と、最後の価格（{{close}}）は消さないこと**（買い／売りの文字だけでも読めるが、価格が最後に無いとゾーンとの突き合わせができない）
+- 旧形式 `❶ short sign {{close}} | {{ticker}} {{interval}} {{timenow}}` も引き続き読める
 
 ## D. Webhook URL を貼る（将成さんの手作業・TradingView の画面で）
 
@@ -48,7 +54,7 @@ https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingview-alert?key=<TV_
 2. **通知** タブ → **Webhook URL** にチェック → 上の URL を貼る → 保存
 3. まず **60（1時間足）の28本**だけ行う。1〜2日運用して問題なければ 240 → 1D → 1W（計128本）
 
-⚠️ Webhook を入れたアラートは MCP から編集できなくなる（メッセージ変更も手作業）。だから C を先に。
+⚠️ Webhook を入れたアラートは MCP から編集できなくなる（メッセージ変更も手作業）。
 
 ## E. 届いているかの確認
 

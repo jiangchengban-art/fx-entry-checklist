@@ -14,8 +14,28 @@ export const TF_MAP = {
 
 const ts = v => { const n = Date.parse(v || ''); return Number.isFinite(n) ? n : 0; };
 
+/* S106: 通知で時間足が分かる形（iPhone の通知の先頭に出る）。右側の「| ticker interval timenow」を付けなくても読める
+     【1時間足】USDJPY 🟢買い long 157.824
+   時刻は受信時刻を使う（TradingView の送信は発火から数秒以内）。 */
+const LABEL_TO_INTERVAL = { '1時間足': '60', '4時間足': '240', '日足': '1D', '週足': '1W' };
+
 export function parseMessage(text) {
-  const m = /^([\s\S]*?)\|\s*(\S+)\s+(\S+)\s+(\S+)\s*$/.exec(String(text || '').trim());
+  const raw = String(text || '').trim();
+  const lm = /^【(1時間足|4時間足|日足|週足)】\s*([A-Za-z0-9!._:]+)\s*([\s\S]*)$/.exec(raw);
+  if (lm && !/\|/.test(raw)) {
+    const head = lm[3];
+    const pm = /(-?\d+(?:\.\d+)?)\s*$/.exec(head.trim());
+    const price = pm ? Number(pm[1]) : null;
+    return {
+      price: Number.isFinite(price) && price > 0 ? price : null,
+      ticker: lm[2].toUpperCase(),
+      interval: LABEL_TO_INTERVAL[lm[1]],
+      at: null,
+      side: /long|買い/i.test(head) ? 'long' : /short|売り/i.test(head) ? 'short' : '',
+      kind: /exit|決済/i.test(head) ? 'exit' : 'entry',
+    };
+  }
+  const m = /^([\s\S]*?)\|\s*(\S+)\s+(\S+)\s+(\S+)\s*$/.exec(raw);
   if (!m) return null;
   const head = m[1];
   const side = /long/i.test(head) ? 'long' : /short/i.test(head) ? 'short' : '';

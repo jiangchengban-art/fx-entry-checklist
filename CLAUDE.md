@@ -571,7 +571,7 @@ function gvEntryDistance(x, y) { … }         // 最寄りのエントリーア
 
 - **分析**：Claude の Routine が1日4回（JST 7/13/17/21時）、TradingView MCP の `get-ohlcv` で28銘柄×1H/4H/D を `count:1500` で取得（大きい結果は `tool-results/` にファイル保存される＝会話に載らない）→ `node tools/zones/zones.mjs <tool-results…>` が symbol/interval から自動で振り分けて計算 → ブランチ **`zones-data`** の `zones.json` を1コミットで上書き push → 最後の返信（通知文）がスマホに届く。手順は `tools/zones/ROUTINE.md`
 - **計算**（`tools/zones/zones.mjs`、純関数）：左右3本のスイング高値・安値を集め、近いものを1ゾーンにまとめる（まとまった数＝反発回数）。幅はその足の ATR × `minW`〜`maxSpan`。上・下それぞれ反発2回以上で一番近いものを1つ（無ければ1回のものを `weak`）。複数足の重なりは**実際の山・谷の範囲（`clo`〜`chi`）どうし**で、1H の ATR × `confTol1h` 以内（表示幅で比べると日足の太いゾーンが何とでも重なる）。「付近」の物差しはどの足でも**1H の ATR × `nearAtr1h`**（日足の ATR で測ると1日分が付近になる）。通知（`hot`）は 4H か D を含むものだけ（1H だけのゾーンはどこにでもある）。調整は `PARAMS` だけ
-- **銘柄**：インジケーターのアラートと同じ銘柄（`SYMBOLS`。指数は CAPITALCOM/FOREXCOM/FX/GOMARKETS、金銀は TVC、原油 OANDA:WTICOUSD、仮想通貨 BINANCE、FX は OANDA）
+- **銘柄**：インジケーターのアラートと同じ銘柄（`SYMBOLS`。指数は CAPITALCOM/FOREXCOM/FX/GOMARKETS、金銀は TVC、原油 OANDA:WTICOUSD、仮想通貨 BINANCE、FX は FX:（USDCAD だけ CMCMARKETS:））
 - **アプリ**（👀監視リスト、⚡・🔭共通。`fetchZones()`/`zoneHits()`）：`raw.githubusercontent.com/.../zones-data/zones.json` を起動時と復帰時（10分おき）に読み、端末ローカルにキャッシュ（`mochipoyo_zones_cache_v1`、同期しない・バックアップ対象外）。⚠️ file:// と localhost では本番 URL を読まない（テストは `window.__ZONES_URL` かキャッシュを仕込む）
   - 「📍 ゾーン付近の通貨」折りたたみ一覧（4H/D を含むものだけ・複数足が上）。＋で監視リストに追加
   - 監視リストの各通貨に、今の価格の近くのゾーンを1行（`.sw-zone-line`）

@@ -89,5 +89,18 @@ check('置換されていない {{close}} は null', parseMessage('❶ short sig
 plan = planUpdate({ rows: [], tomb: {}, target: scalp, parsed: parseMessage('❶ long sign 157.95 | USDJPY 60 2026-09-30T11:00:00Z'), now: NOW });
 check('alertPrice[tf] に入る', plan.item.alertPrice && plan.item.alertPrice['1H'] === 157.95);
 
+// S106: 通知で時間足が分かる形（右側の | を付けない）
+p = parseMessage('【1時間足】USDJPY 🟢買い long 157.824');
+check('【1時間足】→ 60・ticker・long・価格', p && p.interval === '60' && p.ticker === 'USDJPY' && p.side === 'long' && p.price === 157.824 && p.kind === 'entry' && p.at === null);
+p = parseMessage('【4時間足】GBPJPY 🔴売り short 209.034');
+check('【4時間足】→ 240・short', p && p.interval === '240' && p.side === 'short' && p.price === 209.034);
+check('【日足】→ 1D', parseMessage('【日足】BTCUSDT 🟢買い long 84739.12').interval === '1D');
+check('【週足】→ 1W・取引所付き ticker も外す', resolveTarget(parseMessage('【週足】FX:EURUSD 🔴売り short 1.13')).pair === 'EURUSD');
+check('ラベル形式も対応表に乗る（1時間足→⚡）', resolveTarget(parseMessage('【1時間足】WTICOUSD 🟢買い long 94.1')).pair === 'OIL');
+plan = planUpdate({ rows: [], tomb: {}, target: resolveTarget(parseMessage('【4時間足】GBPJPY 🔴売り short 209.034')),
+                    parsed: parseMessage('【4時間足】GBPJPY 🔴売り short 209.034'), now: NOW });
+check('ラベル形式で 🔭 に short と価格・受信時刻', plan.item.kind === 'trendwatch' && plan.item.alertSide['4H'] === 'short' && plan.item.alertPrice['4H'] === 209.034 && plan.item.alerts['4H'] === NOW);
+check('知らないラベルは null', parseMessage('【15分足】USDJPY long 1') === null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
