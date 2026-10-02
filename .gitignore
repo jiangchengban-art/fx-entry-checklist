@@ -25,6 +25,9 @@ debug-*.png
 *.tmp
 .env.local
 
+# Claude Code settings (contains sensitive tokens)
+.claude/settings.json
+
 # Supabase CLI
 supabase/.temp/
 supabase/.branches/
