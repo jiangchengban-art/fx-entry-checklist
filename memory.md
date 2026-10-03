@@ -1,6 +1,6 @@
-# FX Entry Checklist — Project Memory
+# ネックラインアラートシステム — Project Memory
 
-**Last Updated:** 2026-10-03（S106 完了後の整理）
+**Last Updated:** 2026-10-04（S106 完了後の整理）
 **Current State:** ✅ 本番使用可能。最新 S106、`sw.js` CACHE = v78
 **Main Branch:** `master`（GitHub Pages は master のルートから配信）
 **仕様の正本:** `CLAUDE.md`（このファイルは全環境で共有する「現在地と運用メモ」）

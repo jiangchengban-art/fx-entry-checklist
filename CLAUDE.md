@@ -1,4 +1,4 @@
-# fx-entry-checklist プロジェクト
+# ネックラインアラートシステム
 
 FX Entry Checklist（FXエントリーチェックリスト＆トレード記録ツール）
 
