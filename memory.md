@@ -25,6 +25,7 @@
   1. Supabase の Edge Functions → Secrets に `NTFY_TOPIC=fx-neckline-alerts` があるか
   2. S106 版の `tradingview-alert` を再 deploy 済みか（`npx supabase functions deploy tradingview-alert --project-ref inqvrsfzskjusmbwlimx --no-verify-jwt`。手順は `docs/TRADINGVIEW_ALERT_SETUP.md`）
   3. 実アラート（または curl）で🎯通知が iPhone に届くか
+- **2026-10-04 試行（Windows CLI）**：環境変数 `SUPABASE_ACCESS_TOKEN` は有るが権限不足で、`functions list` は通る一方 **deploy は 403（edge_functions_write 不足）・secrets list は 403（edge_functions_secrets_read 不足）**。本番の `tradingview-alert` は version 1（S106 版は未 deploy）。→ 上の 1〜3 は未実施。権限付きトークンの再発行（Dashboard → Account → Access Tokens）か、ユーザー自身の deploy・Secrets 設定が必要。curl 確認には `TV_WEBHOOK_KEY` も要る
 - **ゾーン分析**：`tools/zones/ROUTINE.md` の手順で Routine が `zones-data` に push（最終確認 2026-10-01）
 
 ## 運用メモ
