@@ -294,4 +294,6 @@ async function main(argv) {
   console.log('---\n' + summaryText(doc));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2));
+/* Windows でもパスが一致するよう URL に直して比べる（`file://` + C:\... では一致しない） */
+const isMain = async () => { try { const u = await import('node:url'); return import.meta.url === u.pathToFileURL(process.argv[1]).href; } catch { return false; } };
+if (await isMain()) main(process.argv.slice(2));
