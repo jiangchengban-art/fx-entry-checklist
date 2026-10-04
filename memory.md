@@ -18,14 +18,14 @@
 
 詳細は CLAUDE.md のセッション履歴表。S96 以前は `docs/CHANGELOG_ARCHIVE.md`、撤去済み機能の仕様は `docs/CLAUDE_MD_ARCHIVE.md`。
 
-## 外部連携の状態（2026-10-03）
+## 外部連携の状態（2026-10-04）
 
-- **ntfy**：iPhone の ntfy アプリでトピック `fx-neckline-alerts` を購読済み。ntfy.sh の Web から手動送信したテスト通知が iPhone に届くことを確認した
-- **未確認（次にやること）**：
-  1. Supabase の Edge Functions → Secrets に `NTFY_TOPIC=fx-neckline-alerts` があるか
-  2. S106 版の `tradingview-alert` を再 deploy 済みか（`npx supabase functions deploy tradingview-alert --project-ref inqvrsfzskjusmbwlimx --no-verify-jwt`。手順は `docs/TRADINGVIEW_ALERT_SETUP.md`）
-  3. 実アラート（または curl）で🎯通知が iPhone に届くか
-- **2026-10-04 試行（Windows CLI）**：環境変数 `SUPABASE_ACCESS_TOKEN` は有るが権限不足で、`functions list` は通る一方 **deploy は 403（edge_functions_write 不足）・secrets list は 403（edge_functions_secrets_read 不足）**。本番の `tradingview-alert` は version 1（S106 版は未 deploy）。→ 上の 1〜3 は未実施。権限付きトークンの再発行（Dashboard → Account → Access Tokens）か、ユーザー自身の deploy・Secrets 設定が必要。curl 確認には `TV_WEBHOOK_KEY` も要る
+- **ntfy**：iPhone の ntfy アプリでトピック `fx-neckline-alerts` を購読済み（手動送信のテスト通知は届く）
+- **2026-10-04 完了**：S106 版 `tradingview-alert` を deploy。Secrets に `NTFY_TOPIC=fx-neckline-alerts` と `TV_WEBHOOK_KEY`（新規生成。値はチャットで伝えた・ここには書かない）を設定。curl で旧形式・新形式 `【1時間足】…` とも `ok:true` を確認（どちらもゾーン外で `aim:false`）
+  - 環境変数の `SUPABASE_ACCESS_TOKEN` は権限不足（deploy / secrets が 403）。作業はユーザーが iPhone で発行したフルアクセストークンで行った（チャットに貼ったので、用が済んだら Dashboard → Access Tokens で削除を勧めた）
+  - Windows の Git Bash で curl に日本語を直接書くと文字化けして `unparsed` になる。UTF-8 ファイルを `--data-binary @file` で送る
+  - テスト用に本番の監視リストへ `USDJPY 1H short` の行が入っている（不要なら✓で消す）
+- **未確認（次にやること）**：🎯（ゾーン付近×方向一致）の ntfy 通知が iPhone に届くか。TradingView で `tools/tradingview/webhook-test.pine` を使って鳴らす（手順は `docs/TRADINGVIEW_ALERT_SETUP.md` D2）。本番28本への Webhook URL 貼り付けもユーザー作業で未
 - **ゾーン分析**：`tools/zones/ROUTINE.md` の手順で Routine が `zones-data` に push（最終確認 2026-10-01）
 
 ## 運用メモ

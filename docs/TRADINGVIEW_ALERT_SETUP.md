@@ -66,6 +66,20 @@ https://inqvrsfzskjusmbwlimx.supabase.co/functions/v1/tradingview-alert?key=<TV_
 
 ⚠️ Webhook を入れたアラートは MCP から編集できなくなる（メッセージ変更も手作業）。
 
+## D2. TradingView からのテスト発火（`tools/tradingview/webhook-test.pine`）
+
+TradingView には既存アラートを手動で鳴らすボタンが無いので、テスト専用のインジケーターで鳴らす。
+
+1. TradingView の Pine エディタに `tools/tradingview/webhook-test.pine` を貼って「チャートに追加」
+2. チャートを試したい通貨の **1分足**にする（足が確定するたびに送るので、1分以内に届く）
+3. インジケーターの設定で「送る時間足ラベル」「方向」を選ぶ（🎯を試すなら、ゾーン付近にある通貨と、ゾーンに合う方向を選ぶ）
+4. アラート作成 → 条件＝「Webhook テスト発火」→「**alert() 関数の呼び出しのみ**」→ 通知タブで Webhook URL（D と同じ）→ 作成
+5. 届いたら（監視リストの🔔未確認・ntfy）**そのアラートをすぐ削除**。放置すると毎分送り続ける
+
+メッセージは本番と同じ `【1時間足】USDJPY 🟢買い long 157.824` の形。チャート右上に送る文面が出る。
+
+⚠️ Windows の Git Bash から curl で試すときは、日本語を引数に直接書くと文字化けして `{"ignored":"unparsed"}` になる。本文を UTF-8 のファイルに書いて `--data-binary @file` で送ること。
+
 ## E. 届いているかの確認
 
 - アプリ：⚡👀／🔭👀 の「🔔 未確認アラート」に自動で行が増える（▲long／▼short 付き）。下部タブに赤バッジ

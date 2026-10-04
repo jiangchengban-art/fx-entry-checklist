@@ -1,0 +1,23 @@
+//@version=6
+// Webhook テスト発火（ネックラインアラートシステム用）
+// 1分足チャートに入れてアラートを作ると、足が確定するたびに本番と同じ形のメッセージを送る。
+//   【1時間足】USDJPY 🟢買い long 157.824
+// 確認が済んだらアラートを必ず削除すること（放置すると毎分 Webhook が飛び、監視リストが更新され続ける）。
+indicator("Webhook テスト発火", overlay = true)
+
+tfLabel = input.string("1時間足", "送る時間足ラベル", options = ["1時間足", "4時間足", "日足", "週足"])
+side    = input.string("long", "方向", options = ["long", "short"])
+every   = input.int(1, "何本ごとに送るか", minval = 1)
+
+sideText = side == "long" ? "🟢買い long " : "🔴売り short "
+msg = "【" + tfLabel + "】" + syminfo.ticker + " " + sideText + str.tostring(close, format.mintick)
+
+if bar_index % every == 0
+    alert(msg, alert.freq_once_per_bar_close)
+
+// 送られる内容をチャート右上に表示（確認用）
+var table t = table.new(position.top_right, 1, 1)
+if barstate.islast
+    table.cell(t, 0, 0, msg, text_color = color.white, bgcolor = color.new(color.blue, 20))
+
+plot(close, "close", display = display.none)
