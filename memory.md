@@ -1,7 +1,7 @@
 # ネックラインアラートシステム — Project Memory
 
 **Last Updated:** 2026-10-04（S107）
-**Current State:** ✅ 本番使用可能。最新 S107、`sw.js` CACHE = v79
+**Current State:** ✅ 本番使用可能。最新 S108、`sw.js` CACHE = v80
 **Main Branch:** `master`（GitHub Pages は master のルートから配信）
 **仕様の正本:** `CLAUDE.md`（このファイルは全環境で共有する「現在地と運用メモ」）
 
@@ -9,6 +9,7 @@
 
 | Session | 内容 |
 |---|---|
+| S108 | ゾーン表示をネックライン1本の価格に（`line`）。タップでコピー（TradingView に引く用）。判定は内部のゾーン幅のまま。sw v80 |
 | S107 | ネックラインを監視リストの4つ目の条件に。アラート受信時に Edge Function が ✅/▲/✖ を自動で入れる（`neckJudge`）。zones.json に `ladder`（上下複数）。sw v79。**Edge Function の再 deploy が必要** |
 | S106b | 🎯狙い目：Edge Function がアラート受信時にネックラインゾーン付近×方向一致を判定し `aim[tf]` を書いて ntfy 通知。アプリは🔔未確認に🎯、振り分けタブに「🎯 狙い目」。sw v78 |
 | S106 | 📍ネックラインゾーン：Claude Routine が1日4回 1H/4H/D を分析 → `zones-data` ブランチの `zones.json`。監視リストに📍表示、勝／負記録にゾーンを自動で控える。sw v77 |

@@ -95,9 +95,12 @@ export function clusterZones(pts, a, P = PARAMS) {
     let lo = z.lo, hi = z.hi;
     const minW = a * P.minW;
     if (hi - lo < minW) { const mid = (lo + hi) / 2; lo = mid - minW / 2; hi = mid + minW / 2; }
+    /* ネックライン＝まとまったスイング価格の中央値（TradingView に引く1本の価格） */
+    const ps = z.pts.map(p => p.p).sort((x, y) => x - y);
+    const line = ps.length % 2 ? ps[(ps.length - 1) / 2] : (ps[ps.length / 2 - 1] + ps[ps.length / 2]) / 2;
     const lastT = Math.max(...z.pts.map(p => p.t));
     const kinds = new Set(z.pts.map(p => p.type));
-    return { lo, hi, clo: z.lo, chi: z.hi, touches, lastT, role: kinds.size === 2 ? 'flip' : (kinds.has('H') ? 'res' : 'sup') };
+    return { lo, hi, line, clo: z.lo, chi: z.hi, touches, lastT, role: kinds.size === 2 ? 'flip' : (kinds.has('H') ? 'res' : 'sup') };
   });
 }
 
@@ -171,7 +174,7 @@ export function analyzePair(pair, barsByTf, P = PARAMS) {
       }
       conf.sort((x, y) => TF_ORDER[x] - TF_ORDER[y]);
       const dist = z.lo > price ? z.lo - price : z.hi < price ? price - z.hi : 0;
-      const o = { lo: round(z.lo, dec), hi: round(z.hi, dec), touches: z.touches, role: z.role,
+      const o = { line: round(z.line, dec), lo: round(z.lo, dec), hi: round(z.hi, dec), touches: z.touches, role: z.role,
                   conf, dist: round(dist, dec), near: dist <= nearUnit };
       if (z.weak) o.weak = true;
       return o;
@@ -191,12 +194,12 @@ export function analyzePair(pair, barsByTf, P = PARAMS) {
         same.conf.sort((x, y) => TF_ORDER[x] - TF_ORDER[y]);
         same.touches = Math.max(same.touches, z.touches);
         /* 表示する範囲は 4H を優先（1H は細すぎ、D は太すぎる）→ D → 1H */
-        if (RANGE_PRIO[tf] < RANGE_PRIO[same.tf]) { same.lo = z.lo; same.hi = z.hi; same.tf = tf; }
+        if (RANGE_PRIO[tf] < RANGE_PRIO[same.tf]) { same.lo = z.lo; same.hi = z.hi; same.line = z.line; same.tf = tf; }
         same.side = same.lo > out.price ? 'up' : same.hi < out.price ? 'down' : 'inside';
         same.dist = Math.min(same.dist, z.dist);
         continue;
       }
-      hot.push({ tf, side, lo: z.lo, hi: z.hi, conf: z.conf.slice(), touches: z.touches, dist: z.dist });
+      hot.push({ tf, side, line: z.line, lo: z.lo, hi: z.hi, conf: z.conf.slice(), touches: z.touches, dist: z.dist });
     }
   }
   /* S107: 上下1つずつだけだと、次の分析までに価格がそこを抜けたとき先のゾーンが無く必ず「ゾーン外」になる。
@@ -218,7 +221,7 @@ export function analyzePair(pair, barsByTf, P = PARAMS) {
       }
       conf.sort((x, y) => TF_ORDER[x] - TF_ORDER[y]);
       const dist = z.lo > price ? z.lo - price : z.hi < price ? price - z.hi : 0;
-      return { lo: round(z.lo, dec), hi: round(z.hi, dec), touches: z.touches, role: z.role, conf, dist: round(dist, dec) };
+      return { line: round(z.line, dec), lo: round(z.lo, dec), hi: round(z.hi, dec), touches: z.touches, role: z.role, conf, dist: round(dist, dec) };
     }).sort((x, y) => x.dist - y.dist);
   }
   out.hot = hot.sort((x, y) => y.conf.length - x.conf.length || y.touches - x.touches);
@@ -249,7 +252,7 @@ export function summaryText(doc) {
   const rows = hotList(doc);
   if (!rows.length) return 'ゾーン付近の通貨はありません';
   const sideJa = { inside: 'ゾーン内', up: '↑上のゾーン接近', down: '↓下のゾーン接近' };
-  return rows.map(r => `${r.conf.length >= 2 ? '★' : '・'}${r.pair} ${sideJa[r.side]} ${r.lo}–${r.hi}（${r.conf.join('・')} / 反発${r.touches}回）`).join('\n');
+  return rows.map(r => `${r.conf.length >= 2 ? '★' : '・'}${r.pair} ${sideJa[r.side]} ${r.line ?? r.lo + '–' + r.hi}（${r.conf.join('・')} / 反発${r.touches}回）`).join('\n');
 }
 
 /* ---- CLI ----

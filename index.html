@@ -360,6 +360,8 @@
   }
   .sw-zone-line span.multi b { color: var(--accent); }
   .sw-zone-line b { font-weight: 700; }
+  .zcopy { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; -webkit-tap-highlight-color: rgba(57,135,229,.3); }
+  .sw-zone-line .zcopy { color: var(--ink); font-weight: 700; padding: 2px 0; }
   .tab-bar .tab-btn { position: relative; }
   .tab-badge {
     position: absolute; top: 3px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px;
@@ -3847,7 +3849,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) fetc
 const zoneOverlap = (a, b) => a.lo <= b.hi && b.lo <= a.hi;
 /* その通貨の各足の上・下・内側のゾーンのうち、price から「付近」（1時間足の ATR 基準）にあるものを、
    重なるものどうし1つにまとめて返す。price を省くと分析時の価格で見る */
-function zoneHits(pair, price) {
+function zoneHits(pair, price, all) {
   const r = zonesDoc && zonesDoc.pairs && zonesDoc.pairs[pair];
   if (!r) return [];
   const p = Number.isFinite(price) ? price : r.price;
@@ -3858,16 +3860,17 @@ function zoneHits(pair, price) {
       : ['inside', 'up', 'down'].map(side => r.tfs[tf][side])).forEach(z => {
     if (!z || z.weak) return;
     const dist = z.lo > p ? z.lo - p : z.hi < p ? p - z.hi : 0;
-    if (dist > unit) return;
+    if (!all && dist > unit) return;
     const conf = z.conf || [tf];
     const same = out.find(h => zoneOverlap(h, z));
     if (same) {
       conf.forEach(c => { if (!same.conf.includes(c)) same.conf.push(c); });
+      if ((z.touches || 0) > same.touches) same.line = zoneLineOf(z);
       same.touches = Math.max(same.touches, z.touches || 0);
       same.dist = Math.min(same.dist, dist);
       return;
     }
-    out.push({ lo: z.lo, hi: z.hi, conf: conf.slice(), touches: z.touches || 0, dist });
+    out.push({ lo: z.lo, hi: z.hi, line: zoneLineOf(z), conf: conf.slice(), touches: z.touches || 0, dist });
   }));
   out.forEach(h => {
     h.conf.sort((a, b) => ZONE_TF_ORDER[a] - ZONE_TF_ORDER[b]);
@@ -3876,7 +3879,38 @@ function zoneHits(pair, price) {
   return out.sort((a, b) => b.conf.length - a.conf.length || a.dist - b.dist);
 }
 const zoneConfText = conf => conf.join('·');
-const zoneRangeText = h => h.lo + '–' + h.hi;
+/* S108: 表示はネックライン1本の価格（古い zones.json で line が無いときは範囲の中央） */
+function zoneLineOf(z) { return Number.isFinite(z.line) ? z.line : Number(((z.lo + z.hi) / 2).toPrecision(8)); }
+const zoneRangeText = h => String(zoneLineOf(h));
+/* 現在値の上・下それぞれ一番近いネックライン1本ずつ（4H・日足でも意識されているものを優先） */
+function zoneLines(pair) {
+  const r = zonesDoc && zonesDoc.pairs && zonesDoc.pairs[pair];
+  if (!r) return [];
+  const all = zoneHits(pair, undefined, true).map(h => Object.assign({}, h, { up: zoneLineOf(h) > r.price }));
+  const pick = up => {
+    const side = all.filter(h => h.up === up).sort((a, b) => Math.abs(zoneLineOf(a) - r.price) - Math.abs(zoneLineOf(b) - r.price));
+    return side.find(h => h.conf.some(c => c !== '1H')) || side[0] || null;
+  };
+  return [pick(true), pick(false)].filter(Boolean);
+}
+/* タップで価格をコピーできる表示 */
+const zoneCopyHtml = (v, cls) => '<span class="zcopy' + (cls ? ' ' + cls : '') + '" data-copy="' + esc(String(v)) + '" title="タップでコピー">' + esc(String(v)) + '</span>';
+function copyText(text) {
+  const done = () => showToast(text + ' をコピーしました');
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { showToast('コピーできませんでした'); }
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+document.addEventListener('click', e => {
+  const c = e.target.closest && e.target.closest('[data-copy]');
+  if (c) { e.preventDefault(); copyText(c.dataset.copy); }
+});
 function zoneUpdatedText() {
   if (!zonesDoc || !zonesDoc.generatedAt) return '';
   const old = Date.now() - new Date(zonesDoc.generatedAt).getTime() > ZONE_STALE_H * 3600000;
@@ -3887,7 +3921,7 @@ function zoneBadgeHtml(hits, priceNote) {
   if (!hits.length) return '';
   const h = hits[0];
   return '<span class="zone-badge' + (h.conf.length >= 2 ? ' multi' : '') + '" title="' +
-    esc('ネックラインゾーン ' + zoneRangeText(h) + '（' + h.conf.join('・') + ' / 反発' + h.touches + '回）' + (priceNote || '')) + '">📍' +
+    esc('ネックライン ' + zoneRangeText(h) + '（' + h.conf.join('・') + ' / 反発' + h.touches + '回）' + (priceNote || '')) + '">📍' +
     esc(zoneConfText(h.conf)) + '</span>';
 }
 /* 勝／負の記録に残すゾーンの控え（記録時点の情報なので、あとで zones.json が変わっても残る） */
@@ -3911,7 +3945,7 @@ function zoneSnapshot(pair, price) {
   const hits = zoneHits(pair, price);
   if (!hits.length) return null;
   const h = hits[0];
-  return { lo: h.lo, hi: h.hi, conf: h.conf.slice(), touches: h.touches, at: zonesDoc.generatedAt || '' };
+  return { lo: h.lo, hi: h.hi, line: zoneLineOf(h), conf: h.conf.slice(), touches: h.touches, at: zonesDoc.generatedAt || '' };
 }
 function makeWatchList(cfg) {
   const listEl = document.getElementById(cfg.listId);
@@ -3949,21 +3983,21 @@ function makeWatchList(cfg) {
     const watched = new Set(list.map(t => t.pair));
     const sideMark = { up: '↑', down: '↓', inside: '◆' };
     zoneEl.innerHTML =
-      '<summary>📍 ゾーン付近の通貨（' + rows.length + '）<span class="sw-zones-at">' + esc(zoneUpdatedText()) + '</span></summary>' +
+      '<summary>📍 ネックライン付近の通貨（' + rows.length + '）<span class="sw-zones-at">' + esc(zoneUpdatedText()) + '</span></summary>' +
       '<div class="sw-zones-body">' +
       (rows.length ? rows.map(r =>
         '<div class="sw-zone-row' + (r.conf.length >= 2 ? ' multi' : '') + '">' +
           '<span class="sw-zone-pair">' + esc(r.pair) + '</span>' +
           '<span class="sw-zone-side ' + r.side + '" title="' + (r.side === 'up' ? '上のゾーンに接近' : r.side === 'down' ? '下のゾーンに接近' : '今ゾーンの中') + '">' + sideMark[r.side] + '</span>' +
-          '<span class="sw-zone-range">' + esc(zoneRangeText(r)) + '</span>' +
+          '<span class="sw-zone-range">' + zoneCopyHtml(zoneLineOf(r)) + '</span>' +
           '<span class="sw-zone-conf">' + esc(zoneConfText(r.conf)) + '</span>' +
           '<span class="sw-zone-touch" title="反発回数">×' + r.touches + '</span>' +
           (watched.has(r.pair)
             ? '<span class="sw-zone-in">監視中</span>'
             : '<button type="button" class="sw-zone-add" data-sw-zone-add="' + esc(r.pair) + '" title="監視リストに追加">＋</button>') +
         '</div>').join('')
-        : '<div class="sw-zones-note">いまゾーン付近の通貨はありません。</div>') +
-      '<div class="sw-zones-note">↑上のゾーン接近 ↓下のゾーン接近 ◆ゾーンの中。1H·4H·D は複数の時間足で意識されている水準。×は反発回数。1日4回（7・13・17・21時）更新。</div>' +
+        : '<div class="sw-zones-note">いまネックライン付近の通貨はありません。</div>') +
+      '<div class="sw-zones-note">↑上のネックライン接近 ↓下のネックライン接近 ◆ライン上。価格をタップでコピーして TradingView に引けます。1H·4H·D は複数の時間足で意識されている水準。×は反発回数。</div>' +
       '</div>';
   };
   zoneEl.addEventListener('click', e => {
@@ -4081,7 +4115,7 @@ function makeWatchList(cfg) {
             '<span class="sw-pend-tf" title="' + p.f.title + '">' + p.f.k + '</span>' +
             (side => side === 'long' ? '<span class="sw-pend-side up" title="TradingView: long sign">▲</span>'
                    : side === 'short' ? '<span class="sw-pend-side down" title="TradingView: short sign">▼</span>' : '')((p.t.alertSide || {})[p.f.k]) +
-            (p.aim ? '<span class="aim-badge" title="' + esc('ネックラインゾーン ' + p.aim.lo + '–' + p.aim.hi + '（' + (p.aim.conf || []).join('・') + '）付近で、方向も合っている') + '">🎯' + esc((p.aim.conf || []).join('·')) + '</span>' : zoneBadgeHtml(p.zone, p.zoneNote)) +
+            (p.aim ? '<span class="aim-badge" title="' + esc('ネックライン ' + zoneLineOf(p.aim) + '（' + (p.aim.conf || []).join('・') + '）付近で、方向も合っている') + '">🎯' + esc((p.aim.conf || []).join('·')) + '</span>' : zoneBadgeHtml(p.zone, p.zoneNote)) +
             '<span class="sw-pend-age" title="' + esc(fmtDatetime(p.at)) + ' に記録">⏰' + watchElapsed(p.at) + '</span>' +
             '<span class="sw-pend-ng">' + ng.map(c => { const st = watchState(p.t, c.k);
               return '<span class="' + st + '">' + c.label + WATCH_MARK[st] + '</span>'; }).join('') + '</span>' +
@@ -4131,11 +4165,10 @@ function makeWatchList(cfg) {
   };
   /* S106: その通貨の今の価格の近くにあるゾーンを1行で（無ければ出さない） */
   const zoneLineHtml = pair => {
-    const hits = zoneHits(pair);
-    if (!hits.length) return '';
-    const sideMark = { up: '↑', down: '↓', inside: '◆' };
-    return '<div class="sw-zone-line" title="ネックラインゾーン（' + esc(zoneUpdatedText()) + '）">📍' + hits.slice(0, 2).map(h =>
-      '<span class="' + (h.conf.length >= 2 ? 'multi' : '') + '">' + sideMark[h.side] + esc(zoneRangeText(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
+    const lines = zoneLines(pair);
+    if (!lines.length) return '';
+    return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + lines.map(h =>
+      '<span class="' + (h.conf.length >= 2 ? 'multi' : '') + '">' + (h.up ? '↑' : '↓') + zoneCopyHtml(zoneLineOf(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
       '</div>';
   };
   const toggleAlert = (id, k) => update(id, t => {

@@ -79,7 +79,13 @@ await page.selectOption('#scalpWatchAdd', 'GOLD');
 // 2. 監視リストの各通貨にゾーン行
 check('USDJPY にゾーン行', (await page.textContent(srow('USDJPY'))).includes('📍'));
 check('ゾーン行に範囲と時間足', (await page.textContent(srow('USDJPY') + ' .sw-zone-line')).includes('↑') && (await page.textContent(srow('USDJPY') + ' .sw-zone-line')).includes('4H'));
-check('付近にゾーンが無い通貨は行を出さない', await page.locator(srow('GOLD') + ' .sw-zone-line').count() === 0);
+check('S108: 遠い通貨でも上下のネックライン価格を出す（コピー用）', await page.locator(srow('GOLD') + ' .sw-zone-line .zcopy').count() >= 1);
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+const zc = page.locator(srow('USDJPY') + ' .sw-zone-line .zcopy').first();
+const zcText = await zc.textContent();
+await zc.click();
+check('S108: 価格をタップでコピー', (await page.evaluate(() => navigator.clipboard.readText()).catch(() => zcText)) === zcText && /^\d+(\.\d+)?$/.test(zcText));
+check('S108: 範囲（–）は出さない', !(await page.textContent(srow('USDJPY') + ' .sw-zone-line')).includes('–'));
 
 // 3. 未確認アラートの📍
 await page.click(srow('USDJPY') + ' [data-sw-bell]');
@@ -100,7 +106,7 @@ await page.evaluate(() => {
 });
 check('鳴った価格が遠ければ📍なし', await page.locator(pend('USDJPY') + ' .zone-badge, ' + pend('USDJPY') + ' .aim-badge').count() === 0);
 check('鳴った価格がゾーン内なら印（ゾーン内は🎯狙い目）', await page.locator(pend('GOLD') + ' .aim-badge').count() === 1);
-check('印の説明にゾーンの範囲', (await page.getAttribute(pend('GOLD') + ' .aim-badge', 'title')).includes('4200'));
+check('印の説明にネックラインの価格', (await page.getAttribute(pend('GOLD') + ' .aim-badge', 'title')).includes('4201.5'));
 
 // 4. 勝／負の記録にアラートとゾーンを自動で残す
 await page.click(srow('GOLD') + ' [data-sw-res="win"]');
