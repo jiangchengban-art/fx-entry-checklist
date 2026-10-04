@@ -76,24 +76,34 @@ export function pickLive(rows, tomb) {
 /* S106: 🎯狙い目の判定。鳴った価格がネックラインゾーン（zones.json）の付近で、方向も合っているか。
    付近＝1時間足の ATR（nearUnit）以内。方向：long はゾーンが下か内側（支え）、short は上か内側（抵抗）。
    アプリの zoneHits() と同じ考え方（ゾーンは各足の上・下・内側の weak でないもの、重なるものは1つにまとめる）。 */
-export function zoneMatch(doc, pair, price, side) {
+/* S107: ネックラインを監視リストの4つ目の条件（✅成立／▲微妙／✖不成立）として自動判定する基準。ここだけ触れば調整できる。
+     ✅ 方向の合うゾーンが okAtr（1時間足の ATR 倍）以内で、4H か D でも意識されている水準
+     ▲ 方向の合うゾーンが nearUnit（＝1時間足の ATR）以内にある（遠め、または1時間足だけの水準）
+     ✖ 近くに方向の合うゾーンが無い
+     分析が staleHours より古いと判定しない（古いゾーンで ✖ を付けると、実際は合っていても見逃すため） */
+export const NECK = { okAtr: 0.5, staleHours: 12 };
+
+/* 付近（nearUnit 以内）にあって方向も合うゾーンを重なるものどうし1つにまとめて返す。
+   zones.json に ladder（上下に複数）があればそれを使い、無ければ従来の上・下・内側 */
+export function zoneCandidates(doc, pair, price, side) {
   const r = doc && doc.pairs && doc.pairs[pair];
-  if (!r || !(price > 0)) return null;
+  if (!r || !(price > 0)) return [];
   const unit = r.nearUnit || 0;
   const hits = [];
   for (const tf of Object.keys(r.tfs || {})) {
-    for (const k of ['inside', 'up', 'down']) {
-      const z = r.tfs[tf][k];
-      if (!z || z.weak) continue;
+    const t = r.tfs[tf];
+    const list = Array.isArray(t.ladder) ? t.ladder : ['inside', 'up', 'down'].map(k => t[k]).filter(z => z && !z.weak);
+    for (const z of list) {
       const dist = z.lo > price ? z.lo - price : z.hi < price ? price - z.hi : 0;
       if (dist > unit) continue;
       const same = hits.find(h => h.lo <= z.hi && z.lo <= h.hi);
       if (same) {
         (z.conf || [tf]).forEach(c => { if (!same.conf.includes(c)) same.conf.push(c); });
         same.touches = Math.max(same.touches, z.touches || 0);
+        same.dist = Math.min(same.dist, dist);
         continue;
       }
-      hits.push({ lo: z.lo, hi: z.hi, conf: (z.conf || [tf]).slice(), touches: z.touches || 0 });
+      hits.push({ lo: z.lo, hi: z.hi, conf: (z.conf || [tf]).slice(), touches: z.touches || 0, dist });
     }
   }
   const order = { '1H': 0, '4H': 1, 'D': 2 };
@@ -101,9 +111,27 @@ export function zoneMatch(doc, pair, price, side) {
     conf: h.conf.sort((a, b) => order[a] - order[b]),
     side: h.lo > price ? 'up' : h.hi < price ? 'down' : 'inside',
   })).filter(h => h.side === 'inside' || (side === 'long' ? h.side === 'down' : side === 'short' ? h.side === 'up' : true));
-  if (!ok.length) return null;
   ok.sort((a, b) => b.conf.length - a.conf.length || b.touches - a.touches);
-  return Object.assign(ok[0], { zonesAt: doc.generatedAt || '' });
+  return ok.map(h => Object.assign(h, { zonesAt: doc.generatedAt || '' }));
+}
+
+/* S106: 🎯狙い目の判定（付近＋方向）。最も強い1つを返す */
+export function zoneMatch(doc, pair, price, side) {
+  return zoneCandidates(doc, pair, price, side)[0] || null;
+}
+
+/* S107: ネックラインの自動判定。state は 'ok' | 'mid' | 'ng' | ''（判定しない）。hit は根拠のゾーン */
+export function neckJudge(doc, pair, price, side, nowMs = Date.now()) {
+  const r = doc && doc.pairs && doc.pairs[pair];
+  if (!r || !(price > 0)) return { state: '', reason: 'nodata' };
+  const at = Date.parse(doc.generatedAt || '');
+  if (Number.isFinite(at) && nowMs - at > NECK.staleHours * 3600000) return { state: '', reason: 'stale' };
+  const cands = zoneCandidates(doc, pair, price, side);
+  const unit = r.nearUnit || 0;
+  const strong = cands.find(h => h.dist <= unit * NECK.okAtr && h.conf.some(c => c !== '1H'));
+  if (strong) return { state: 'ok', hit: strong };
+  if (cands.length) return { state: 'mid', hit: cands[0] };
+  return { state: 'ng', hit: null };
 }
 
 /* 通知の文面（iPhone のロック画面で読める短さに） */
@@ -116,12 +144,13 @@ export function aimMessage(target, parsed, hit) {
   };
 }
 
-export function planUpdate({ rows, tomb, target, parsed, now, zone }) {
+export function planUpdate({ rows, tomb, target, parsed, now, zone, neck }) {
   const live = pickLive(rows, tomb);
   const at = parsed.at || now;
   const item = live ? JSON.parse(JSON.stringify(live)) : {
     id: target.prefix + '_tv_' + target.pair, kind: target.kind, pair: target.pair,
-    ng: { granville: false, rci: false, macd: false }, ok: { granville: false, rci: false, macd: false },
+    ng: { granville: false, rci: false, macd: false }, mid: { granville: false, rci: false, macd: false },
+    ok: { granville: false, rci: false, macd: false },
     notes: '', alerts: {}, createdAt: now, updatedAt: now,
   };
   item.alerts = Object.assign({}, item.alerts, { [target.tf]: at });
@@ -131,6 +160,10 @@ export function planUpdate({ rows, tomb, target, parsed, now, zone }) {
   item.aim = Object.assign({}, item.aim);
   if (zone) item.aim[target.tf] = { lo: zone.lo, hi: zone.hi, conf: zone.conf, touches: zone.touches, side: zone.side, zonesAt: zone.zonesAt };
   else delete item.aim[target.tf];
+  /* S107: ネックライン条件（k='neck'）を自動で埋める。タップで手直しできる（ng/mid/ok は排他）。判定できないときは触らない */
+  if (neck && neck.state) {
+    for (const m of ['ng', 'mid', 'ok']) item[m] = Object.assign({}, item[m], { neck: m === neck.state });
+  }
   item.updatedAt = now;
   return { created: !live, item, row: { id: 't:' + item.id, data: item, updated_at: now } };
 }

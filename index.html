@@ -265,7 +265,7 @@
   @keyframes scPaneLeft  { from { transform: translateX(-28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
   .sc-swipe-hint { margin-top: 10px; font-size: 11px; color: var(--ink-muted); }
   @media (prefers-reduced-motion: reduce) { .sc-pane.from-right, .sc-pane.from-left { animation: none; } }
-  /* S92: 👀 監視リスト。1段目＝通貨と1時間足の条件3つ、2段目＝メモ・🔔・勝負・🗑（S105で→カードを撤去） */
+  /* S92: 👀 監視リスト。1段目＝通貨と条件4つ（S107でネックを追加）、2段目＝メモ・🔔・勝負・🗑（S105で→カードを撤去） */
   .sw-add { width: auto; min-width: 150px; font-weight: 400; }
   .sc-tfsel {
     flex: none; width: 68px; font-size: 11px; font-weight: 700; font-family: inherit;
@@ -276,12 +276,12 @@
   .sc-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .sc-filter-count { font-size: 12px; color: var(--ink-muted); }
   .sc-add-card { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
-  .sw-item .sw-pair { flex: 0 0 66px; font-size: 13px; font-weight: 700; }
-  .sw-item .trend-head .sc-btn { padding: 0 4px; font-size: 11.5px; }
-  .sw-item .trend-head .tgroup { gap: 3px; }
+  .sw-item .sw-pair { flex: 0 0 62px; font-size: 12.5px; font-weight: 700; }
+  .sw-item .trend-head .sc-btn { padding: 0 2px; font-size: 11px; }
+  .sw-item .trend-head .tgroup { gap: 2px; }
   .sw-mark { font-size: 10px; margin-left: 1px; }
   .sw-item .trend-head .spacer { flex-basis: 0 !important; }
-  .sw-ok { font-size: 11px; font-weight: 700; color: var(--good); padding: 2px 7px; border-radius: 999px; background: var(--good-soft); }
+  .sw-ok { font-size: 10.5px; font-weight: 700; color: var(--good); padding: 2px 4px; flex: none; border-radius: 999px; background: var(--good-soft); }
   .sw-item.ng { border-left: 3px solid var(--bad); }
   .sw-item.ok { border-left: 3px solid var(--good); }
   .tgoto.sw-bell { width: auto; min-width: 26px; padding: 0 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
@@ -1162,7 +1162,7 @@
     <h2>👀 監視リスト（上位足）</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で3つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 4H/D/W のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
+      <div class="trend-help-body">上位足（1時間足以上）で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD・ネックはタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、4つとも ✅ なら「揃い」になります。<strong>ネック（ネックラインゾーン）は TradingView のアラートが届いた時点で自動で入ります</strong>（ゾーン付近＋方向が合えば✅、遠めなら▲、外れなら✖。違うと思ったらタップで直せます）。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で4つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔の横の鳴った時間足（1H/4H/D/W）をタップ</strong>と、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 4H/D/W のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="trendWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -1210,7 +1210,7 @@
     <h2>👀 監視リスト</h2>
     <details class="trend-help sw-help">
       <summary>📖 使い方</summary>
-      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD はタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、3つとも ✅ なら「揃い」になります。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で3つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 1H のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
+      <div class="trend-help-body">1時間足で狙っている通貨を絞り込んでおく場所です。グランビル・RCI・MACD・ネックはタップするたびに <strong>✅成立 → ▲微妙 → ✖不成立 → 未選択</strong> と切り替わり、4つとも ✅ なら「揃い」になります。<strong>ネック（ネックラインゾーン）は TradingView のアラートが届いた時点で自動で入ります</strong>（ゾーン付近＋方向が合えば✅、遠めなら▲、外れなら✖。違うと思ったらタップで直せます）。▲は「微妙に成立していないが、他が良ければ入る」ときに使います。上のタブで <strong>✅ エントリー</strong>（✖が無く✅か▲で4つ埋まる）と <strong>⏳ 待ち</strong>（✖が1つでも）に振り分けて見られます（タップ直後は行が残り、タブを押し直すと並び替わります）。条件が外れたら🗑で消します。<strong>入ったトレードは 勝／負 をタップするだけで記録</strong>され、下の「📒 勝敗の記録」に条件別（✅揃い／▲あり／✖あり）の勝率が出ます（誤タップは記録の🗑で取り消し）。<strong>アラートが鳴ったが条件待ちのときは🔔</strong>を押すと、上の「🔔 未確認アラート」に古い順で残り、確認したら ✓ で外せます。TradingView の 1H のアラートは自動でここに入ります（▲long／▼short、監視リストに無い通貨は自動で追加）。3端末で同期されます。</div>
     </details>
     <div class="list-toolbar">
       <select class="sc-pair sw-add" id="scalpWatchAdd" aria-label="監視リストに通貨を追加"></select>
@@ -3785,6 +3785,8 @@ const WATCH_NG = [
   { k: 'granville', label: 'グランビル', title: 'グランビルが不成立' },
   { k: 'rci',       label: 'RCI',        title: 'RCIが不成立' },
   { k: 'macd',      label: 'MACD',       title: 'MACDが不成立' },
+  /* S107: ネックライン。アラートが届いた時点で Edge Function が ✅/▲/✖ を自動で入れる（タップで手直しできる） */
+  { k: 'neck',      label: 'ネック',     title: 'ネックラインゾーン付近ではない／方向が合わない' },
 ];
 /* S105: 各条件は ✅成立 / ▲微妙 / ✖不成立 / 未選択 の4状態。ng・mid・ok の3つの真偽マップで持ち、排他（ng が最優先） */
 const watchState = (t, k) => (t.ng || {})[k] ? 'ng' : (t.mid || {})[k] ? 'mid' : (t.ok || {})[k] ? 'ok' : '';
@@ -3818,6 +3820,8 @@ function watchElapsed(iso) {
 const ZONES_URL = 'https://raw.githubusercontent.com/jiangchengban-art/fx-entry-checklist/zones-data/zones.json';
 const ZONES_CACHE_KEY = 'mochipoyo_zones_cache_v1';
 const ZONES_REFETCH_MS = 10 * 60 * 1000;
+const NECK_OK_ATR = 0.5;   // supabase/functions/tradingview-alert/core.mjs の NECK.okAtr と同じ値にすること
+const ZONE_STALE_H = 12;   // 同 NECK.staleHours
 const ZONE_TF_ORDER = { '1H': 0, '4H': 1, 'D': 2 };
 let zonesDoc = null;
 let zonesFetchedAt = 0;
@@ -3849,8 +3853,9 @@ function zoneHits(pair, price) {
   const p = Number.isFinite(price) ? price : r.price;
   const unit = r.nearUnit || 0;
   const out = [];
-  Object.keys(r.tfs || {}).forEach(tf => ['inside', 'up', 'down'].forEach(side => {
-    const z = r.tfs[tf][side];
+  /* S107: zones.json に ladder（上下に複数）があればそれを使う。無ければ従来の上・下・内側 */
+  Object.keys(r.tfs || {}).forEach(tf => (Array.isArray(r.tfs[tf].ladder) ? r.tfs[tf].ladder
+      : ['inside', 'up', 'down'].map(side => r.tfs[tf][side])).forEach(z => {
     if (!z || z.weak) return;
     const dist = z.lo > p ? z.lo - p : z.hi < p ? p - z.hi : 0;
     if (dist > unit) return;
@@ -3874,7 +3879,8 @@ const zoneConfText = conf => conf.join('·');
 const zoneRangeText = h => h.lo + '–' + h.hi;
 function zoneUpdatedText() {
   if (!zonesDoc || !zonesDoc.generatedAt) return '';
-  return fmtDatetime(zonesDoc.generatedAt) + ' 時点';
+  const old = Date.now() - new Date(zonesDoc.generatedAt).getTime() > ZONE_STALE_H * 3600000;
+  return fmtDatetime(zonesDoc.generatedAt) + ' 時点' + (old ? '⚠古い' : '');
 }
 /* 1つのアラートに付ける 📍。複数足で重なるほど強く見せる */
 function zoneBadgeHtml(hits, priceNote) {
@@ -3894,8 +3900,11 @@ function aimOf(t, tf) {
   const price = Number((t.alertPrice || {})[tf]);
   if (!(price > 0)) return null;
   const side = (t.alertSide || {})[tf] || '';
-  return zoneHits(t.pair, price).find(h => h.side === 'inside' ||
-    (side === 'long' ? h.side === 'down' : side === 'short' ? h.side === 'up' : true)) || null;
+  /* S107: ネックラインの ✅ と同じ基準（受信側の NECK と同じ値）：0.5ATR 以内で、4H か D でも意識されている水準 */
+  const unit = ((zonesDoc && zonesDoc.pairs && zonesDoc.pairs[t.pair]) || {}).nearUnit || 0;
+  return zoneHits(t.pair, price).find(h => (h.side === 'inside' ||
+    (side === 'long' ? h.side === 'down' : side === 'short' ? h.side === 'up' : true)) &&
+    h.dist <= unit * NECK_OK_ATR && h.conf.some(c => c !== '1H')) || null;
 }
 const watchAimTfs = t => Object.keys(t.alerts || {}).filter(tf => aimOf(t, tf));
 function zoneSnapshot(pair, price) {
@@ -4007,9 +4016,11 @@ function makeWatchList(cfg) {
   const renderLog = () => {
     const list = logs();
     if (!list.length) { logEl.innerHTML = ''; return; }
-    const allOkL = list.filter(t => WATCH_NG.every(c => (t.cond || {})[c.k] === 'ok'));
-    const midL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'mid'));
-    const ngL = list.filter(t => WATCH_NG.some(c => (t.cond || {})[c.k] === 'ng'));
+    /* S107: 条件が増える前の記録（cond.neck が無い）は、当時あった条件だけで数える */
+    const keysOf = t => WATCH_NG.filter(c => (t.cond || {})[c.k] !== undefined);
+    const allOkL = list.filter(t => keysOf(t).every(c => (t.cond || {})[c.k] === 'ok'));
+    const midL = list.filter(t => keysOf(t).some(c => (t.cond || {})[c.k] === 'mid'));
+    const ngL = list.filter(t => keysOf(t).some(c => (t.cond || {})[c.k] === 'ng'));
     const zoneL = list.filter(t => t.zone);
     logEl.innerHTML =
       '<div class="sw-log-head">📒 勝敗の記録　' + rate(list) + '</div>' +
@@ -4098,7 +4109,7 @@ function makeWatchList(cfg) {
           }).join('') +
           '</span>' +
           '<span class="spacer"></span>' +
-          (allOk ? '<span class="sw-ok" title="グランビル・RCI・MACD がすべて✅">揃い</span>' : '') +
+          (allOk ? '<span class="sw-ok" title="グランビル・RCI・MACD・ネックがすべて✅">揃</span>' : '') +
         '</div>' +
         zoneLineHtml(t.pair) +
         '<div class="trend-tf">' +
@@ -4156,7 +4167,7 @@ function makeWatchList(cfg) {
     listEl.innerHTML = !list.length
       ? '<div class="empty-state">まだありません。上の「＋ 通貨を追加」から選んでください。</div>'
       : shown.length ? shown.map(itemHtml).join('')
-      : '<div class="empty-state">' + (group === 'entry' ? '✖ が無く3つとも ✅／▲ の通貨はまだありません。'
+      : '<div class="empty-state">' + (group === 'entry' ? '✖ が無く4つとも ✅／▲ の通貨はまだありません。'
         : group === 'aim' ? 'ネックラインゾーン付近で方向の合うアラートが鳴った通貨は、ここに自動で入ります。'
         : '✖ が付いている通貨はありません。') + '</div>';
     renderPend();
@@ -4198,9 +4209,9 @@ function makeWatchList(cfg) {
     const trades = loadTrades();
     if (trades.some(t => isMine(t) && t.pair === pair)) { render(); return; }
     const now = new Date().toISOString();
-    trades.push({ id: mvGenId(cfg.idPrefix), kind: cfg.kind, pair, ng: { granville: false, rci: false, macd: false },
-                  mid: { granville: false, rci: false, macd: false },
-                  ok: { granville: false, rci: false, macd: false }, notes: '', createdAt: now, updatedAt: now });
+    trades.push({ id: mvGenId(cfg.idPrefix), kind: cfg.kind, pair, ng: { granville: false, rci: false, macd: false, neck: false },
+                  mid: { granville: false, rci: false, macd: false, neck: false },
+                  ok: { granville: false, rci: false, macd: false, neck: false }, notes: '', createdAt: now, updatedAt: now });
     if (!saveTrades(trades)) return;
     if (group !== 'all') setGroup('all'); else render();
   });

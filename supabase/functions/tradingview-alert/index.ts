@@ -1,7 +1,7 @@
 /* TradingView Webhook の受け口。POST の本文（アラートメッセージ）を読んで trades_checklist の監視アイテム行を更新する。
    ?key=<TV_WEBHOOK_KEY> で認証（TradingView は Authorization ヘッダを付けないので verify_jwt=false）。
    TradingView は 4xx/5xx を受けると再送や停止をするので、拒否するのは key 不一致だけ。読めない本文は 200 で無視してログに残す。 */
-import { aimMessage, parseMessage, planUpdate, resolveTarget, zoneMatch } from './core.mjs';
+import { aimMessage, neckJudge, parseMessage, planUpdate, resolveTarget } from './core.mjs';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -76,8 +76,10 @@ Deno.serve(async (req) => {
     sb(TABLE + '?select=data&id=eq.tomb'),
   ]);
   const tomb = (tombRows && tombRows[0] && tombRows[0].data) || {};
-  const zone = zoneMatch(await loadZones(), target.pair, parsed.price, parsed.side);
-  const plan = planUpdate({ rows, tomb, target, parsed, now: new Date().toISOString(), zone });
+  /* S107: ネックラインを条件として判定。✅（付近・方向一致・4H/D でも意識）のときだけ 🎯 と通知 */
+  const neck = neckJudge(await loadZones(), target.pair, parsed.price, parsed.side);
+  const zone = neck.state === 'ok' ? neck.hit : null;
+  const plan = planUpdate({ rows, tomb, target, parsed, now: new Date().toISOString(), zone, neck });
   await sb(TABLE, {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -85,5 +87,5 @@ Deno.serve(async (req) => {
   });
   console.log('[tv]', target.pair, target.tf, parsed.side, plan.created ? 'created' : 'updated', plan.item.id);
   if (zone) await notify(aimMessage(target, parsed, zone));
-  return reply({ ok: true, pair: target.pair, tf: target.tf, side: parsed.side, id: plan.item.id, created: plan.created, aim: !!zone });
+  return reply({ ok: true, pair: target.pair, tf: target.tf, side: parsed.side, id: plan.item.id, created: plan.created, aim: !!zone, neck: neck.state || neck.reason });
 });

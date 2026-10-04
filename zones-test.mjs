@@ -77,5 +77,12 @@ check('通知はゾーン付近の通貨だけ', hotList(doc).every(h => h.pair 
 check('通知文に★と時間足', /★USDJPY .*1H・4H・D/.test(summaryText(doc)));
 check('付近が無ければその旨', summaryText({ pairs: {} }) === 'ゾーン付近の通貨はありません');
 
+// 9. S107: ladder（上下に複数残す）
+const lad = near.tfs['4H'].ladder;
+check('ladder は距離順の配列', Array.isArray(lad) && lad.length >= 1 && lad.every((z, i) => i === 0 || lad[i - 1].dist <= z.dist));
+check('ladder に複数足の重なり(conf)が付く', lad.some(z => z.conf.length === 3));
+check('ladder は上下 ladderN 個＋内側まで', lad.length <= 2 * 4 + 1);
+
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

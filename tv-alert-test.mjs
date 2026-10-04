@@ -1,5 +1,5 @@
 /* S104: TradingView アラート → 監視リスト行更新（Edge Function の純関数部分） */
-import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage } from './supabase/functions/tradingview-alert/core.mjs';
+import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage, neckJudge, zoneCandidates } from './supabase/functions/tradingview-alert/core.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -125,6 +125,34 @@ check('次に揃わないアラートが来たら印を外す', !plan.item.aim['
 const am = aimMessage(gt, gp, zoneMatch(Z, 'GBPJPY', 209.10, 'short'));
 check('通知の見出しに 通貨・足・売買', am.title === '🎯 GBPJPY 4H 🔴売り');
 check('通知の本文に価格・ゾーン・時間足', am.body.includes('209.1') && am.body.includes('上のゾーン手前') && am.body.includes('1H・4H・D'));
+
+// S107: ネックラインを4つ目の条件として自動判定（✅/▲/✖、古い分析は判定しない）
+const T0 = Date.parse('2026-10-02T00:00:00Z');
+let nj = neckJudge(Z, 'GBPJPY', 209.10, 'short', T0);
+check('近く(0.5ATR以内)・方向一致・4H/Dでも意識 → ✅', nj.state === 'ok' && nj.hit.conf.includes('D'));
+nj = neckJudge(Z, 'GBPJPY', 209.0, 'short', T0);
+check('1ATR以内だが0.5ATRより遠い → ▲', nj.state === 'mid');
+nj = neckJudge(Z, 'GBPJPY', 208.85, 'long', T0);
+check('1Hだけの水準が近い → ▲', nj.state === 'mid' && nj.hit.conf.join() === '1H');
+check('近くに方向の合うゾーンが無い → ✖', neckJudge(Z, 'GBPJPY', 208.0, 'long', T0).state === 'ng');
+check('方向が逆（long で上のゾーンだけ近い）→ ✖', neckJudge(Z, 'GBPJPY', 209.10, 'long', T0).state === 'ng');
+check('ゾーン内は ✅（4H/D でも意識）', neckJudge(Z, 'GBPJPY', 209.22, 'long', T0).state === 'ok');
+check('分析が12時間より古い → 判定しない', neckJudge(Z, 'GBPJPY', 209.10, 'short', T0 + 40 * 3600000).state === '');
+check('通貨が zones に無い → 判定しない', neckJudge(Z, 'XXXJPY', 1, 'short', T0).state === '');
+const ZL = { generatedAt: '2026-10-01T22:00:00Z', pairs: { USDJPY: { nearUnit: 0.2, tfs: {
+  '4H': { up: null, down: null, ladder: [
+    { lo: 158.0, hi: 158.1, touches: 3, conf: ['4H', 'D'] }, { lo: 157.4, hi: 157.5, touches: 2, conf: ['4H', 'D'] },
+  ] } } } } };
+check('ladder の2番目のゾーン（価格が最初のを抜けた後）も判定できる', neckJudge(ZL, 'USDJPY', 157.55, 'long', T0).state === 'ok');
+check('従来形式（up/down だけ）でも候補が出る', zoneCandidates(Z, 'GBPJPY', 209.10, 'short').length === 1);
+plan = planUpdate({ rows: [], tomb: {}, target: gt, parsed: gp, now: NOW, neck: { state: 'ok' } });
+check('neck ✅ → ok.neck だけ true', plan.item.ok.neck === true && plan.item.mid.neck === false && plan.item.ng.neck === false);
+plan = planUpdate({ rows: [{ data: plan.item }], tomb: {}, target: gt, parsed: gp, now: NOW, neck: { state: 'ng' } });
+check('次のアラートで ✖ に更新（排他）', plan.item.ng.neck === true && plan.item.ok.neck === false);
+plan = planUpdate({ rows: [{ data: plan.item }], tomb: {}, target: gt, parsed: gp, now: NOW, neck: { state: '' } });
+check('判定しないときは手元の値を触らない', plan.item.ng.neck === true);
+check('他の条件（グランビル等）は触らない', plan.item.ok.granville === false && plan.item.mid.rci === false);
+
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

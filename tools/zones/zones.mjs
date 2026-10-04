@@ -24,6 +24,7 @@ export const PARAMS = {
   confTol1h: 0.2,   // 複数足の重なり：実際の山・谷の価格どうしが「1時間足の ATR×これ」以内なら同じ水準とみなす
   hotTfs: ['4H', 'D'], // 通知に載せるのは、この足のゾーンを含むものだけ（1時間足だけのゾーンはどこにでもあるので載せない）
   hotMax: 12,       // 通知に載せる最大件数
+  ladderN: 4,       // S107: 現在値の上・下それぞれ、近い順に何個まで zones.json に残すか（次の分析までに価格がゾーンを抜けても判定できるように）
 };
 
 export const TFS = ['1H', '4H', 'D'];
@@ -197,6 +198,28 @@ export function analyzePair(pair, barsByTf, P = PARAMS) {
       }
       hot.push({ tf, side, lo: z.lo, hi: z.hi, conf: z.conf.slice(), touches: z.touches, dist: z.dist });
     }
+  }
+  /* S107: 上下1つずつだけだと、次の分析までに価格がそこを抜けたとき先のゾーンが無く必ず「ゾーン外」になる。
+     反発 minTouch 回以上のゾーンを現在値の上・下それぞれ近い順に ladderN 個（＋内側）残す。重なり判定は ladder どうしで行う */
+  const ladders = {};
+  for (const tf of Object.keys(tfRes)) {
+    const sr = tfRes[tf].strong;
+    ladders[tf] = [
+      ...sr.filter(z => z.lo <= price && price <= z.hi),
+      ...sr.filter(z => z.lo > price).sort((x, y) => x.lo - y.lo).slice(0, P.ladderN),
+      ...sr.filter(z => z.hi < price).sort((x, y) => y.hi - x.hi).slice(0, P.ladderN),
+    ];
+  }
+  for (const tf of Object.keys(tfRes)) {
+    out.tfs[tf].ladder = ladders[tf].map(z => {
+      const conf = [tf];
+      for (const o of Object.keys(ladders)) {
+        if (o !== tf && ladders[o].some(oz => z.clo - confTol <= oz.chi && oz.clo - confTol <= z.chi)) conf.push(o);
+      }
+      conf.sort((x, y) => TF_ORDER[x] - TF_ORDER[y]);
+      const dist = z.lo > price ? z.lo - price : z.hi < price ? price - z.hi : 0;
+      return { lo: round(z.lo, dec), hi: round(z.hi, dec), touches: z.touches, role: z.role, conf, dist: round(dist, dec) };
+    }).sort((x, y) => x.dist - y.dist);
   }
   out.hot = hot.sort((x, y) => y.conf.length - x.conf.length || y.touches - x.touches);
   out.nearUnit = round(nearUnit, dec);

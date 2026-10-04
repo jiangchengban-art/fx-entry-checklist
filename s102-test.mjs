@@ -42,7 +42,7 @@ check('既定は「すべて」', await page.$eval(`${P} [data-sw-group="all"]`,
 
 for (const p of ['USDJPY', 'EURUSD', 'GOLD']) await page.selectOption('#trendWatchAdd', p);
 // USDJPY：3つとも✅ → エントリー／EURUSD：MACD✖ → 待ち／GOLD：グランビルだけ✅ → どちらでもない
-await tap('USDJPY', 'granville'); await tap('USDJPY', 'rci'); await tap('USDJPY', 'macd');
+await tap('USDJPY', 'granville'); await tap('USDJPY', 'rci'); await tap('USDJPY', 'macd'); await tap('USDJPY', 'neck');
 await tap('EURUSD', 'granville'); await tap('EURUSD', 'macd', 3);
 await tap('GOLD', 'granville');
 check('件数：すべて3', (await tabText('all')).includes('3'));
@@ -50,7 +50,7 @@ check('件数：エントリー1', (await tabText('entry')).endsWith('1'));
 check('件数：待ち1', (await tabText('wait')).endsWith('1'));
 
 await selectGroup('entry');
-check('エントリーは3つとも✅の通貨だけ', (await shownPairs()).join() === 'USDJPY');
+check('エントリーは4つとも✅の通貨だけ', (await shownPairs()).join() === 'USDJPY');
 await selectGroup('wait');
 check('待ちは✖が付いた通貨だけ', (await shownPairs()).join() === 'EURUSD');
 await selectGroup('all');
@@ -66,7 +66,7 @@ await tap('USDJPY', 'macd');
 check('タップ直後は行が残る', (await shownPairs()).join() === 'USDJPY');
 check('件数は即時に更新（エントリー0・待ち2）', (await tabText('entry')).endsWith('0') && (await tabText('wait')).endsWith('2'));
 await selectGroup('entry');
-check('該当なしの表示', (await page.textContent('#trendWatch')).includes('✖ が無く3つとも ✅／▲ の通貨はまだありません'));
+check('該当なしの表示', (await page.textContent('#trendWatch')).includes('✖ が無く4つとも ✅／▲ の通貨はまだありません'));
 
 // 選んだタブは再読み込み後も残る
 await selectGroup('wait');

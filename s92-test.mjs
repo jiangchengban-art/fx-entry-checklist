@@ -65,11 +65,11 @@ check('追加直後は揃いにならない（未選択）', await page.locator(
 
 // 2. ✅成立 → ▲微妙 → ✖不成立 → 未選択（S104で▲を追加）
 const tap = k => page.click(`${row('USDJPY')} [data-sw-ng="${k}"]`);
-await tap('granville'); await tap('rci'); await tap('macd');
+await tap('granville'); await tap('rci'); await tap('macd'); await tap('neck');
 let u = (await watch()).find(t => t.pair === 'USDJPY');
 check('1タップで✅成立として保存', u.ok.granville && u.ok.rci && u.ok.macd && !u.ng.rci);
 check('ボタンに✅が付く', (await page.textContent(`${row('USDJPY')} [data-sw-ng="rci"]`)) === 'RCI✅');
-check('3つとも✅で揃い', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
+check('4つとも✅で揃い', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
 check('件数表示（揃い 1）', (await page.textContent('#scalpWatchCount')).includes('2 通貨（揃い 1）'));
 await tap('rci'); await tap('macd');
 u = (await watch()).find(t => t.pair === 'USDJPY');
@@ -182,8 +182,8 @@ check('375pxで横スクロールなし', await page.evaluate(() => document.doc
 await page.click(`${row('USDJPY')} [data-sw-ng="rci"]`);
 await page.click(`${row('USDJPY')} [data-sw-ng="macd"]`);
 await page.click(`${row('USDJPY')} [data-sw-ng="macd"]`);
-check('3つとも✅で揃い表示', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
-check('1行目（通貨＋3条件）が1行に収まる', await page.$$eval('#scalpWatch [data-sw] .trend-head > :not(.spacer)',
+check('4つとも✅で揃い表示', await page.locator(`${row('USDJPY')} .sw-ok`).count() === 1);
+check('1行目（通貨＋4条件）が1行に収まる', await page.$$eval('#scalpWatch [data-sw] .trend-head > :not(.spacer)',
   els => { const c = els.map(e => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; }); return Math.max(...c) - Math.min(...c) < 8; }));
 
 check('コンソールエラーなし', errors.length === 0);

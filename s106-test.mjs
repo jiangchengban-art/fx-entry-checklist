@@ -31,7 +31,7 @@ const DOC = {
     },
     GOLD: {
       price: 4170, nearUnit: 5, tfs: {
-        '1H': { atr: 5, up: { lo: 4200, hi: 4203, touches: 2, conf: ['1H'] }, down: null, inside: null },
+        '1H': { atr: 5, up: { lo: 4200, hi: 4203, touches: 2, conf: ['1H', '4H'] }, down: null, inside: null },
         '4H': { atr: 12, up: { lo: 4230, hi: 4240, touches: 3, conf: ['4H'] }, down: null, inside: null },
       },
     },
