@@ -10,7 +10,7 @@
 | Session | 内容 |
 |---|---|
 | S108 | ゾーン表示をネックライン1本の価格に（`line`）。タップでコピー（TradingView に引く用）。判定は内部のゾーン幅のまま。sw v80 |
-| S107 | ネックラインを監視リストの4つ目の条件に。アラート受信時に Edge Function が ✅/▲/✖ を自動で入れる（`neckJudge`）。zones.json に `ladder`（上下複数）。sw v79。**Edge Function の再 deploy が必要** |
+| S107 | ネックラインを監視リストの4つ目の条件に。アラート受信時に Edge Function が ✅/▲/✖ を自動で入れる（`neckJudge`）。zones.json に `ladder`（上下複数）。sw v79。Edge Function は 10/05 に deploy 済み |
 | S106b | 🎯狙い目：Edge Function がアラート受信時にネックラインゾーン付近×方向一致を判定し `aim[tf]` を書いて ntfy 通知。アプリは🔔未確認に🎯、振り分けタブに「🎯 狙い目」。sw v78 |
 | S106 | 📍ネックラインゾーン：Claude Routine が1日4回 1H/4H/D を分析 → `zones-data` ブランチの `zones.json`。監視リストに📍表示、勝／負記録にゾーンを自動で控える。sw v77 |
 | S105 | 監視リストに ▲微妙・勝／負の1タップ記録（`kind:'watchlog'`）、→カード撤去 |
@@ -27,6 +27,7 @@
   - 環境変数の `SUPABASE_ACCESS_TOKEN` は権限不足（deploy / secrets が 403）。作業はユーザーが iPhone で発行したフルアクセストークンで行った（チャットに貼ったので、用が済んだら Dashboard → Access Tokens で削除を勧めた）
   - Windows の Git Bash で curl に日本語を直接書くと文字化けして `unparsed` になる。UTF-8 ファイルを `--data-binary @file` で送る
   - テスト用に本番の監視リストへ `USDJPY 1H short` の行が入っている（不要なら✓で消す）
+- **2026-10-05 完了**：S107/S108 版 `tradingview-alert`（`neckJudge` 入り）を再 deploy、`NTFY_TOPIC` を再設定。使ったフルアクセストークンはチャットに貼られたもの。ユーザーに Dashboard → Access Tokens での削除を依頼済み（削除したかは未確認）
 - **未確認（次にやること）**：🎯（ゾーン付近×方向一致）の ntfy 通知が iPhone に届くか。TradingView で `tools/tradingview/webhook-test.pine` を使って鳴らす（手順は `docs/TRADINGVIEW_ALERT_SETUP.md` D2）。本番28本への Webhook URL 貼り付けもユーザー作業で未
 - **ゾーン分析**：⚠️ 2026-10-04 時点で **定期実行の Routine は登録されていない**（RemoteTrigger の一覧は無関係の「4H重要ライン定点レポート」1件のみ。zones-data の更新は 10/01 の手動実行1回だけだった）。10/04 に手動で再生成して push 済み（ladder つき）。定期化するには Routine を作る必要がある（手順 `tools/zones/ROUTINE.md`、1回で約10万トークン×1日4回）。アプリ・Edge Function は分析が 12 時間より古いと「古い」表示／ネック判定なしにする
 
