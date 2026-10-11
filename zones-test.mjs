@@ -1,5 +1,5 @@
 /* S106: ネックラインゾーンの計算（tools/zones/zones.mjs の純関数）。ブラウザ不要 */
-import { analyzeTf, analyzePair, buildZones, hotList, summaryText, decimalsOf, pivots } from './tools/zones/zones.mjs';
+import { analyzeTf, analyzePair, buildZones, hotList, summaryText, decimalsOf, pivots, SYMBOLS, CRYPTO, isWeekendJst, activePairs } from './tools/zones/zones.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -83,6 +83,22 @@ check('ladder は距離順の配列', Array.isArray(lad) && lad.length >= 1 && l
 check('ladder に複数足の重なり(conf)が付く', lad.some(z => z.conf.length === 3));
 check('ladder は上下 ladderN 個＋内側まで', lad.length <= 2 * 4 + 1);
 
+
+// 10. S109: 仮想通貨は BTC・ETH だけ／土日（日本時間）は仮想通貨だけ分析し、他は前回の結果を残す
+check('仮想通貨の銘柄は BTC と ETH だけ', CRYPTO.join() === 'BTCUSDT,ETHUSDT' && Object.keys(SYMBOLS).filter(p => /USDT$/.test(p)).join() === 'BTCUSDT,ETHUSDT');
+check('日本時間の土曜・日曜は週末', isWeekendJst(new Date('2026-10-10T06:00:00+09:00')) && isWeekendJst(new Date('2026-10-11T17:00:00+09:00')));
+check('日本時間の月曜 6:00 は平日（金曜の夜 23:59 も平日）', !isWeekendJst(new Date('2026-10-12T06:00:00+09:00')) && !isWeekendJst(new Date('2026-10-09T23:59:00+09:00')));
+check('週末の対象は仮想通貨だけ・平日は全銘柄', activePairs(new Date('2026-10-11T06:00:00+09:00')).join() === 'BTCUSDT,ETHUSDT' &&
+  activePairs(new Date('2026-10-12T06:00:00+09:00')).length === Object.keys(SYMBOLS).length);
+{
+  const fri = buildZones({ USDJPY: { '1H': rangeBars(300), '4H': rangeBars(300, { dt: 14400 }) },
+                           BTCUSDT: { '1H': rangeBars(300), '4H': rangeBars(300, { dt: 14400 }) } }, '2026-10-09T08:00:00Z');
+  const sat = buildZones({ BTCUSDT: { '1H': rangeBars(300, { lo: 200, hi: 220, end: 210 }), '4H': rangeBars(300, { lo: 200, hi: 220, end: 210, dt: 14400 }) } },
+    '2026-10-10T21:00:00Z', undefined, fri);
+  check('土曜の分析：仮想通貨は更新・FX は金曜の結果を残す', !!sat.pairs.USDJPY && sat.pairs.USDJPY.at === '2026-10-09T08:00:00Z' && sat.pairs.BTCUSDT.at === '2026-10-10T21:00:00Z');
+  check('更新された通貨は新しい価格帯', sat.pairs.BTCUSDT.price > 150);
+  check('前回が無ければ今回の分だけ', Object.keys(buildZones({ USDJPY: { '1H': rangeBars(300) } }, '2026-10-09T08:00:00Z').pairs).join() === 'USDJPY');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,5 +1,5 @@
 /* S104: TradingView アラート → 監視リスト行更新（Edge Function の純関数部分） */
-import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage, neckJudge, zoneCandidates } from './supabase/functions/tradingview-alert/core.mjs';
+import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage, neckJudge, zoneCandidates, itemCls } from './supabase/functions/tradingview-alert/core.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -153,6 +153,33 @@ plan = planUpdate({ rows: [{ data: plan.item }], tomb: {}, target: gt, parsed: g
 check('判定しないときは手元の値を触らない', plan.item.ng.neck === true);
 check('他の条件（グランビル等）は触らない', plan.item.ok.granville === false && plan.item.mid.rci === false);
 
+
+
+// S109: アラートの時間足で種類（スキャ／デイ／スイング）が決まる。デイとスイングは別のカード
+check('60→スキャ・240→デイ・1D/1W→スイング', resolveTarget({ ticker: 'USDJPY', interval: '60' }).cls === 'scalp' &&
+  resolveTarget({ ticker: 'USDJPY', interval: '240' }).cls === 'day' && resolveTarget({ ticker: 'USDJPY', interval: '1D' }).cls === 'swing' &&
+  resolveTarget({ ticker: 'USDJPY', interval: '1W' }).cls === 'swing');
+check('itemCls：scalpwatch=スキャ／cls優先／旧データは鳴っている足で決める',
+  itemCls({ kind: 'scalpwatch' }) === 'scalp' && itemCls({ kind: 'trendwatch', cls: 'swing', alerts: { '4H': 'x' } }) === 'swing' &&
+  itemCls({ kind: 'trendwatch', alerts: { '4H': 'x' } }) === 'day' && itemCls({ kind: 'trendwatch', alerts: { D: 'x' } }) === 'swing' &&
+  itemCls({ kind: 'trendwatch', alerts: {} }) === 'day');
+{
+  const dayItem = { data: { id: 'tw_tv_USDJPY', kind: 'trendwatch', pair: 'USDJPY', cls: 'day', alerts: { '4H': '2026-09-30T08:00:00.000Z' },
+    ng: {}, mid: {}, ok: {}, notes: '', createdAt: '2026-09-30T08:00:00.000Z', updatedAt: '2026-09-30T08:00:00.000Z' } };
+  const pd = parseMessage('【日足】USDJPY 🔴売り short 157.1');
+  const pl = planUpdate({ rows: [dayItem], tomb: {}, target: resolveTarget(pd), parsed: pd, now: NOW });
+  check('同じ通貨のデイのカードがあっても、日足アラートはスイングの別カード（tw_tv_<PAIR>_s・cls=swing）',
+    pl.created && pl.item.id === 'tw_tv_USDJPY_s' && pl.item.cls === 'swing' && pl.item.alerts.D && !pl.item.alerts['4H']);
+  const swingItem = { data: Object.assign({}, pl.item) };
+  const p4 = parseMessage('【4時間足】USDJPY 🟢買い long 157.0');
+  const pl2 = planUpdate({ rows: [dayItem, swingItem], tomb: {}, target: resolveTarget(p4), parsed: p4, now: NOW });
+  check('4Hのアラートはデイのカードだけを更新', !pl2.created && pl2.item.id === 'tw_tv_USDJPY' && pl2.item.alerts['4H'] === pl2.item.alerts['4H'] && pl2.item.cls === 'day');
+  const ps = planUpdate({ rows: [], tomb: {}, target: resolveTarget(p4), parsed: p4, now: NOW });
+  check('新規のデイは cls=day・id は従来どおり tw_tv_<PAIR>', ps.item.id === 'tw_tv_USDJPY' && ps.item.cls === 'day');
+  const p1h = parseMessage('【1時間足】USDJPY 🟢買い long 157.0');
+  const pp = planUpdate({ rows: [], tomb: {}, target: resolveTarget(p1h), parsed: p1h, now: NOW });
+  check('スキャ（scalpwatch）には cls を付けない', pp.item.cls === undefined && pp.item.id === 'sw_tv_USDJPY');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

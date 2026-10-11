@@ -1,4 +1,4 @@
-/* S55 スモークテスト：🎯タブ廃止・記録フォームのモーダル（S97から新規記録は🔭カードの💾、モーダルは📚の✎編集用） */
+/* S55 スモークテスト：記録フォームのモーダル（S109: 新規記録は👀監視の「入った」、モーダルは✎編集用） */
 import { chromium } from 'playwright';
 import path from 'path';
 
@@ -20,34 +20,36 @@ async function newPage() {
   return page;
 }
 
-/* 🔭記録カードで💾まで済ませる（S97）。カード0に通貨・足・区分・方向を入れて保存 */
+/* 👀監視の「入った」まで済ませる（S109）。4時間足のアラートが鳴った監視カードを作り、エントリー足（既定）と約定価格だけで記録 */
 async function recordViaCard(page, pair, dir) {
-  await page.click('.tab-btn[data-tab="trend"]');
-  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
-  const c = '#trendSlots [data-slot="0"] ';
-  await page.selectOption(c + '[data-sc-pair]', pair);
-  await page.selectOption(c + '[data-sc-sel="tfHigher"]', '4時間足');
-  await page.selectOption(c + '[data-sc-sel="tfEntry"]', '5分足');
-  await page.click(c + '[data-sc="tradeType"][data-v="demo"]');
-  await page.click(c + '[data-sc="direction"][data-v="' + dir + '"]');
-  await page.click(c + '[data-sc-act="save"]');
+  await page.evaluate(([pair, dir]) => {
+    const now = new Date().toISOString();
+    const c4 = () => ({ granville: false, rci: false, macd: false, neck: false });
+    saveTrades([{ id: 'w_' + pair, kind: 'trendwatch', pair, cls: 'day', ng: c4(), mid: c4(), ok: c4(), notes: '',
+                  alerts: { '4H': now }, alertSide: { '4H': dir }, createdAt: now, updatedAt: now }]);
+    watchBoard.render();
+  }, [pair, dir]);
+  await page.click('.tab-btn[data-tab="watch"]');
+  await page.click('#swList [data-sw] [data-sw-in-open]');
+  await page.fill('#swList [data-sw-in="entry"]', '150.12');
+  await page.click('#swList [data-sw-go]');
 }
 
-console.log('\n[①] 🎯タブが存在しない・既定タブは一覧');
+console.log('\n[①] 🎯タブが存在しない・既定タブは監視');
 {
   const page = await newPage();
-  eq('タブは4つ（S88で⚡1分足を追加）', await page.locator('.tab-btn').count(), 4);
+  eq('タブは4つ（監視/記録/振り返り/設定）', await page.locator('.tab-btn').count(), 4);
   eq('🎯タブが無い', await page.locator('[data-tab="trade"]').count(), 0);
-  ok('既定で一覧タブがアクティブ', await page.locator('[data-tab="trend"]').evaluate(el => el.classList.contains('active')));
+  ok('既定で監視タブがアクティブ', await page.locator('[data-tab="watch"]').evaluate(el => el.classList.contains('active')));
   await page.context().close();
 }
 
-console.log('\n[②] 🔭記録カードの💾でモーダルを開かずに記録できる（S97）');
+console.log('\n[②] 「入った」でモーダルを開かずに記録できる（S109）');
 {
   const page = await newPage();
   await recordViaCard(page, 'USDJPY', 'long');
   ok('モーダルは開かない', !(await page.locator('#tradeModal').evaluate(el => el.classList.contains('show'))));
-  ok('一覧タブはアクティブのまま', await page.locator('[data-tab="trend"]').evaluate(el => el.classList.contains('active')));
+  ok('監視タブはアクティブのまま', await page.locator('[data-tab="watch"]').evaluate(el => el.classList.contains('active')));
   await page.click('[data-tab="review"]');
   ok('振り返りタブの履歴にUSDJPYが載る', (await page.textContent('#recordList')).includes('USDJPY'));
   await page.context().close();

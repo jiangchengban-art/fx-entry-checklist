@@ -34,14 +34,23 @@ export const INTERVAL_TO_TF = { '1h': '1H', '60': '1H', '4h': '4H', '240': '4H',
 export const SYMBOLS = {
   SPX500: 'CAPITALCOM:SPX500', NAS100: 'CAPITALCOM:NAS100', US30: 'CAPITALCOM:US30',
   JP225: 'FOREXCOM:JP225', UK100: 'FX:UK100', DAX40: 'GOMARKETS:DAX40',
-  BTCUSDT: 'BINANCE:BTCUSDT', ETHUSDT: 'BINANCE:ETHUSDT', XRPUSDT: 'BINANCE:XRPUSDT',
-  SOLUSDT: 'BINANCE:SOLUSDT', BNBUSDT: 'BINANCE:BNBUSDT', DOGEUSDT: 'BINANCE:DOGEUSDT',
+  BTCUSDT: 'BINANCE:BTCUSDT', ETHUSDT: 'BINANCE:ETHUSDT',
   GOLD: 'TVC:GOLD', SILVER: 'TVC:SILVER', OIL: 'OANDA:WTICOUSD',
   USDJPY: 'FX:USDJPY', EURJPY: 'FX:EURJPY', GBPJPY: 'FX:GBPJPY', EURUSD: 'FX:EURUSD',
   GBPUSD: 'FX:GBPUSD', AUDUSD: 'FX:AUDUSD', AUDJPY: 'FX:AUDJPY', NZDUSD: 'FX:NZDUSD',
   NZDJPY: 'FX:NZDJPY', USDCHF: 'FX:USDCHF', CHFJPY: 'FX:CHFJPY', USDCAD: 'CMCMARKETS:USDCAD',
   CADJPY: 'FX:CADJPY',
 };
+/* S109: 仮想通貨は BTC と ETH だけを分析する（他の銘柄のアラートにはネック判定が付かない）。
+   土日（日本時間）は市場が開いている仮想通貨だけを分析し、他は前回の結果を残す */
+export const CRYPTO = ['BTCUSDT', 'ETHUSDT'];
+export function isWeekendJst(d = new Date()) {
+  const day = new Date(d.getTime() + 9 * 3600000).getUTCDay();
+  return day === 0 || day === 6;
+}
+export function activePairs(d = new Date()) {
+  return Object.keys(SYMBOLS).filter(p => !isWeekendJst(d) || CRYPTO.includes(p));
+}
 export const SYMBOL_TO_PAIR = Object.fromEntries(Object.entries(SYMBOLS).map(([p, s]) => [s, p]));
 
 export function atr(bars, len = PARAMS.atrLen) {
@@ -229,11 +238,17 @@ export function analyzePair(pair, barsByTf, P = PARAMS) {
   return out;
 }
 
-export function buildZones(barsByPair, now = new Date().toISOString(), P = PARAMS) {
+export function buildZones(barsByPair, now = new Date().toISOString(), P = PARAMS, prev = null) {
   const pairs = {};
+  /* 今回分析しなかった銘柄（土日の FX など）は、前回の結果をそのまま残す（各通貨の at が分析した時刻） */
+  if (prev && prev.pairs) {
+    for (const pair of Object.keys(prev.pairs)) {
+      if (SYMBOLS[pair]) pairs[pair] = Object.assign({ at: prev.generatedAt }, prev.pairs[pair]);
+    }
+  }
   for (const pair of Object.keys(barsByPair)) {
     const r = analyzePair(pair, barsByPair[pair], P);
-    if (r) pairs[pair] = r;
+    if (r) pairs[pair] = Object.assign(r, { at: now });
   }
   return { version: 1, generatedAt: now, params: P, pairs };
 }
@@ -256,17 +271,25 @@ export function summaryText(doc) {
 }
 
 /* ---- CLI ----
- * node tools/zones/zones.mjs <tool-results ディレクトリ…> [--out data/zones.json] [--since-min 90]
+ * node tools/zones/zones.mjs --list                 … 今回取得する銘柄（平日は全銘柄、土日は仮想通貨だけ）
+ * node tools/zones/zones.mjs <tool-results ディレクトリ…> [--out data/zones.json] [--since-min 90] [--prev 前回の zones.json]
  * ディレクトリ内の get-ohlcv 結果ファイルを symbol / interval から自動で通貨・足に振り分ける
  * （Routine のモデルがパスを書き写さなくて済むように）。同じ組み合わせが複数あれば新しいファイルを使う。 */
 async function main(argv) {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  const dirs = []; let out = 'data/zones.json'; let sinceMin = 90;
+  const dirs = []; let out = 'data/zones.json'; let sinceMin = 90; let prevPath = ''; let list = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--out') out = argv[++i];
     else if (argv[i] === '--since-min') sinceMin = Number(argv[++i]);
+    else if (argv[i] === '--prev') prevPath = argv[++i];
+    else if (argv[i] === '--list') list = true;
     else dirs.push(argv[i]);
+  }
+  /* 今回取得する銘柄の一覧（Routine が最初に呼ぶ）。土日は仮想通貨だけ */
+  if (list) {
+    activePairs().forEach(p => console.log(p + ' ' + SYMBOLS[p]));
+    return;
   }
   const cutoff = Date.now() - sinceMin * 60000;
   const pick = {};
@@ -287,9 +310,11 @@ async function main(argv) {
   }
   const barsByPair = {};
   Object.values(pick).forEach(({ pair, tf, bars }) => { (barsByPair[pair] ||= {})[tf] = bars; });
-  const doc = buildZones(barsByPair);
+  let prev = null;
+  if (prevPath && fs.existsSync(prevPath)) { try { prev = JSON.parse(fs.readFileSync(prevPath, 'utf8')); } catch { prev = null; } }
+  const doc = buildZones(barsByPair, undefined, undefined, prev);
   const missing = [];
-  Object.keys(SYMBOLS).forEach(p => TFS.forEach(tf => { if (!(barsByPair[p] || {})[tf]) missing.push(p + ' ' + tf); }));
+  activePairs().forEach(p => TFS.forEach(tf => { if (!(barsByPair[p] || {})[tf]) missing.push(p + ' ' + tf); }));
   doc.missing = missing;
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(doc));

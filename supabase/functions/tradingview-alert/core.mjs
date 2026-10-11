@@ -4,13 +4,23 @@
 
 export const PAIR_MAP = { WTICOUSD: 'OIL' };
 
-/* 1H はスキャル用（⚡）、4H/D/W は 🔭 */
+/* S109: アラートの時間足で種類が決まる。1H＝スキャ（scalpwatch）、4H＝デイ、日足・週足＝スイング（どちらも trendwatch に cls 付き）。
+   同じ通貨でもデイとスイングは別のカード（別の行 id）にする。デイは従来の tw_tv_<PAIR>、スイングは tw_tv_<PAIR>_s */
 export const TF_MAP = {
-  '60':  { kind: 'scalpwatch', tf: '1H', prefix: 'sw' },
-  '240': { kind: 'trendwatch', tf: '4H', prefix: 'tw' },
-  '1D':  { kind: 'trendwatch', tf: 'D',  prefix: 'tw' },
-  '1W':  { kind: 'trendwatch', tf: 'W',  prefix: 'tw' },
+  '60':  { kind: 'scalpwatch', tf: '1H', prefix: 'sw', cls: 'scalp', suffix: '' },
+  '240': { kind: 'trendwatch', tf: '4H', prefix: 'tw', cls: 'day',   suffix: '' },
+  '1D':  { kind: 'trendwatch', tf: 'D',  prefix: 'tw', cls: 'swing', suffix: '_s' },
+  '1W':  { kind: 'trendwatch', tf: 'W',  prefix: 'tw', cls: 'swing', suffix: '_s' },
 };
+
+/* アプリ（index.html）の watchCls() と同じ判定にそろえること。cls を持たない旧アイテムは鳴っている時間足から決める */
+export function itemCls(item) {
+  if (!item) return '';
+  if (item.kind === 'scalpwatch') return 'scalp';
+  if (item.cls === 'day' || item.cls === 'swing') return item.cls;
+  const a = item.alerts || {};
+  return a['4H'] ? 'day' : (a.D || a.W) ? 'swing' : 'day';
+}
 
 const ts = v => { const n = Date.parse(v || ''); return Number.isFinite(n) ? n : 0; };
 
@@ -60,12 +70,13 @@ export function resolveTarget(parsed) {
 }
 
 /* クラウドの t: 行は削除されても残る（削除は tomb 行の時刻）。墓標より新しい行だけが生きている。 */
-export function pickLive(rows, tomb) {
+export function pickLive(rows, tomb, cls) {
   const dead = (tomb && tomb.trades) || {};
   let best = null;
   (rows || []).forEach(r => {
     const t = r && r.data;
     if (!t || !t.id) return;
+    if (cls && itemCls(t) !== cls) return;
     const stamp = ts(t.updatedAt) || ts(t.createdAt);
     if (ts(dead[t.id]) >= stamp) return;
     if (!best || stamp > (ts(best.updatedAt) || ts(best.createdAt))) best = t;
@@ -81,7 +92,7 @@ export function pickLive(rows, tomb) {
      ▲ 方向の合うゾーンが nearUnit（＝1時間足の ATR）以内にある（遠め、または1時間足だけの水準）
      ✖ 近くに方向の合うゾーンが無い
      分析が staleHours より古いと判定しない（古いゾーンで ✖ を付けると、実際は合っていても見逃すため） */
-export const NECK = { okAtr: 0.5, staleHours: 12 };
+export const NECK = { okAtr: 0.5, staleHours: 18 };   // S109: 分析が1日2回になったので 12 → 18
 
 /* 付近（nearUnit 以内）にあって方向も合うゾーンを重なるものどうし1つにまとめて返す。
    zones.json に ladder（上下に複数）があればそれを使い、無ければ従来の上・下・内側 */
@@ -145,10 +156,11 @@ export function aimMessage(target, parsed, hit) {
 }
 
 export function planUpdate({ rows, tomb, target, parsed, now, zone, neck }) {
-  const live = pickLive(rows, tomb);
+  const live = pickLive(rows, tomb, target.cls);
   const at = parsed.at || now;
   const item = live ? JSON.parse(JSON.stringify(live)) : {
-    id: target.prefix + '_tv_' + target.pair, kind: target.kind, pair: target.pair,
+    id: target.prefix + '_tv_' + target.pair + (target.suffix || ''), kind: target.kind, pair: target.pair,
+    ...(target.kind === 'trendwatch' ? { cls: target.cls } : {}),
     ng: { granville: false, rci: false, macd: false }, mid: { granville: false, rci: false, macd: false },
     ok: { granville: false, rci: false, macd: false },
     notes: '', alerts: {}, createdAt: now, updatedAt: now,

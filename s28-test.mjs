@@ -37,16 +37,13 @@ async function newPage() {
   ok('初回起動でプリセット28銘柄が生成される', before && before.pairs.length === 28, before && before.pairs.length);
   ok('破損バナーは出ていない', !(await page.locator('#fatalBanner.show').count()));
 
-  // 🔭記録カードでトレードを1件記録する（実際の書き込み経路を通す。S97で巡回一覧は撤去）
-  await page.click('.tab-btn[data-tab="trend"]');
-  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
-  const c = '#trendSlots [data-slot="0"] ';
-  await page.selectOption(c + '[data-sc-pair]', 'USDJPY');
-  await page.selectOption(c + '[data-sc-sel="tfHigher"]', '4時間足');
-  await page.selectOption(c + '[data-sc-sel="tfEntry"]', '5分足');
-  await page.click(c + '[data-sc="tradeType"][data-v="demo"]');
-  await page.click(c + '[data-sc="direction"][data-v="long"]');
-  await page.click(c + '[data-sc-act="save"]');
+  // 👀監視に通貨を足し、「入った」で記録する（実際の書き込み経路を通す。S109で記録カードは撤去）
+  await page.click('.tab-btn[data-tab="watch"]');
+  await page.selectOption('#swAdd', 'USDJPY');
+  await page.click('#swList [data-sw] [data-sw-in-open]');
+  await page.click('#swList [data-sw-pick="dir"][data-v="long"]');
+  await page.fill('#swList [data-sw-in="entry"]', '150.12');
+  await page.click('#swList [data-sw-go]');
   await page.waitForTimeout(200);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
   ok('記録が localStorage に保存される', saved.length === 1 && saved[0].pair === 'USDJPY');
@@ -71,13 +68,14 @@ async function newPage() {
     Object.keys(localStorage).filter(k => /__corrupt_\d+$/.test(k)));
   ok('原文が __corrupt_* に退避される', corrupt.length === 1, corrupt);
 
-  // 画面の操作を一通り叩いても上書きされないこと（S97: 🔭は記録カードになり market を書く画面は無い）
-  await page.click('.tab-btn[data-tab="trend"]');
-  await page.click('#tabPanel-trend [data-sc-pane="cards"]');
-  for (const sel of ['#trendSlots .tstate-btn', '#trendSlots .sc-btn', '#trendSlots [data-sc-act="save"]']) {
+  // 画面の操作を一通り叩いても上書きされないこと（S109: 👀監視・📒記録のタブを巡回して操作する）
+  await page.click('.tab-btn[data-tab="watch"]');
+  await page.selectOption('#swAdd', 'EURUSD').catch(() => {});
+  for (const sel of ['#swList .sc-btn', '#swList [data-sw-skip]']) {
     const el = page.locator(sel).first();
     if (await el.count()) { await el.click().catch(() => {}); await page.waitForTimeout(80); }
   }
+  await page.click('.tab-btn[data-tab="record"]');
 
   const raw = await page.evaluate(k => localStorage.getItem(k), MARKET_KEY);
   ok('壊れた原文が1バイトも書き換わっていない', raw === '{"pairs":[{"id":"w1","pair":"USDJPY"}', raw);
@@ -165,9 +163,9 @@ async function newPage() {
   await page.waitForTimeout(400);
 
   // 記録を作る
-  await page.click('.tab-btn[data-tab="trend"]');
+  await page.click('.tab-btn[data-tab="watch"]');
   await page.waitForTimeout(300);
-  await page.selectOption('#trendWatchAdd', 'USDJPY');   // S97: 巡回一覧の撤去に伴い、監視リストへの追加で記録を作る
+  await page.selectOption('#swAdd', 'USDJPY');   // S97: 巡回一覧の撤去に伴い、監視リストへの追加で記録を作る
   await page.waitForTimeout(200);
 
   const snapshot = await page.evaluate(() => {
@@ -294,17 +292,17 @@ async function newPage() {
 
   // S97: 巡回一覧（trend/alerts/judge/checks をタップで書く画面）は撤去した。
   // 端末間マージの時刻は記録単位の updatedAt で見るので、監視リストの更新で updatedAt が進むことを確かめる。
-  await page.click('.tab-btn[data-tab="trend"]');
-  await page.selectOption('#trendWatchAdd', 'USDJPY');
+  await page.click('.tab-btn[data-tab="watch"]');
+  await page.selectOption('#swAdd', 'USDJPY');
   await page.waitForTimeout(150);
   let d = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
-  const w0 = d.find(t => t.kind === 'trendwatch');
+  const w0 = d.find(t => t.kind === 'scalpwatch');
   ok('監視リストに createdAt / updatedAt が入る', !!(w0 && w0.createdAt && w0.updatedAt));
   await page.waitForTimeout(1100);
-  await page.click('#trendWatch [data-sw-ng="rci"]');
+  await page.click('#swList [data-sw-ng="rci"]');
   await page.waitForTimeout(150);
   d = await page.evaluate(() => JSON.parse(localStorage.getItem('mochipoyo_trades_v1') || '[]'));
-  const w1 = d.find(t => t.kind === 'trendwatch');
+  const w1 = d.find(t => t.kind === 'scalpwatch');
   ok('更新すると updatedAt が進む', w1.updatedAt > w0.updatedAt && w1.ok.rci === true);
 
   ok('JSエラーなし', errors.length === 0, errors);

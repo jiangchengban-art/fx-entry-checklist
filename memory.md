@@ -1,7 +1,7 @@
 # ネックラインアラートシステム — Project Memory
 
-**Last Updated:** 2026-10-04（S107）
-**Current State:** ✅ 本番使用可能。最新 S108、`sw.js` CACHE = v80
+**Last Updated:** 2026-10-11（S109）
+**Current State:** ✅ 本番使用可能。最新 S109、`sw.js` CACHE = v81
 **Main Branch:** `master`（GitHub Pages は master のルートから配信）
 **仕様の正本:** `CLAUDE.md`（このファイルは全環境で共有する「現在地と運用メモ」）
 
@@ -9,6 +9,7 @@
 
 | Session | 内容 |
 |---|---|
+| S109 | タブを 👀監視／📒記録／📚／⚙ に作り直し。アラートの時間足でスキャ／デイ／スイングに自動で種類分け、「入った」は約定価格だけ、2:1の価格から損切り・3:1・4:1 を計算（`rrCalc`）。見送りは条件つきで記録。`tools/backfill/`（価格からエントリー時刻・3:1/4:1到達・見送りのシミュレーション）は計算部分のみ。ゾーン分析は1日2回（6:00/17:00）・BTC/ETH のみ・土日は仮想通貨だけ。Edge Function は1D/1W を別カードに（**要再deploy**）。sw v81 |
 | S108 | ゾーン表示をネックライン1本の価格に（`line`）。タップでコピー（TradingView に引く用）。判定は内部のゾーン幅のまま。sw v80 |
 | S107 | ネックラインを監視リストの4つ目の条件に。アラート受信時に Edge Function が ✅/▲/✖ を自動で入れる（`neckJudge`）。zones.json に `ladder`（上下複数）。sw v79。Edge Function は 10/05 に deploy 済み |
 | S106b | 🎯狙い目：Edge Function がアラート受信時にネックラインゾーン付近×方向一致を判定し `aim[tf]` を書いて ntfy 通知。アプリは🔔未確認に🎯、振り分けタブに「🎯 狙い目」。sw v78 |
