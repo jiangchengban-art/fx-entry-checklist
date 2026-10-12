@@ -71,7 +71,7 @@ await seed([
 
 // 1. 各カードのゾーン行（ネックライン1本の価格・タップでコピー）
 check('USDJPY のカードにゾーン行', (await page.textContent(row('USDJPY'))).includes('📍'));
-check('ゾーン行に上のネックラインと時間足', (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('↑') && (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('1H·4H·D'));
+check('ゾーン行に上のネックラインと時間足', (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('上') && (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('1H·4H·D'));
 check('S108: 遠い通貨でも上下のネックライン価格を出す（コピー用）', await page.locator(row('GOLD') + ' .sw-zone-line .zcopy').count() >= 1);
 await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
 const zc = page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first();

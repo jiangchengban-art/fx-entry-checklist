@@ -1,7 +1,7 @@
 # ネックラインアラートシステム — Project Memory
 
-**Last Updated:** 2026-10-11（S109）
-**Current State:** ✅ 本番使用可能。最新 S109、`sw.js` CACHE = v81
+**Last Updated:** 2026-10-12（S110）
+**Current State:** ✅ 本番使用可能。最新 S110、`sw.js` CACHE = v82
 **Main Branch:** `master`（GitHub Pages は master のルートから配信）
 **仕様の正本:** `CLAUDE.md`（このファイルは全環境で共有する「現在地と運用メモ」）
 
@@ -9,6 +9,7 @@
 
 | Session | 内容 |
 |---|---|
+| S110 | 監視カードに ⏳待ち（`t.wait`・待ちの間は自動で消さない）と 🗑（記録に残さず削除）。10/11 に S109 版 Edge Function を deploy 済み、ゾーン分析の Routine `trig_016McfHXL7Q1qahADQ8vDPut` を登録（JST 5:50/16:50、定期実行2回成功）。色は案B（落ち着いた配色）。Webhook の 400 は 10/11 深夜に解消しカードは入る。**未解決：毎時0分にアラートが重なると TradingView 側でタイムアウト（反映が6〜30秒遅れる）**。ntfy はユーザー判断で停止する（`NTFY_TOPIC` を消す）。週足アラート時の自動ネックライン分析（A案）は未着手 |
 | S109 | タブを 👀監視／📒記録／📚／⚙ に作り直し。アラートの時間足でスキャ／デイ／スイングに自動で種類分け、「入った」は約定価格だけ、2:1の価格から損切り・3:1・4:1 を計算（`rrCalc`）。見送りは条件つきで記録。`tools/backfill/`（価格からエントリー時刻・3:1/4:1到達・見送りのシミュレーション）は計算部分のみ。ゾーン分析は1日2回（6:00/17:00）・BTC/ETH のみ・土日は仮想通貨だけ。Edge Function は1D/1W を別カードに（**要再deploy**）。sw v81 |
 | S108 | ゾーン表示をネックライン1本の価格に（`line`）。タップでコピー（TradingView に引く用）。判定は内部のゾーン幅のまま。sw v80 |
 | S107 | ネックラインを監視リストの4つ目の条件に。アラート受信時に Edge Function が ✅/▲/✖ を自動で入れる（`neckJudge`）。zones.json に `ladder`（上下複数）。sw v79。Edge Function は 10/05 に deploy 済み |

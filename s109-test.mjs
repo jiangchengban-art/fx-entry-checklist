@@ -181,6 +181,29 @@ check('既定の区分をリアルに', await page.evaluate(() => defaultTradeTy
 /* ---- CSV ---- */
 check('CSV列に 種類・価格 が入っている', await page.evaluate(() => ['cls', 'entryPrice', 'stopPrice', 'tp2Price', 'tp3Price', 'tp4Price'].every(h => CSV_HEADERS.includes(h))));
 
+/* ---- S110: ⏳形成待ち・🗑削除 ---- */
+await page.click('.tab-btn[data-tab="watch"]');
+await page.evaluate(([a, b, c]) => { saveTrades(loadTrades().concat([a, b, c])); watchBoard.render(); }, [
+  mk('x1', 'trendwatch', 'AUDJPY', { cls: 'swing', alerts: { W: ago(100 * 3600e3) }, alertSide: { W: 'long' }, wait: true }),   // 72時間を過ぎても待ちなら残る
+  mk('x2', 'trendwatch', 'CADJPY', { cls: 'swing', alerts: { W: ago(10 * 3600e3) }, alertSide: { W: 'long' } }),
+  mk('x3', 'scalpwatch', 'CHFJPY', { alerts: { '1H': ago(10 * 60e3) }, alertSide: { '1H': 'short' } }),
+]);
+check('⏳形成待ちのカードは期限を過ぎても消えない', (await pairs()).includes('AUDJPY'));
+check('形成待ちの印が出る', await page.locator(row('AUDJPY') + ' .sw-wait-badge').count() === 1);
+check('週足のエントリー足は 1時間足・4時間足', await (async () => { await page.click(`${row('CADJPY')} [data-sw-in-open]`);
+  const v = await page.$$eval(`${row('CADJPY')} [data-sw-pick="tf"]`, els => els.map(e => e.textContent)); await page.click(`${row('CADJPY')} [data-sw-cancel]`); return v.join() === '1時間足,4時間足'; })());
+await page.click(`${row('CADJPY')} [data-sw-wait]`);
+check('⏳待ちをタップで wait=true・印が付く', (await trades()).find(t => t.id === 'x2').wait === true && await page.locator(row('CADJPY') + ' .sw-wait-badge').count() === 1);
+await page.click(`${row('CADJPY')} [data-sw-wait]`);
+check('もう一度で解除', (await trades()).find(t => t.id === 'x2').wait === false && await page.locator(row('CADJPY') + ' .sw-wait-badge').count() === 0);
+const logsBefore = (await trades()).filter(t => t.kind === 'watchlog').length;
+await page.click(`${row('CHFJPY')} [data-sw-del]`);
+check('🗑でカードが消える', !(await pairs()).includes('CHFJPY') && !(await trades()).some(t => t.id === 'x3'));
+check('🗑は見送りの記録を作らない', (await trades()).filter(t => t.kind === 'watchlog').length === logsBefore);
+check('🗑は墓標を残す（他端末から復活しない）', await page.evaluate(() => !!(JSON.parse(localStorage.getItem('mochipoyo_tombstones_v1') || '{}').trades || {}).x3));
+check('ボタンを足しても 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth &&
+  [...document.querySelectorAll('#swList .trend-tf')].every(r => r.scrollWidth <= r.clientWidth + 1)));
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

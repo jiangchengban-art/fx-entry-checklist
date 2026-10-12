@@ -962,6 +962,9 @@
   .sw-conds { gap: 4px; }
   .sw-conds .sc-btn { flex: 1 1 0; min-width: 0; padding: 0 1px; font-size: 11px; white-space: nowrap; letter-spacing: -0.02em; }
   .sw-res.skip { color: var(--ink-2); border: 1px solid var(--border); }
+  .sw-wait-badge { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; flex: none; color: var(--warn); background: var(--warn-soft); }
+  .tgoto.sw-wait { width: auto; padding: 0 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .tgoto.sw-wait.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
   .sw-res.in { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
   .sw-res.in.on { background: var(--surface); color: var(--accent); }
   .sw-entry { margin: 4px 0 0; padding: 6px 0 6px; border-top: 1px dashed var(--border); }
@@ -980,6 +983,45 @@
   .pos-hint { font-size: 11px; color: var(--ink-muted); }
   .pos-card.closed { opacity: 0.92; }
   #legacyScalpBox summary { font-size: 13px; cursor: pointer; }
+
+  /* ===== S110: 色でひと目で分かるように（案B＝落ち着いた配色：塗らずに薄い背景＋色文字）。
+     種類＝左の帯とチップ（スキャ橙・デイ青・スイング紫）、方向＝緑/赤の枠チップ、条件＝薄い緑/黄/赤、経過時間＝期限に近いほど赤 ===== */
+  :root { --cls-scalp: #f0802a; --cls-day: #3987e5; --cls-swing: #a06be0; --buy: #12a150; --sell: #e0494f;
+          --cls-scalp-ink: #f0802a; --cls-day-ink: #5a9cec; --cls-swing-ink: #b58af0; --buy-ink: #2fc46e; --sell-ink: #f0777c; }
+  :root[data-theme="light"] { --cls-scalp-ink: #b4570a; --cls-day-ink: #1f63b8; --cls-swing-ink: #6f3fc0; --buy-ink: #0a7a3a; --sell-ink: #c2333a; }
+  .sw-cls.scalp, .sw-cls.day, .sw-cls.swing { padding: 2px 8px; font-size: 11px; }
+  .sw-cls.scalp { background: rgba(240,128,42,.16); color: var(--cls-scalp-ink); }
+  .sw-cls.day   { background: rgba(57,135,229,.16); color: var(--cls-day-ink); }
+  .sw-cls.swing { background: rgba(160,107,224,.18); color: var(--cls-swing-ink); }
+  .sw-item, .pos-card { border-left: 5px solid var(--border); }
+  .sw-item.cls-scalp, .pos-card.cls-scalp { border-left-color: var(--cls-scalp); }
+  .sw-item.cls-day,   .pos-card.cls-day   { border-left-color: var(--cls-day); }
+  .sw-item.cls-swing, .pos-card.cls-swing { border-left-color: var(--cls-swing); }
+  .sw-item.ok  { border-left-width: 5px; border-left-style: solid; border-top-color: var(--buy); border-right-color: var(--buy); border-bottom-color: var(--buy); }
+  .sw-item.ng  { border-left-width: 5px; border-left-style: solid; opacity: 0.72; }
+  .sw-item.mid { border-left-width: 5px; border-left-style: solid; }
+  .sw-dir { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; white-space: nowrap; flex: none; background: transparent; }
+  .sw-dir.up   { color: var(--buy-ink);  border: 1.5px solid var(--buy); }
+  .sw-dir.down { color: var(--sell-ink); border: 1.5px solid var(--sell); }
+  .sw-tfchip { color: var(--ink); background: var(--surface); border-color: var(--ink-muted); padding: 1px 6px; }
+  .sw-item .sw-pend-age { font-size: 12px; }
+  .sw-pend-age.age-new { color: var(--ink-2); }
+  .sw-pend-age.age-mid { color: var(--warn); }
+  .sw-pend-age.age-late { color: var(--bad); }
+  .sw-pend-age.age-idle { color: var(--ink-muted); }
+  .sw-conds .sc-btn { border-style: dashed; color: var(--ink-muted); background: transparent; }
+  .sw-conds .sc-btn.on { border-style: solid; }
+  .sw-conds .sc-btn.on.ok  { background: rgba(18,161,80,.16);  border-color: var(--buy);  color: var(--buy-ink); }
+  .sw-conds .sc-btn.on.mid { background: rgba(250,178,25,.16); border-color: var(--warn); color: var(--warn); }
+  .sw-conds .sc-btn.on.ng  { background: rgba(224,73,79,.16);  border-color: var(--sell); color: var(--sell-ink); }
+  .sw-zone-line i { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 0 4px; border-radius: 4px; margin-right: 3px; }
+  .sw-zone-line .zup i   { color: var(--sell-ink); border: 1px solid var(--sell); }
+  .sw-zone-line .zdown i { color: var(--buy-ink);  border: 1px solid var(--buy); }
+  .sw-zone-line span.multi b { color: var(--cls-day-ink); }
+  .aim-badge { background: var(--buy); padding: 2px 7px; font-size: 11px; }
+  .sw-tab.active[data-sw-cls="scalp"] { color: var(--cls-scalp-ink); }
+  .sw-tab.active[data-sw-cls="day"]   { color: var(--cls-day-ink); }
+  .sw-tab.active[data-sw-cls="swing"] { color: var(--cls-swing-ink); }
 </style>
 </head>
 <body>
@@ -1200,7 +1242,8 @@
         <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ4時間・デイ24時間・スイング72時間。メモがあるものは残ります）。<br>
         <strong>通貨名</strong>：タップで通貨名をコピー。▲／▼はアラートの方向、1H／4H／D／W は鳴った時間足、⏰は鳴ってからの時間、🎯はネックライン付近で方向も合っている印（表示だけ）。<br>
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
-        <strong>📍の価格</strong>：タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
+        <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
+        <strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
         <strong>見送り</strong>：カードを消し、そのときの条件つきで「見送り」を記録します（あとで入っていたら勝てたかを検証）。<br>
         <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。記録は📒記録タブに入り、カードは消えます。<br>
         ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、種類を選んで足します。3端末で同期されます。
@@ -3943,11 +3986,11 @@ function makeWatchBoard() {
   tabBadge.className = 'tab-badge';
   document.querySelector('.tab-btn[data-tab="watch"]').appendChild(tabBadge);
 
-  /* 期限切れ（アラートから、スキャ4時間・デイ24時間・スイング72時間）で、メモの無いカードは自動で消す。
+  /* 期限切れ（アラートから、スキャ4時間・デイ24時間・スイング72時間）で、メモの無いカードは自動で消す（S110: ⏳形成待ちのカードは消さない）。
      墓標を付けるが、同じ通貨に次のアラートが来れば Edge Function が作り直す（新しい記録は墓標より新しい） */
   const expired = (t, nowMs) => {
     const l = watchLatest(t);
-    return !!l && !(t.notes || '').trim() && nowMs - Date.parse(l.at) > TRADE_CLS_BY[watchCls(t)].expireH * 3600000;
+    return !!l && !t.wait && !(t.notes || '').trim() && nowMs - Date.parse(l.at) > TRADE_CLS_BY[watchCls(t)].expireH * 3600000;
   };
   const prune = list => {
     const nowMs = Date.now();
@@ -3967,11 +4010,17 @@ function makeWatchBoard() {
     ((watchLatest(b) || {}).at || '').localeCompare((watchLatest(a) || {}).at || '') ||
     (b.createdAt || '').localeCompare(a.createdAt || ''));
 
+  /* S110: 経過時間の色。期限（種類ごと）の半分までは落ち着いた色、半分を過ぎたら黄、8割を過ぎたら赤。⏳待ちは期限が無いので色を付けない */
+  const ageCls = (t, l) => {
+    if (t.wait) return 'age-idle';
+    const r = (Date.now() - Date.parse(l.at)) / (TRADE_CLS_BY[watchCls(t)].expireH * 3600000);
+    return r > 0.8 ? 'age-late' : r > 0.5 ? 'age-mid' : 'age-new';
+  };
   const zoneLineHtml = pair => {
     const lines = zoneLines(pair);
     if (!lines.length) return '';
     return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + lines.map(h =>
-      '<span class="' + (h.conf.length >= 2 ? 'multi' : '') + '">' + (h.up ? '↑' : '↓') + zoneCopyHtml(zoneLineOf(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
+      '<span class="' + (h.up ? 'zup' : 'zdown') + (h.conf.length >= 2 ? ' multi' : '') + '"><i>' + (h.up ? '上' : '下') + '</i>' + zoneCopyHtml(zoneLineOf(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
       '</div>';
   };
   const pick = (name, v, on, label) =>
@@ -4006,16 +4055,17 @@ function makeWatchBoard() {
     const st = entryState[t.id];
     const chips = Object.keys(t.alerts || {}).sort((a, b) => ['1H', '4H', 'D', 'W'].indexOf(a) - ['1H', '4H', 'D', 'W'].indexOf(b));
     return (
-      '<div class="trend-item sc-card sw-item' + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + '" data-sw="' + esc(t.id) + '">' +
+      '<div class="trend-item sc-card sw-item cls-' + cls + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + (t.wait ? ' waiting' : '') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
           '<span class="sw-pair" data-copy="' + esc(t.pair) + '" title="タップで通貨名をコピー">' + esc(t.pair) + '</span>' +
           '<span class="sw-cls ' + cls + '">' + clsText(cls) + '</span>' +
-          (l ? (l.side === 'long' ? '<span class="sw-pend-side up" title="アラートの方向">▲</span>'
-              : l.side === 'short' ? '<span class="sw-pend-side down" title="アラートの方向">▼</span>' : '') : '') +
+          (l ? (l.side === 'long' ? '<span class="sw-dir up" title="アラートの方向">▲買</span>'
+              : l.side === 'short' ? '<span class="sw-dir down" title="アラートの方向">▼売</span>' : '') : '') +
           chips.map(c => '<span class="sw-tfchip">' + c + '</span>').join('') +
+          (t.wait ? '<span class="sw-wait-badge" title="条件は見たが、下位足の形ができるのを待っている">⏳待ち</span>' : '') +
           '<span class="spacer"></span>' +
           (aims.length ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート">🎯' + esc(((aimOf(t, aims[0]) || {}).conf || []).join('·')) + '</span>' : '') +
-          (l ? '<span class="sw-pend-age" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
+          (l ? '<span class="sw-pend-age ' + ageCls(t, l) + '" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
         '</div>' +
         '<div class="trend-tf sw-conds">' + WATCH_NG.map(c => {
           const s = watchState(t, c.k);
@@ -4025,6 +4075,8 @@ function makeWatchBoard() {
         zoneLineHtml(t.pair) +
         '<div class="trend-tf">' +
           '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ">📝</button>' +
+          '<button type="button" class="tgoto sw-wait' + (t.wait ? ' on' : '') + '" data-sw-wait title="下位足の形成待ち（もう一度で解除）。待ちの間は時間がたってもカードを消しません">⏳待ち</button>' +
+          '<button type="button" class="tclear" data-sw-del title="カードを削除（記録には残しません）">🗑</button>' +
           '<span class="spacer"></span>' +
           '<button type="button" class="sw-res skip" data-sw-skip title="見送る（カードを消し、条件つきで「見送り」を記録）">見送り</button>' +
           '<button type="button" class="sw-res in' + (st ? ' on' : '') + '" data-sw-in-open title="入った → エントリー足と約定価格だけ入れて記録">入った</button>' +
@@ -4122,6 +4174,10 @@ function makeWatchBoard() {
       }, true);
       return;
     }
+    /* S110: ⏳形成待ち（条件は揃っているが下位足の形を待つ。週足は何日もかかる）。待ちの間は期限切れで消さない */
+    if (e.target.closest('[data-sw-wait]')) { update(id, t => { t.wait = !t.wait; }, true); return; }
+    /* S110: 🗑 ただ消す（見送りの記録は作らない）。墓標で他端末からの復活を防ぐ */
+    if (e.target.closest('[data-sw-del]')) { remove(id); render(); return; }
     if (e.target.closest('[data-sw-skip]')) {
       blurActive();
       const trades = loadTrades();
@@ -4268,14 +4324,14 @@ function makePositions() {
   const head = t => '<div class="trend-head">' +
     '<span class="sw-pair">' + esc(t.pair) + '</span>' +
     '<span class="sw-cls ' + tradeCls(t) + '">' + clsText(tradeCls(t)) + '</span>' +
-    '<span class="sw-pend-side ' + (t.direction === 'long' ? 'up' : 'down') + '">' + (t.direction === 'long' ? '▲買' : '▼売') + '</span>' +
+    '<span class="sw-dir ' + (t.direction === 'long' ? 'up' : 'down') + '">' + (t.direction === 'long' ? '▲買' : '▼売') + '</span>' +
     '<span class="sw-tfchip">' + esc(t.tfEntry) + '</span>' +
     '<span class="spacer"></span>' +
     '<span class="pos-time">' + esc(fmtDatetime(t.datetime)) + '</span>' +
     '</div>';
   const openHtml = t => {
     const fix = fixOpen.has(t.id);
-    return '<div class="trend-item sc-card pos-card" data-pos="' + esc(t.id) + '">' + head(t) + levels(t) +
+    return '<div class="trend-item sc-card pos-card cls-' + tradeCls(t) + '" data-pos="' + esc(t.id) + '">' + head(t) + levels(t) +
       (t.stopPrice == null
         ? '<div class="trend-tf"><label class="sw-in"><span>2:1の価格</span><input type="text" inputmode="decimal" autocomplete="off" data-pos-tp2 placeholder="利確した価格"></label></div>'
         : '') +
@@ -4296,7 +4352,7 @@ function makePositions() {
   const closedHtml = t => {
     const tag = t.resultTag;
     const rrTags = ['reg', 'big', 'max'];
-    return '<div class="trend-item sc-card pos-card closed" data-pos="' + esc(t.id) + '">' + head(t) +
+    return '<div class="trend-item sc-card pos-card closed cls-' + tradeCls(t) + '" data-pos="' + esc(t.id) + '">' + head(t) +
       (t.stopPrice != null ? levels(t) : '<div class="pos-prices">入 ' + px(t.entryPrice) + '</div>') +
       '<div class="trend-tf">' +
         '<span class="badge result-tag">' + esc(RESULT_TAG_LABELS[tag] || tag || '') + '</span>' +
