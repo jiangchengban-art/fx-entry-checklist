@@ -965,6 +965,9 @@
   .sw-wait-badge { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; flex: none; color: var(--warn); background: var(--warn-soft); }
   .tgoto.sw-wait { width: auto; padding: 0 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
   .tgoto.sw-wait.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .tgoto.sw-pin { opacity: 0.45; }
+  .tgoto.sw-pin.on { opacity: 1; border-color: var(--accent); background: var(--accent-soft); }
+  .sw-item.pinned { box-shadow: inset 0 3px 0 var(--accent); }
   .sw-res.in { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
   .sw-res.in.on { background: var(--surface); color: var(--accent); }
   .sw-entry { margin: 4px 0 0; padding: 6px 0 6px; border-top: 1px dashed var(--border); }
@@ -1239,11 +1242,11 @@
     <details class="trend-help sw-help">
       <summary>📖 使い方（どこをタップすると何が起きるか）</summary>
       <div class="trend-help-body">
-        <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ4時間・デイ24時間・スイング72時間。メモがあるものは残ります）。<br>
+        <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ4時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
         <strong>通貨名</strong>：タップで通貨名をコピー。▲／▼はアラートの方向、1H／4H／D／W は鳴った時間足、⏰は鳴ってからの時間、🎯はネックライン付近で方向も合っている印（表示だけ）。<br>
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
-        <strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
+        <strong>📌</strong>：ピン止め。一番上に固定され、時間がたっても自動で消えなくなります（もう一度で解除）。<strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
         <strong>見送り</strong>：カードを消し、そのときの条件つきで「見送り」を記録します（あとで入っていたら勝てたかを検証）。<br>
         <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。記録は📒記録タブに入り、カードは消えます。<br>
         ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、種類を選んで足します。3端末で同期されます。
@@ -3990,7 +3993,7 @@ function makeWatchBoard() {
      墓標を付けるが、同じ通貨に次のアラートが来れば Edge Function が作り直す（新しい記録は墓標より新しい） */
   const expired = (t, nowMs) => {
     const l = watchLatest(t);
-    return !!l && !t.wait && !(t.notes || '').trim() && nowMs - Date.parse(l.at) > TRADE_CLS_BY[watchCls(t)].expireH * 3600000;
+    return !!l && !t.wait && !t.pin && !(t.notes || '').trim() && nowMs - Date.parse(l.at) > TRADE_CLS_BY[watchCls(t)].expireH * 3600000;
   };
   const prune = list => {
     const nowMs = Date.now();
@@ -4006,7 +4009,8 @@ function makeWatchBoard() {
     if (WATCH_NG.some(c => watchState(t, c.k) === 'ng')) return 3;
     return watchEnterable(t) ? 1 : 2;
   };
-  const sorted = list => list.slice().sort((a, b) => rank(a) - rank(b) ||
+  /* S111: 📌ピン止めは自動の並び順より上（ピンどうしは自動の並び順のまま） */
+  const sorted = list => list.slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || rank(a) - rank(b) ||
     ((watchLatest(b) || {}).at || '').localeCompare((watchLatest(a) || {}).at || '') ||
     (b.createdAt || '').localeCompare(a.createdAt || ''));
 
@@ -4055,7 +4059,7 @@ function makeWatchBoard() {
     const st = entryState[t.id];
     const chips = Object.keys(t.alerts || {}).sort((a, b) => ['1H', '4H', 'D', 'W'].indexOf(a) - ['1H', '4H', 'D', 'W'].indexOf(b));
     return (
-      '<div class="trend-item sc-card sw-item cls-' + cls + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + (t.wait ? ' waiting' : '') + '" data-sw="' + esc(t.id) + '">' +
+      '<div class="trend-item sc-card sw-item cls-' + cls + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + (t.wait ? ' waiting' : '') + (t.pin ? ' pinned' : '') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
           '<span class="sw-pair" data-copy="' + esc(t.pair) + '" title="タップで通貨名をコピー">' + esc(t.pair) + '</span>' +
           '<span class="sw-cls ' + cls + '">' + clsText(cls) + '</span>' +
@@ -4075,6 +4079,7 @@ function makeWatchBoard() {
         zoneLineHtml(t.pair) +
         '<div class="trend-tf">' +
           '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ">📝</button>' +
+          '<button type="button" class="tgoto sw-pin' + (t.pin ? ' on' : '') + '" data-sw-pin title="ピン止め（一番上に固定・時間がたっても消さない。もう一度で解除）">📌</button>' +
           '<button type="button" class="tgoto sw-wait' + (t.wait ? ' on' : '') + '" data-sw-wait title="下位足の形成待ち（もう一度で解除）。待ちの間は時間がたってもカードを消しません">⏳待ち</button>' +
           '<button type="button" class="tclear" data-sw-del title="カードを削除（記録には残しません）">🗑</button>' +
           '<span class="spacer"></span>' +
@@ -4175,6 +4180,8 @@ function makeWatchBoard() {
       return;
     }
     /* S110: ⏳形成待ち（条件は揃っているが下位足の形を待つ。週足は何日もかかる）。待ちの間は期限切れで消さない */
+    /* S111: 📌ピン止め。並びが変わるので全体を描き直す */
+    if (e.target.closest('[data-sw-pin]')) { update(id, t => { t.pin = !t.pin; }, false); render(); return; }
     if (e.target.closest('[data-sw-wait]')) { update(id, t => { t.wait = !t.wait; }, true); return; }
     /* S110: 🗑 ただ消す（見送りの記録は作らない）。墓標で他端末からの復活を防ぐ */
     if (e.target.closest('[data-sw-del]')) { remove(id); render(); return; }

@@ -204,6 +204,20 @@ check('🗑は墓標を残す（他端末から復活しない）', await page.e
 check('ボタンを足しても 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth &&
   [...document.querySelectorAll('#swList .trend-tf')].every(r => r.scrollWidth <= r.clientWidth + 1)));
 
+/* ---- S111: 📌ピン止め ---- */
+await page.evaluate(([a, b]) => { saveTrades(loadTrades().filter(t => !['x1', 'x2'].includes(t.id)).concat([a, b])); watchBoard.render(); }, [
+  mk('p1', 'scalpwatch', 'EURGBP', { alerts: { '1H': ago(3 * 3600e3) }, ng: c4({ macd: true }) }),     // ✖あり＝ふつうは一番下
+  mk('p2', 'scalpwatch', 'EURAUD', { alerts: { '1H': ago(10 * 3600e3) }, pin: true }),                 // 4時間を過ぎてもピンなら残る
+]);
+check('📌のカードは期限を過ぎても消えない', (await pairs()).includes('EURAUD'));
+check('📌のカードが一番上', (await pairs())[0] === 'EURAUD');
+await page.click(`${row('EURGBP')} [data-sw-pin]`);
+check('📌をタップで pin=true・上に移る（✖ありでも）', (await trades()).find(t => t.id === 'p1').pin === true && (await pairs()).slice(0, 2).sort().join() === 'EURAUD,EURGBP');
+await page.click(`${row('EURGBP')} [data-sw-pin]`);
+check('もう一度で解除・元の並びに戻る', (await trades()).find(t => t.id === 'p1').pin === false && (await pairs())[0] === 'EURAUD' && (await pairs()).indexOf('EURGBP') > 0);
+check('📌を足しても 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth &&
+  [...document.querySelectorAll('#swList .trend-tf')].every(r => r.scrollWidth <= r.clientWidth + 1)));
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);
