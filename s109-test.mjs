@@ -59,8 +59,8 @@ await page.evaluate(([a, b, c, d, e]) => {
   mk('w1', 'scalpwatch', 'EURUSD', { alerts: { '1H': ago(10 * 60e3) }, alertSide: { '1H': 'long' }, alertPrice: { '1H': 1.0912 } }),
   mk('w2', 'trendwatch', 'USDJPY', { cls: 'day', alerts: { '4H': ago(30 * 60e3) }, alertSide: { '4H': 'short' } }),
   mk('w3', 'trendwatch', 'GOLD', { alerts: { D: ago(2 * 3600e3) }, alertSide: { D: 'short' } }),
-  mk('w4', 'scalpwatch', 'GBPUSD', { alerts: { '1H': ago(5 * 3600e3) } }),                    // 期限切れ（4時間）→ 消える
-  mk('w5', 'scalpwatch', 'NZDUSD', { alerts: { '1H': ago(5 * 3600e3) }, notes: '残す' }),       // 期限切れでもメモ有り → 残る
+  mk('w4', 'scalpwatch', 'GBPUSD', { alerts: { '1H': ago(7 * 3600e3) } }),                    // 期限切れ（6時間）→ 消える
+  mk('w5', 'scalpwatch', 'NZDUSD', { alerts: { '1H': ago(7 * 3600e3) }, notes: '残す' }),       // 期限切れでもメモ有り → 残る
 ]);
 await page.reload();
 await page.waitForSelector('#tabBar');
@@ -217,6 +217,15 @@ await page.click(`${row('EURGBP')} [data-sw-pin]`);
 check('もう一度で解除・元の並びに戻る', (await trades()).find(t => t.id === 'p1').pin === false && (await pairs())[0] === 'EURAUD' && (await pairs()).indexOf('EURGBP') > 0);
 check('📌を足しても 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth &&
   [...document.querySelectorAll('#swList .trend-tf')].every(r => r.scrollWidth <= r.clientWidth + 1)));
+
+/* ---- S112: 🎯のラインの価格（タップでコピー） ---- */
+const aimNow = Date.now();
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().filter(t => t.id !== 'p2').concat([{ id: 'aim1', kind: 'scalpwatch', pair: 'GBPAUD', ng: c, mid: c, ok: c, notes: '',
+    alerts: { '1H': at }, alertSide: { '1H': 'long' }, alertPrice: { '1H': 2.01 }, aim: { '1H': { lo: 2.0, hi: 2.04, conf: ['1H', '4H'], touches: 3, side: 'down' } },
+    createdAt: at, updatedAt: at }])); watchBoard.render(); }, new Date(aimNow - 12 * 60e3).toISOString());
+check('🎯のカードにラインの価格が出る（範囲の中央）', (await page.textContent(row('GBPAUD') + ' .aim-badge')).includes('2.02'));
+check('🎯の価格はタップでコピーできる', await page.locator(row('GBPAUD') + ' .aim-badge .zcopy').count() === 1);
 
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));

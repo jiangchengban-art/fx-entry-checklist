@@ -1022,6 +1022,7 @@
   .sw-zone-line .zdown i { color: var(--buy-ink);  border: 1px solid var(--buy); }
   .sw-zone-line span.multi b { color: var(--cls-day-ink); }
   .aim-badge { background: var(--buy); padding: 2px 7px; font-size: 11px; }
+  .aim-badge .zcopy { color: inherit; padding: 0; font-weight: 700; }
   .sw-tab.active[data-sw-cls="scalp"] { color: var(--cls-scalp-ink); }
   .sw-tab.active[data-sw-cls="day"]   { color: var(--cls-day-ink); }
   .sw-tab.active[data-sw-cls="swing"] { color: var(--cls-swing-ink); }
@@ -1242,7 +1243,7 @@
     <details class="trend-help sw-help">
       <summary>📖 使い方（どこをタップすると何が起きるか）</summary>
       <div class="trend-help-body">
-        <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ4時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
+        <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ6時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
         <strong>通貨名</strong>：タップで通貨名をコピー。▲／▼はアラートの方向、1H／4H／D／W は鳴った時間足、⏰は鳴ってからの時間、🎯はネックライン付近で方向も合っている印（表示だけ）。<br>
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
@@ -3814,7 +3815,7 @@ function zoneSnapshot(pair, price) {
    保存先は従来どおり trades 配列（監視＝scalpwatch/trendwatch、見送り＝watchlog、入った＝通常の記録）なので、
    同期・墓標・📚・CSV はそのまま使える。 */
 const TRADE_CLS = [
-  { k: 'scalp', icon: '⚡', label: 'スキャ',   tf: '1時間足', expireH: 4,  entries: ['1分足', '5分足'] },
+  { k: 'scalp', icon: '⚡', label: 'スキャ',   tf: '1時間足', expireH: 6,  entries: ['1分足', '5分足'] },
   { k: 'day',   icon: '☀️', label: 'デイ',     tf: '4時間足', expireH: 24, entries: ['5分足', '15分足'] },
   { k: 'swing', icon: '🌙', label: 'スイング', tf: '日足',    expireH: 72, entries: ['15分足', '1時間足'] },
 ];
@@ -3989,7 +3990,7 @@ function makeWatchBoard() {
   tabBadge.className = 'tab-badge';
   document.querySelector('.tab-btn[data-tab="watch"]').appendChild(tabBadge);
 
-  /* 期限切れ（アラートから、スキャ4時間・デイ24時間・スイング72時間）で、メモの無いカードは自動で消す（S110: ⏳形成待ちのカードは消さない）。
+  /* 期限切れ（アラートから、スキャ6時間・デイ24時間・スイング72時間）で、メモの無いカードは自動で消す（S110: ⏳形成待ちのカードは消さない）。
      墓標を付けるが、同じ通貨に次のアラートが来れば Edge Function が作り直す（新しい記録は墓標より新しい） */
   const expired = (t, nowMs) => {
     const l = watchLatest(t);
@@ -4056,6 +4057,13 @@ function makeWatchBoard() {
     const allOk = watchAllOk(t);
     const anyMid = !anyNg && !allOk && watchEnterable(t);
     const aims = watchAimTfs(t);
+    /* S112: 🎯（ネック✅）を出したラインの価格。受信側の aim には line が無いので、手元のゾーンと範囲の重なりで探す */
+    const aimHit = aims.length ? (() => {
+      const z = aimOf(t, aims[0]);
+      if (!z) return null;
+      const m = zoneHits(t.pair, undefined, true).find(h => zoneOverlap(h, z));
+      return { line: zoneLineOf(m || z), conf: z.conf || [] };
+    })() : null;
     const st = entryState[t.id];
     const chips = Object.keys(t.alerts || {}).sort((a, b) => ['1H', '4H', 'D', 'W'].indexOf(a) - ['1H', '4H', 'D', 'W'].indexOf(b));
     return (
@@ -4068,7 +4076,7 @@ function makeWatchBoard() {
           chips.map(c => '<span class="sw-tfchip">' + c + '</span>').join('') +
           (t.wait ? '<span class="sw-wait-badge" title="条件は見たが、下位足の形ができるのを待っている">⏳待ち</span>' : '') +
           '<span class="spacer"></span>' +
-          (aims.length ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート">🎯' + esc(((aimOf(t, aims[0]) || {}).conf || []).join('·')) + '</span>' : '') +
+          (aimHit ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート。価格をタップでコピー（TradingView に引く用）">🎯' + zoneCopyHtml(aimHit.line) + ' ' + esc(aimHit.conf.join('·')) + '</span>' : '') +
           (l ? '<span class="sw-pend-age ' + ageCls(t, l) + '" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
         '</div>' +
         '<div class="trend-tf sw-conds">' + WATCH_NG.map(c => {
