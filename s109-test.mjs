@@ -224,8 +224,15 @@ await page.evaluate(at => { const c = { granville: false, rci: false, macd: fals
   saveTrades(loadTrades().filter(t => t.id !== 'p2').concat([{ id: 'aim1', kind: 'scalpwatch', pair: 'GBPAUD', ng: c, mid: c, ok: c, notes: '',
     alerts: { '1H': at }, alertSide: { '1H': 'long' }, alertPrice: { '1H': 2.01 }, aim: { '1H': { lo: 2.0, hi: 2.04, conf: ['1H', '4H'], touches: 3, side: 'down' } },
     createdAt: at, updatedAt: at }])); watchBoard.render(); }, new Date(aimNow - 12 * 60e3).toISOString());
-check('🎯のカードにラインの価格が出る（範囲の中央）', (await page.textContent(row('GBPAUD') + ' .aim-badge')).includes('2.02'));
-check('🎯の価格はタップでコピーできる', await page.locator(row('GBPAUD') + ' .aim-badge .zcopy').count() === 1);
+check('🎯のラインの価格は📍の行に出る（範囲の中央）', (await page.textContent(row('GBPAUD') + ' .sw-zone-line')).includes('2.02'));
+check('🎯の価格はタップでコピーできる（📍の行の価格と同じ部品）', await page.locator(row('GBPAUD') + ' .sw-zone-line .zam ~ .zcopy').count() === 1);
+check('ヘッダの🎯は印だけ（価格は出さない）', !(await page.textContent(row('GBPAUD') + ' .aim-badge')).includes('2.02'));
+await page.evaluate(() => { const z = (lo, hi, conf) => ({ lo, hi, line: lo, touches: 3, conf });
+  localStorage.setItem('mochipoyo_zones_cache_v1', JSON.stringify({ version: 1, generatedAt: new Date().toISOString(), pairs: { GBPAUD: { price: 2.01, nearUnit: 0.05,
+    tfs: { '4H': { atr: 0.1, ladder: [z(2.02, 2.04, ['1H', '4H']), z(1.96, 1.98, ['4H'])] } } } } })); location.reload(); });
+await page.waitForSelector('#tabBar');
+check('🎯が上のラインと同じ価格なら重複させず、そのラインに🎯を付ける', await page.locator(row('GBPAUD') + ' .sw-zone-line .zcopy').count() === 2 && await page.locator(row('GBPAUD') + ' .sw-zone-line .zam').count() === 1);
+check('📍の行は価格の高い順（上→下）', await page.$$eval(row('GBPAUD') + ' .sw-zone-line .zcopy', els => els.map(e => Number(e.textContent))).then(a => a[0] > a[1]));
 
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));

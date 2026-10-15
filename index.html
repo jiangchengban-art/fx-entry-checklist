@@ -1022,7 +1022,7 @@
   .sw-zone-line .zdown i { color: var(--buy-ink);  border: 1px solid var(--buy); }
   .sw-zone-line span.multi b { color: var(--cls-day-ink); }
   .aim-badge { background: var(--buy); padding: 2px 7px; font-size: 11px; }
-  .aim-badge .zcopy { color: inherit; padding: 0; font-weight: 700; }
+  .sw-zone-line em.zam { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 0 4px; border-radius: 4px; margin-right: 3px; background: var(--buy); color: #fff; }
   .sw-tab.active[data-sw-cls="scalp"] { color: var(--cls-scalp-ink); }
   .sw-tab.active[data-sw-cls="day"]   { color: var(--cls-day-ink); }
   .sw-tab.active[data-sw-cls="swing"] { color: var(--cls-swing-ink); }
@@ -4021,11 +4021,19 @@ function makeWatchBoard() {
     const r = (Date.now() - Date.parse(l.at)) / (TRADE_CLS_BY[watchCls(t)].expireH * 3600000);
     return r > 0.8 ? 'age-late' : r > 0.5 ? 'age-mid' : 'age-new';
   };
-  const zoneLineHtml = pair => {
-    const lines = zoneLines(pair);
-    if (!lines.length) return '';
-    return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + lines.map(h =>
-      '<span class="' + (h.up ? 'zup' : 'zdown') + (h.conf.length >= 2 ? ' multi' : '') + '"><i>' + (h.up ? '上' : '下') + '</i>' + zoneCopyHtml(zoneLineOf(h)) + ' <b>' + esc(zoneConfText(h.conf)) + '</b></span>').join('') +
+  /* S113: 📍の行に 上のライン・下のライン・🎯（ネック✅を出したライン）を価格の高い順に並べる。🎯が上/下のラインと同じ価格なら、そのラインに🎯を付けて重複させない */
+  const zoneLineHtml = (pair, aim) => {
+    const items = zoneLines(pair).map(h => ({ price: zoneLineOf(h), up: h.up, conf: h.conf, aim: false }));
+    if (aim) {
+      const same = items.find(x => Math.abs(x.price - aim.line) <= Math.abs(aim.line) * 1e-9);
+      if (same) same.aim = true; else items.push({ price: aim.line, up: null, conf: aim.conf, aim: true });
+    }
+    if (!items.length) return '';
+    items.sort((x, y) => y.price - x.price);
+    return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + items.map(x =>
+      '<span class="' + (x.up === null ? 'zaim' : x.up ? 'zup' : 'zdown') + (x.conf.length >= 2 ? ' multi' : '') + '">' +
+      (x.aim ? '<em class="zam" title="ネック✅を出したライン">🎯</em>' : '') +
+      (x.up === null ? '' : '<i>' + (x.up ? '上' : '下') + '</i>') + zoneCopyHtml(x.price) + ' <b>' + esc(zoneConfText(x.conf)) + '</b></span>').join('') +
       '</div>';
   };
   const pick = (name, v, on, label) =>
@@ -4076,7 +4084,7 @@ function makeWatchBoard() {
           chips.map(c => '<span class="sw-tfchip">' + c + '</span>').join('') +
           (t.wait ? '<span class="sw-wait-badge" title="条件は見たが、下位足の形ができるのを待っている">⏳待ち</span>' : '') +
           '<span class="spacer"></span>' +
-          (aimHit ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート。価格をタップでコピー（TradingView に引く用）">🎯' + zoneCopyHtml(aimHit.line) + ' ' + esc(aimHit.conf.join('·')) + '</span>' : '') +
+          (aimHit ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート（価格は下の📍の行）">🎯' + esc(aimHit.conf.join('·')) + '</span>' : '') +
           (l ? '<span class="sw-pend-age ' + ageCls(t, l) + '" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
         '</div>' +
         '<div class="trend-tf sw-conds">' + WATCH_NG.map(c => {
@@ -4084,7 +4092,7 @@ function makeWatchBoard() {
           return '<button type="button" class="sc-btn ' + (s || 'ng') + (s ? ' on' : '') + '" data-sw-ng="' + c.k +
             '" title="' + c.label + '（タップで✅成立→▲微妙→✖不成立→解除）">' + c.label + (s ? '<span class="sw-mark">' + WATCH_MARK[s] + '</span>' : '') + '</button>';
         }).join('') + '</div>' +
-        zoneLineHtml(t.pair) +
+        zoneLineHtml(t.pair, aimHit) +
         '<div class="trend-tf">' +
           '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ">📝</button>' +
           '<button type="button" class="tgoto sw-pin' + (t.pin ? ' on' : '') + '" data-sw-pin title="ピン止め（一番上に固定・時間がたっても消さない。もう一度で解除）">📌</button>' +
