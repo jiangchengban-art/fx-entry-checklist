@@ -1,5 +1,5 @@
 /* S104: TradingView アラート → 監視リスト行更新（Edge Function の純関数部分） */
-import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage, neckJudge, zoneCandidates, itemCls } from './supabase/functions/tradingview-alert/core.mjs';
+import { parseMessage, resolveTarget, pickLive, planUpdate, zoneMatch, aimMessage, neckJudge, zoneCandidates, itemCls, itemTf } from './supabase/functions/tradingview-alert/core.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -179,6 +179,22 @@ check('itemCls：scalpwatch=スキャ／cls優先／旧データは鳴ってい�
   const p1h = parseMessage('【1時間足】USDJPY 🟢買い long 157.0');
   const pp = planUpdate({ rows: [], tomb: {}, target: resolveTarget(p1h), parsed: p1h, now: NOW });
   check('スキャ（scalpwatch）には cls を付けない', pp.item.cls === undefined && pp.item.id === 'sw_tv_USDJPY');
+  // S114: 週足は日足と別カード。カードには時間足（tf）が付く
+  const pw = parseMessage('【週足】USDJPY 🟢買い long 157.0');
+  const plW = planUpdate({ rows: [swingItem], tomb: {}, target: resolveTarget(pw), parsed: pw, now: NOW });
+  check('日足のカードがあっても、週足は別カード（tw_tv_<PAIR>_w・cls=swing・tf=W）', plW.created && plW.item.id === 'tw_tv_USDJPY_w' && plW.item.cls === 'swing' && plW.item.tf === 'W');
+  check('日足のカードは tf=D', pl.item.tf === 'D');
+  const plD2 = planUpdate({ rows: [swingItem, { data: plW.item }], tomb: {}, target: resolveTarget(pd), parsed: pd, now: NOW });
+  check('日足のアラートは日足のカードだけを更新', !plD2.created && plD2.item.id === 'tw_tv_USDJPY_s');
+  check('itemTf：tf優先／scalpwatch=1H／デイ=4H／旧スイングは日足があればD、週足だけならW',
+    itemTf({ tf: 'W', kind: 'trendwatch', alerts: { D: 'x' } }) === 'W' && itemTf({ kind: 'scalpwatch' }) === '1H' &&
+    itemTf({ kind: 'trendwatch', alerts: { '4H': 'x' } }) === '4H' && itemTf({ kind: 'trendwatch', cls: 'swing', alerts: { D: 'x', W: 'y' } }) === 'D' &&
+    itemTf({ kind: 'trendwatch', cls: 'swing', alerts: { W: 'y' } }) === 'W');
+  const legacy = { data: { id: 'tw_tv_EURUSD_s', kind: 'trendwatch', pair: 'EURUSD', cls: 'swing', alerts: { D: '2026-09-30T08:00:00.000Z' }, ng: {}, mid: {}, ok: {}, notes: '',
+    createdAt: '2026-09-30T08:00:00.000Z', updatedAt: '2026-09-30T08:00:00.000Z' } };
+  const pd3 = parseMessage('【日足】EURUSD 🔴売り short 1.12');
+  const pl3 = planUpdate({ rows: [legacy], tomb: {}, target: resolveTarget(pd3), parsed: pd3, now: NOW });
+  check('tf の無い旧カードを更新すると tf を書き足す', !pl3.created && pl3.item.tf === 'D');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -10,10 +10,20 @@ export const TF_MAP = {
   '60':  { kind: 'scalpwatch', tf: '1H', prefix: 'sw', cls: 'scalp', suffix: '' },
   '240': { kind: 'trendwatch', tf: '4H', prefix: 'tw', cls: 'day',   suffix: '' },
   '1D':  { kind: 'trendwatch', tf: 'D',  prefix: 'tw', cls: 'swing', suffix: '_s' },
-  '1W':  { kind: 'trendwatch', tf: 'W',  prefix: 'tw', cls: 'swing', suffix: '_s' },
+  '1W':  { kind: 'trendwatch', tf: 'W',  prefix: 'tw', cls: 'swing', suffix: '_w' },   // S114: 週足は日足と別カード
 };
 
 /* アプリ（index.html）の watchCls() と同じ判定にそろえること。cls を持たない旧アイテムは鳴っている時間足から決める */
+/* S114: カードは時間足ごとに1枚（同じ通貨でも 1H/4H/D/W は別カード）。tf を持たない旧アイテムは種類と鳴っている足から決める。
+   ⚠️ アプリ（index.html）の watchTf() と同じ判定にそろえること */
+export function itemTf(item) {
+  if (!item) return '';
+  if (['1H', '4H', 'D', 'W'].includes(item.tf)) return item.tf;
+  if (item.kind === 'scalpwatch') return '1H';
+  if (itemCls(item) === 'day') return '4H';
+  const a = item.alerts || {};
+  return a.D ? 'D' : a.W ? 'W' : 'D';
+}
 export function itemCls(item) {
   if (!item) return '';
   if (item.kind === 'scalpwatch') return 'scalp';
@@ -70,13 +80,14 @@ export function resolveTarget(parsed) {
 }
 
 /* クラウドの t: 行は削除されても残る（削除は tomb 行の時刻）。墓標より新しい行だけが生きている。 */
-export function pickLive(rows, tomb, cls) {
+export function pickLive(rows, tomb, cls, tf) {
   const dead = (tomb && tomb.trades) || {};
   let best = null;
   (rows || []).forEach(r => {
     const t = r && r.data;
     if (!t || !t.id) return;
     if (cls && itemCls(t) !== cls) return;
+    if (tf && itemTf(t) !== tf) return;
     const stamp = ts(t.updatedAt) || ts(t.createdAt);
     if (ts(dead[t.id]) >= stamp) return;
     if (!best || stamp > (ts(best.updatedAt) || ts(best.createdAt))) best = t;
@@ -156,15 +167,16 @@ export function aimMessage(target, parsed, hit) {
 }
 
 export function planUpdate({ rows, tomb, target, parsed, now, zone, neck }) {
-  const live = pickLive(rows, tomb, target.cls);
+  const live = pickLive(rows, tomb, target.cls, target.tf);
   const at = parsed.at || now;
   const item = live ? JSON.parse(JSON.stringify(live)) : {
     id: target.prefix + '_tv_' + target.pair + (target.suffix || ''), kind: target.kind, pair: target.pair,
-    ...(target.kind === 'trendwatch' ? { cls: target.cls } : {}),
+    ...(target.kind === 'trendwatch' ? { cls: target.cls } : {}), tf: target.tf,
     ng: { granville: false, rci: false, macd: false }, mid: { granville: false, rci: false, macd: false },
     ok: { granville: false, rci: false, macd: false },
     notes: '', alerts: {}, createdAt: now, updatedAt: now,
   };
+  if (!item.tf) item.tf = target.tf;   // S114: 旧アイテムにも時間足を書いておく
   item.alerts = Object.assign({}, item.alerts, { [target.tf]: at });
   if (parsed.side) item.alertSide = Object.assign({}, item.alertSide, { [target.tf]: parsed.side });
   if (parsed.price) item.alertPrice = Object.assign({}, item.alertPrice, { [target.tf]: parsed.price });

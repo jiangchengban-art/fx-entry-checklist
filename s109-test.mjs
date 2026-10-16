@@ -234,6 +234,31 @@ await page.waitForSelector('#tabBar');
 check('🎯が上のラインと同じ価格なら重複させず、そのラインに🎯を付ける', await page.locator(row('GBPAUD') + ' .sw-zone-line .zcopy').count() === 2 && await page.locator(row('GBPAUD') + ' .sw-zone-line .zam').count() === 1);
 check('📍の行は価格の高い順（上→下）', await page.$$eval(row('GBPAUD') + ' .sw-zone-line .zcopy', els => els.map(e => Number(e.textContent))).then(a => a[0] > a[1]));
 
+/* ---- S114: 時間足ごとに別カード・他の足のアラート・逆向きの警告 ---- */
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  const mk = (id, kind, extra) => Object.assign({ id, kind, pair: 'AUDJPY', ng: c, mid: c, ok: c, notes: '', createdAt: at.d, updatedAt: at.d }, extra);
+  saveTrades([
+    mk('tW', 'trendwatch', { cls: 'swing', tf: 'W', alerts: { W: at.w }, alertSide: { W: 'long' } }),
+    mk('tD', 'trendwatch', { cls: 'swing', tf: 'D', alerts: { D: at.d }, alertSide: { D: 'short' } }),
+    mk('t1', 'scalpwatch', { alerts: { '1H': at.h }, alertSide: { '1H': 'long' } }),
+  ]); watchBoard.render(); }, { w: new Date(Date.now() - 5 * 3600e3).toISOString(), d: new Date(Date.now() - 2 * 3600e3).toISOString(), h: new Date(Date.now() - 20 * 60e3).toISOString() });
+const card = id => `#swList [data-sw="${id}"]`;
+check('同じ通貨の週足・日足・1時間足は別々のカード', await page.locator('#swList [data-sw]').count() === 3);
+check('ヘッダの時間足は自分の足だけ', (await page.$$eval(card('tW') + ' .sw-tfchip', els => els.map(e => e.textContent))).join() === 'W');
+check('週足のカードに「他の足」：1H▲買・D▼売', /1H▲買/.test(await page.textContent(card('tW') + ' .sw-other')) && /D▼売/.test(await page.textContent(card('tW') + ' .sw-other')));
+check('週足（買い）は日足（売り）と逆向き → ⚠逆向き・赤い行', await page.locator(card('tW') + ' .sw-conflict').count() === 1 && await page.locator(card('tW') + ' .sw-other.conflict').count() === 1);
+check('逆向きの足のチップに印', await page.locator(card('tW') + ' .sw-ochip.opp').count() === 1);
+check('日足（売り）から見て週足・1時間足（買い）は逆向き', await page.locator(card('tD') + ' .sw-ochip.opp').count() === 2);
+await page.evaluate(() => { const ts = loadTrades(); ts.find(t => t.id === 'tD').alertSide = { D: 'long' }; saveTrades(ts); watchBoard.render(); });
+check('全部同じ向きなら⚠は出ず「🔗 他の足」だけ', await page.locator('#swList .sw-conflict').count() === 0 && (await page.textContent(card('tW') + ' .sw-other')).includes('他の足'));
+await page.evaluate(() => { saveTrades(loadTrades().filter(t => t.id === 't1')); watchBoard.render(); });
+check('他の足が無ければ行は出ない', await page.locator(card('t1') + ' .sw-other').count() === 0);
+await page.selectOption('#swAddCls', 'W');
+await page.selectOption('#swAdd', 'AUDJPY');
+const addW = (await trades()).find(t => t.pair === 'AUDJPY' && t.tf === 'W');
+check('手で追加は時間足を選ぶ（週足 → スイング・tf=W）', !!addW && addW.kind === 'trendwatch' && addW.cls === 'swing');
+check('手で足した週足のカードにも1時間足のアラートが「他の足」で出る', /1H/.test(await page.textContent(card(addW.id) + ' .sw-other')));
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

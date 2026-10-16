@@ -962,6 +962,15 @@
   .sw-conds { gap: 4px; }
   .sw-conds .sc-btn { flex: 1 1 0; min-width: 0; padding: 0 1px; font-size: 11px; white-space: nowrap; letter-spacing: -0.02em; }
   .sw-res.skip { color: var(--ink-2); border: 1px solid var(--border); }
+  .sw-other { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 11px 4px 9px; padding: 3px 6px; border-radius: 6px; font-size: 11px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border); }
+  .sw-other.conflict { background: rgba(224,73,79,.12); border-color: var(--sell); color: var(--sell-ink); }
+  .sw-other b { font-weight: 700; }
+  .sw-other-lab { font-weight: 700; color: var(--ink-muted); }
+  .sw-ochip { font-weight: 700; padding: 0 6px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .sw-ochip.up { color: var(--buy-ink); border-color: var(--buy); }
+  .sw-ochip.down { color: var(--sell-ink); border-color: var(--sell); }
+  .sw-ochip.opp { background: rgba(224,73,79,.20); }
+  .sw-conflict { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; color: #fff; background: var(--sell); white-space: nowrap; flex: none; }
   .sw-wait-badge { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; flex: none; color: var(--warn); background: var(--warn-soft); }
   .tgoto.sw-wait { width: auto; padding: 0 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
   .tgoto.sw-wait.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
@@ -1243,20 +1252,20 @@
     <details class="trend-help sw-help">
       <summary>📖 使い方（どこをタップすると何が起きるか）</summary>
       <div class="trend-help-body">
-        <strong>カードは TradingView のアラートで自動的に入ります</strong>（通貨×種類で1枚）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ6時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
+        <strong>カードは TradingView のアラートで自動的に入ります</strong>（<strong>通貨×時間足で1枚</strong>。同じ通貨でも1時間足・4時間足・日足・週足は別のカードです）。同じ通貨の他の時間足でもアラートが鳴っていると、カードに「🔗 他の足」の行が出て、時間足・向き・経過時間が分かります。<strong>向きが逆のアラートがあると「⚠逆向き」の印が付き、その行が赤くなります</strong>（買いと売りが拮抗しているので注意）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ6時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
         <strong>通貨名</strong>：タップで通貨名をコピー。▲／▼はアラートの方向、1H／4H／D／W は鳴った時間足、⏰は鳴ってからの時間、🎯はネックライン付近で方向も合っている印（表示だけ）。<br>
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
         <strong>📌</strong>：ピン止め。一番上に固定され、時間がたっても自動で消えなくなります（もう一度で解除）。<strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
         <strong>見送り</strong>：カードを消し、そのときの条件つきで「見送り」を記録します（あとで入っていたら勝てたかを検証）。<br>
         <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。記録は📒記録タブに入り、カードは消えます。<br>
-        ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、種類を選んで足します。3端末で同期されます。
+        ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、時間足を選んで足します。3端末で同期されます。
       </div>
     </details>
     <div class="sw-tabs" id="swTabs" role="tablist"></div>
     <div class="list-toolbar">
-      <select class="sc-pair sw-add" id="swAddCls" aria-label="追加する種類">
-        <option value="scalp">⚡スキャ</option><option value="day">☀️デイ</option><option value="swing">🌙スイング</option>
+      <select class="sc-pair sw-add" id="swAddCls" aria-label="追加する時間足">
+        <option value="1H">⚡1時間足</option><option value="4H">☀️4時間足</option><option value="D">🌙日足</option><option value="W">🌙週足</option>
       </select>
       <select class="sc-pair sw-add" id="swAdd" aria-label="通貨を手で追加"></select>
       <span class="spacer"></span>
@@ -3831,14 +3840,27 @@ function watchCls(t) {
   const a = t.alerts || {};
   return a['4H'] ? 'day' : (a.D || a.W) ? 'swing' : 'day';
 }
+/* S114: カードは時間足ごとに1枚（同じ通貨でも 1H/4H/D/W は別カード）。tf を持たない旧カードは種類と鳴っている足から決める。
+   ⚠️ supabase/functions/tradingview-alert/core.mjs の itemTf() と同じ判定にそろえること */
+const TF_CLS = { '1H': 'scalp', '4H': 'day', D: 'swing', W: 'swing' };
+const TF_ORDER = ['1H', '4H', 'D', 'W'];
+function watchTf(t) {
+  if (TF_CLS[t.tf]) return t.tf;
+  if (t.kind === 'scalpwatch') return '1H';
+  if (watchCls(t) === 'day') return '4H';
+  const a = t.alerts || {};
+  return a.D ? 'D' : a.W ? 'W' : 'D';
+}
 /* 週足のアラートだけ、エントリー足の候補を 1時間足・4時間足 にする */
 function entryOptions(cls, tf) {
   return cls === 'swing' && tf === 'W' ? ['1時間足', '4時間足'] : (TRADE_CLS_BY[cls] || TRADE_CLS_BY.day).entries;
 }
-/* 一番新しいアラート { tf, at, side, price }（無ければ null） */
+/* そのカードのアラート { tf, at, side, price }。自分の時間足を優先し、無ければ一番新しいもの（無ければ null） */
 function watchLatest(t) {
   let best = null;
-  Object.keys(t.alerts || {}).forEach(tf => {
+  const own = watchTf(t);
+  if ((t.alerts || {})[own]) best = { tf: own, at: t.alerts[own] };
+  else Object.keys(t.alerts || {}).forEach(tf => {
     const at = t.alerts[tf];
     if (at && (!best || at > best.at)) best = { tf, at };
   });
@@ -4058,8 +4080,23 @@ function makeWatchBoard() {
         '<button type="button" class="btn-ghost" data-sw-cancel>やめる</button></div>' +
     '</div>';
   };
-  const itemHtml = t => {
+  /* S114: 同じ通貨の他の時間足で鳴っているアラート（監視中のカードのもの。時間足ごとに一番新しいもの） */
+  const otherTfs = (t, all) => {
+    const me = watchTf(t);
+    const best = {};
+    all.filter(u => u.pair === t.pair).forEach(u => Object.keys(u.alerts || {}).forEach(tf => {
+      const at = u.alerts[tf];
+      if (tf === me || !at) return;
+      if (!best[tf] || at > best[tf].at) best[tf] = { tf, at, side: (u.alertSide || {})[tf] || '' };
+    }));
+    return TF_ORDER.filter(k => best[k]).map(k => best[k]);
+  };
+  const itemHtml = (t, all) => {
     const cls = watchCls(t);
+    const myTf = watchTf(t);
+    const others = otherTfs(t, all || items());
+    const mySide = (t.alertSide || {})[myTf] || '';
+    const conflict = !!mySide && others.some(o => o.side && o.side !== mySide);
     const l = watchLatest(t);
     const anyNg = WATCH_NG.some(c => watchState(t, c.k) === 'ng');
     const allOk = watchAllOk(t);
@@ -4073,7 +4110,7 @@ function makeWatchBoard() {
       return { line: zoneLineOf(m || z), conf: z.conf || [] };
     })() : null;
     const st = entryState[t.id];
-    const chips = Object.keys(t.alerts || {}).sort((a, b) => ['1H', '4H', 'D', 'W'].indexOf(a) - ['1H', '4H', 'D', 'W'].indexOf(b));
+    const chips = [myTf];
     return (
       '<div class="trend-item sc-card sw-item cls-' + cls + (anyNg ? ' ng' : allOk ? ' ok' : anyMid ? ' mid' : '') + (t.wait ? ' waiting' : '') + (t.pin ? ' pinned' : '') + '" data-sw="' + esc(t.id) + '">' +
         '<div class="trend-head">' +
@@ -4082,11 +4119,17 @@ function makeWatchBoard() {
           (l ? (l.side === 'long' ? '<span class="sw-dir up" title="アラートの方向">▲買</span>'
               : l.side === 'short' ? '<span class="sw-dir down" title="アラートの方向">▼売</span>' : '') : '') +
           chips.map(c => '<span class="sw-tfchip">' + c + '</span>').join('') +
+          (conflict ? '<span class="sw-conflict" title="同じ通貨の他の時間足で、逆向きのアラートが出ています">⚠逆向き</span>' : '') +
           (t.wait ? '<span class="sw-wait-badge" title="条件は見たが、下位足の形ができるのを待っている">⏳待ち</span>' : '') +
           '<span class="spacer"></span>' +
           (aimHit ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート（価格は下の📍の行）">🎯' + esc(aimHit.conf.join('·')) + '</span>' : '') +
           (l ? '<span class="sw-pend-age ' + ageCls(t, l) + '" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
         '</div>' +
+        (others.length ? '<div class="sw-other' + (conflict ? ' conflict' : '') + '" title="同じ通貨の他の時間足で鳴っているアラート">' +
+          (conflict ? '<b>⚠ 他の足と逆向き</b>' : '<span class="sw-other-lab">🔗 他の足</span>') +
+          others.map(o => '<span class="sw-ochip' + (o.side === 'long' ? ' up' : o.side === 'short' ? ' down' : '') + (mySide && o.side && o.side !== mySide ? ' opp' : '') +
+            '" title="' + esc(fmtDatetime(o.at)) + ' にアラート">' + o.tf + (o.side === 'long' ? '▲買' : o.side === 'short' ? '▼売' : '') + ' ' + watchElapsed(o.at) + '</span>').join('') +
+          '</div>' : '') +
         '<div class="trend-tf sw-conds">' + WATCH_NG.map(c => {
           const s = watchState(t, c.k);
           return '<button type="button" class="sc-btn ' + (s || 'ng') + (s ? ' on' : '') + '" data-sw-ng="' + c.k +
@@ -4123,12 +4166,12 @@ function makeWatchBoard() {
     tabBadge.textContent = all.length ? String(all.length) : '';
     countEl.textContent = all.length ? all.length + ' 件' : '';
     const shown = sorted(all.filter(t => clsFilter === 'all' || watchCls(t) === clsFilter));
-    listEl.innerHTML = shown.length ? shown.map(itemHtml).join('')
+    listEl.innerHTML = shown.length ? shown.map(t => itemHtml(t, all)).join('')
       : '<div class="empty-state">' + (all.length ? 'この種類のカードはありません。' : 'アラートが鳴ると、ここに自動でカードが入ります。') + '</div>';
-    const has = new Set(all.map(t => t.pair + '|' + watchCls(t)));
-    const cls = addClsEl.value || 'scalp';
+    const has = new Set(all.map(t => t.pair + '|' + watchTf(t)));
+    const addTf = TF_CLS[addClsEl.value] ? addClsEl.value : '1H';
     addEl.innerHTML = '<option value="">＋ 通貨を手で追加</option>' + MV_PAIR_GROUPS.map(g =>
-      '<optgroup label="' + esc(g.label) + '">' + g.pairs.filter(p => !has.has(p + '|' + cls)).map(p =>
+      '<optgroup label="' + esc(g.label) + '">' + g.pairs.filter(p => !has.has(p + '|' + addTf)).map(p =>
         '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
   };
   const update = (id, fn, rerender) => {
@@ -4166,13 +4209,14 @@ function makeWatchBoard() {
   addEl.addEventListener('change', () => {
     const pair = addEl.value;
     if (!pair) return;
-    const cls = addClsEl.value || 'scalp';
+    const tf = TF_CLS[addClsEl.value] ? addClsEl.value : '1H';
+    const cls = TF_CLS[tf];
     const trades = loadTrades();
-    if (trades.some(t => isWatch(t) && t.pair === pair && watchCls(t) === cls)) { render(); return; }
+    if (trades.some(t => isWatch(t) && t.pair === pair && watchTf(t) === tf)) { render(); return; }
     const now = new Date().toISOString();
     const c4 = () => ({ granville: false, rci: false, macd: false, neck: false });
     const item = { id: mvGenId(cls === 'scalp' ? 'sw' : 'tw'), kind: cls === 'scalp' ? 'scalpwatch' : 'trendwatch', pair,
-                   ng: c4(), mid: c4(), ok: c4(), notes: '', createdAt: now, updatedAt: now };
+                   ng: c4(), mid: c4(), ok: c4(), notes: '', tf, createdAt: now, updatedAt: now };
     if (cls !== 'scalp') item.cls = cls;
     trades.push(item);
     if (!saveTrades(trades)) return;
