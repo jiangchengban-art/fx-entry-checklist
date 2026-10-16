@@ -89,6 +89,15 @@ export function backfillTrade(t, bars) {
   const dir = t.direction;
   const toMs = Date.parse(t.createdAt || '') || Date.now();           // 「入った」を押した時刻（これより前に約定している）
   const fromMs = Date.parse(t.alertAt || '') || toMs - 6 * 3600000;    // アラートが鳴った時刻（これより前には入っていない）
+  /* S115: 後から記録して日時を手で入れた記録は、その時刻を含む足をエントリーとする（価格での突き合わせはしない） */
+  const manualMs = t.entryAtManual ? Date.parse(t.entryAtIso || '') : NaN;
+  if (Number.isFinite(manualMs)) {
+    let idx = -1;
+    for (let k = 0; k < bars.length; k++) { if (bars[k].t * 1000 <= manualMs) idx = k; else break; }
+    if (idx < 0) return { error: 'entry before bars', entryAt: '' };
+    const wm = walkTrade(bars, idx, dir, { entry: t.entryPrice, stop: t.stopPrice, tp2: t.tp2Price, tp3: t.tp3Price, tp4: t.tp4Price }, tf.sec);
+    return Object.assign({ entryAt: new Date(manualMs).toISOString(), entryCandidates: 1, entryAtSource: 'manual' }, wm);
+  }
   const e = findEntry(bars, t.entryPrice, fromMs, toMs, tf.sec);
   if (e.index < 0) return { error: 'entry not found', entryAt: '' };
   const w = walkTrade(bars, e.index, dir, { entry: t.entryPrice, stop: t.stopPrice, tp2: t.tp2Price, tp3: t.tp3Price, tp4: t.tp4Price }, tf.sec);

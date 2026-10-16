@@ -259,6 +259,34 @@ const addW = (await trades()).find(t => t.pair === 'AUDJPY' && t.tf === 'W');
 check('手で追加は時間足を選ぶ（週足 → スイング・tf=W）', !!addW && addW.kind === 'trendwatch' && addW.cls === 'swing');
 check('手で足した週足のカードにも1時間足のアラートが「他の足」で出る', /1H/.test(await page.textContent(card(addW.id) + ' .sw-other')));
 
+/* ---- S115: 後から記録するときはエントリー日時を手で入れる ---- */
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().concat([{ id: 'late1', kind: 'scalpwatch', pair: 'NZDJPY', tf: '1H', ng: c, mid: c, ok: c, notes: '', alerts: { '1H': at }, alertSide: { '1H': 'short' }, createdAt: at, updatedAt: at }]));
+  watchBoard.render(); }, new Date(Date.now() - 2 * 3600e3).toISOString());
+await page.click('.tab-btn[data-tab="watch"]');
+await page.click(`${card('late1')} [data-sw-in-open]`);
+check('入ったの欄にエントリー日時の入力がある', await page.locator(`${card('late1')} input[type="datetime-local"][data-sw-in="at"]`).count() === 1);
+await page.fill(`${card('late1')} [data-sw-in="entry"]`, '88.123');
+const future = await page.evaluate(() => toDatetimeLocalValue(new Date(Date.now() + 3 * 3600e3)));
+await page.fill(`${card('late1')} [data-sw-in="at"]`, future);
+await page.click(`${card('late1')} [data-sw-go]`);
+check('未来の日時は記録できない', (await toast()).includes('未来') && !(await trades()).some(t => t.pair === 'NZDJPY' && t.status));
+const past = await page.evaluate(() => toDatetimeLocalValue(new Date(Date.now() - 90 * 60e3)));
+await page.fill(`${card('late1')} [data-sw-in="at"]`, past);
+await page.click(`${card('late1')} [data-sw-go]`);
+const late = (await trades()).find(t => t.pair === 'NZDJPY' && t.status);
+check('入れた日時がエントリー日時になる（手入力の印つき）', !!late && late.datetime === past && late.entryAtManual === true && !!late.entryAtIso && late.entryPrice === 88.123);
+const nowRec = await page.evaluate(() => buildPosition({ id: 'x', kind: 'scalpwatch', pair: 'USDJPY', tf: '1H', alerts: {} }, { tf: '5分足', dir: 'long', entry: '150.1', stop: '', at: '' }));
+check('日時を入れなければ従来どおり（押した時刻・手入力の印なし）', nowRec.entryAtManual === false && nowRec.entryAtIso === '' && Math.abs(Date.parse(nowRec.datetime) - Date.now()) < 120000);
+await page.click('.tab-btn[data-tab="record"]');
+const lateCard = `#posOpen [data-pos="${late.id}"]`;
+await page.click(`${lateCard} [data-pos-fix]`);
+check('「価格」の欄でエントリー日時も直せる', await page.locator(`${lateCard} [data-pos-fix-in="at"]`).inputValue() === past);
+const past2 = await page.evaluate(() => toDatetimeLocalValue(new Date(Date.now() - 3 * 3600e3)));
+await page.fill(`${lateCard} [data-pos-fix-in="at"]`, past2);
+await page.click(`${lateCard} [data-pos-fix-save]`);
+check('直した日時が保存される', (await trades()).find(t => t.id === late.id).datetime === past2);
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

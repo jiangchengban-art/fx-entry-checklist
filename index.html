@@ -1258,7 +1258,7 @@
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
         <strong>📌</strong>：ピン止め。一番上に固定され、時間がたっても自動で消えなくなります（もう一度で解除）。<strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
         <strong>見送り</strong>：カードを消し、そのときの条件つきで「見送り」を記録します（あとで入っていたら勝てたかを検証）。<br>
-        <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。記録は📒記録タブに入り、カードは消えます。<br>
+        <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。<strong>後から記録するときは「エントリー日時」も入れてください</strong>（入れた日時がそのまま記録され、突き合わせもその時刻を使います）。記録は📒記録タブに入り、カードは消えます。<br>
         ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、時間足を選んで足します。3端末で同期されます。
       </div>
     </details>
@@ -3918,6 +3918,13 @@ function rrCalc(o) {
   return { dir, r, dec, stop: at(-1), tp2: at(2), tp3: at(3), tp4: at(4) };
 }
 
+/* S115: 手で入れたエントリー日時のチェック（datetime-local の値。端末の時刻として読む） */
+function entryAtError(v) {
+  const ms = Date.parse(v);
+  if (!Number.isFinite(ms)) return 'エントリー日時が読めません';
+  if (ms > Date.now() + 60000) return 'エントリー日時が未来になっています';
+  return '';
+}
 /* ---- 「入った」→ 通常の記録（保有中）を作る ---- */
 function buildPosition(w, f) {
   const now = new Date();
@@ -3940,8 +3947,10 @@ function buildPosition(w, f) {
     tfEntry: f.tf,
     entryPattern: f.tf + '×' + tfJa,
     mvChecks: { higher: {}, entry: { entryOrderType: f.order || '', entryFibo: f.order === '指値' ? (f.fibo || '') : '' } },
-    /* 押した時刻は目安（実際の約定時刻は、あとで価格から突き合わせる） */
-    datetime: toDatetimeLocalValue(now),
+    /* 押した時刻は目安（実際の約定時刻は、あとで価格から突き合わせる）。S115: 後から記録するときは自分で入れた日時を使い、突き合わせもその時刻を使う */
+    datetime: f.at || toDatetimeLocalValue(now),
+    entryAtManual: !!f.at,
+    entryAtIso: f.at ? new Date(f.at).toISOString() : '',
     exitDatetime: '',
     direction: f.dir,
     exitResult: '',
@@ -4072,6 +4081,7 @@ function makeWatchBoard() {
         '<label class="sw-in"><span>約定価格</span><input type="text" inputmode="decimal" autocomplete="off" data-sw-in="entry" value="' + esc(st.entry) + '"></label>' +
         '<label class="sw-in"><span>損切り価格<small>任意</small></span><input type="text" inputmode="decimal" autocomplete="off" data-sw-in="stop" value="' + esc(st.stop) + '"></label>' +
       '</div>' +
+      '<div class="trend-tf"><label class="sw-in"><span>エントリー日時<small>任意・後から記録するとき</small></span><input type="datetime-local" data-sw-in="at" value="' + esc(st.at || '') + '"></label></div>' +
       '<div class="trend-tf"><span class="sw-lab">注文</span>' +
         pick('order', '指値', st.order === '指値', '指値') + pick('order', '逆指値', st.order === '逆指値', '逆指値') +
         (st.order === '指値' ? '<span class="sw-lab">Fibo</span>' + TREND_FIBOS.map(f => pick('fibo', f, st.fibo === f, f)).join('') : '') +
@@ -4276,7 +4286,7 @@ function makeWatchBoard() {
       const opts = entryOptions(cls, l && l.tf);
       const pref = lastEntryPrefs();
       entryState[id] = { tf: opts.includes(pref['tf_' + cls]) ? pref['tf_' + cls] : opts[0], dir: l ? l.side : '',
-                         entry: '', stop: '', order: pref.order || '', fibo: pref.fibo || '' };
+                         entry: '', stop: '', at: '', order: pref.order || '', fibo: pref.fibo || '' };
       redrawRow(id);
       const inp = listEl.querySelector('[data-sw="' + id + '"] [data-sw-in="entry"]');
       if (inp) inp.focus();
@@ -4301,6 +4311,7 @@ function makeWatchBoard() {
       if (!st.tf) { showToast('⚠ エントリー足を選んでください'); return; }
       if (!st.dir) { showToast('⚠ 売買方向（▲買／▼売）を選んでください'); return; }
       if (parsePrice(st.entry) == null) { showToast('⚠ 約定価格を入れてください'); return; }
+      if (st.at && entryAtError(st.at)) { showToast('⚠ ' + entryAtError(st.at)); return; }
       if (st.stop.trim()) {
         const c = rrCalc({ entry: st.entry, stop: st.stop });
         if (c.error) { showToast('⚠ ' + c.error); return; }
@@ -4332,6 +4343,12 @@ function makeWatchBoard() {
   });
   listEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.matches('[data-sw-note]')) e.target.blur();
+  });
+  /* S115: iOS の日時の入力欄は input が来ないことがあるので change でも拾う */
+  listEl.addEventListener('change', e => {
+    if (!e.target.matches('[data-sw-in]')) return;
+    const id = e.target.closest('[data-sw]').dataset.sw;
+    if (entryState[id]) entryState[id][e.target.dataset.swIn] = e.target.value;
   });
   listEl.addEventListener('input', e => {
     const id = e.target.closest('[data-sw]') && e.target.closest('[data-sw]').dataset.sw;
@@ -4412,7 +4429,8 @@ function makePositions() {
         '<button type="button" class="tclear" data-pos-del title="削除">🗑</button>' +
       '</div>' +
       (fix ? '<div class="trend-tf"><label class="sw-in"><span>約定価格</span><input type="text" inputmode="decimal" data-pos-fix-in="entry" value="' + esc(t.entryPrice == null ? '' : t.entryPrice) + '"></label>' +
-              '<label class="sw-in"><span>損切り価格</span><input type="text" inputmode="decimal" data-pos-fix-in="stop" value="' + esc(t.stopPrice == null ? '' : t.stopPrice) + '"></label>' +
+              '<label class="sw-in"><span>損切り価格</span><input type="text" inputmode="decimal" data-pos-fix-in="stop" value="' + esc(t.stopPrice == null ? '' : t.stopPrice) + '"></label></div>' +
+            '<div class="trend-tf"><label class="sw-in"><span>エントリー日時</span><input type="datetime-local" data-pos-fix-in="at" value="' + esc(t.datetime || '') + '"></label>' +
               '<button type="button" class="btn-primary sw-go" data-pos-fix-save>保存</button></div>' : '') +
     '</div>';
   };
@@ -4484,6 +4502,7 @@ function makePositions() {
       const g = k => card.querySelector('[data-pos-fix-in="' + k + '"]').value.trim();
       const err = save(id, t => {
         const dec = Math.max(priceDecimals(g('entry')), priceDecimals(g('stop')));
+        if (!g('at')) return 'エントリー日時を入れてください';
         if (parsePrice(g('entry')) == null) return 'エントリー価格を入れてください';
         if (g('stop')) {
           const c = rrCalc({ entry: g('entry'), stop: g('stop'), dec });
@@ -4491,6 +4510,11 @@ function makePositions() {
           if (c.dir !== t.direction) return '損切り価格が売買方向と合いません';
           Object.assign(t, { stopPrice: c.stop, tp2Price: c.tp2, tp3Price: c.tp3, tp4Price: c.tp4 });
         } else Object.assign(t, { stopPrice: null, tp2Price: null, tp3Price: null, tp4Price: null });
+        /* S115: 日時を変えたら、その時刻を正として突き合わせる */
+        if (g('at') && g('at') !== t.datetime) {
+          if (entryAtError(g('at'))) return entryAtError(g('at'));
+          Object.assign(t, { datetime: g('at'), entryAtManual: true, entryAtIso: new Date(g('at')).toISOString() });
+        }
         t.entryPrice = parsePrice(g('entry'));
         t.priceDec = dec;
         t.autoFill = '';

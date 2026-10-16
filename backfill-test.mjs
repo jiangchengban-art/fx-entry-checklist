@@ -63,6 +63,12 @@ check('backfillTrade：エントリー時刻＋3:1/4:1', r.entryAt === at(1) && 
 check('価格が揃っていなければエラー', !!backfillTrade({ tfEntry: '5分足', entryPrice: 100 }, mk(flat)).error);
 check('足が無ければエラー', !!backfillTrade(trade, []).error);
 
+// S115: 日時を手で入れた記録は、その時刻の足からエントリーとして見る（価格で探さない）
+r = backfillTrade(Object.assign({}, trade, { entryAtManual: true, entryAtIso: at(3), alertAt: '', createdAt: at(9) }),
+  mk([[101, 100.5], [100.4, 99.8], [102.3, 100.8], [103.2, 101.5], [104.2, 102]]));
+check('手で入れた日時を使う（その足の次から判定）', r.entryAtSource === 'manual' && r.entryAt === at(3) && r.outcome === 'max' && r.tp4At === at(4));
+check('手で入れた日時が足より前ならエラー', !!backfillTrade(Object.assign({}, trade, { entryAtManual: true, entryAtIso: at(-5) }), mk(flat)).error);
+
 /* ---- 見送りの「もし入っていたら」 ---- */
 const calm = n => Array.from({ length: n }, () => [100.5, 99.5]);          // 値幅1.0 → ATR 約1.0 → 損切り幅 1.5・利確 3.0
 const withTail = tail => mk(calm(20).concat(tail));
