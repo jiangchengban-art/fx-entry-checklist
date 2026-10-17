@@ -461,6 +461,39 @@ check('🗑で候補を消せる', !(await cd()));
 check('候補の画面も 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 await page.click('#swSeg [data-sw-pane="alert"]');
 
+/* ---- S120: 候補にもグランビル／RCI／MACD／ネック ---- */
+await page.evaluate(() => { saveTrades([]); renderAll(); });
+await page.click('#swSeg [data-sw-pane="cand"]');
+await page.selectOption('#cdAdd', 'AUDUSD');
+let c2 = await cd();
+await page.click(cdSel(c2.id) + ' [data-cd-save]');
+check('候補カードに4つの条件ボタン', await page.locator(cdSel(c2.id) + ' [data-cd-ng]').count() === 4);
+await page.click(cdSel(c2.id) + ' [data-cd-ng="granville"]');
+await page.click(cdSel(c2.id) + ' [data-cd-ng="rci"]'); await page.click(cdSel(c2.id) + ' [data-cd-ng="rci"]');
+await page.click(cdSel(c2.id) + ' [data-cd-ng="macd"]'); await page.click(cdSel(c2.id) + ' [data-cd-ng="macd"]'); await page.click(cdSel(c2.id) + ' [data-cd-ng="macd"]');
+c2 = await cd();
+const st = (t, k) => t.ng[k] ? 'ng' : t.mid[k] ? 'mid' : t.ok[k] ? 'ok' : '';
+check('タップで ✅→▲→✖ と回る（グランビル✅・RCI▲・MACD✖・ネック未選択）', st(c2, 'granville') === 'ok' && st(c2, 'rci') === 'mid' && st(c2, 'macd') === 'ng' && st(c2, 'neck') === '');
+check('ボタンに印が出る', (await page.textContent(cdSel(c2.id) + ' [data-cd-ng="granville"]')).includes('✅') && (await page.textContent(cdSel(c2.id) + ' [data-cd-ng="macd"]')).includes('✖'));
+await page.click(cdSel(c2.id) + ' [data-cd-ng="granville"]'); await page.click(cdSel(c2.id) + ' [data-cd-ng="granville"]'); await page.click(cdSel(c2.id) + ' [data-cd-ng="granville"]');
+check('4回目で解除', st(await cd(), 'granville') === '');
+await page.click(cdSel(c2.id) + ' [data-cd-ng="granville"]');
+// アラートのカードの「📋 候補」の行に条件が出る
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().concat([{ id: 'al2', kind: 'scalpwatch', tf: '1H', pair: 'AUDUSD', ng: c, mid: c, ok: c, notes: '', alerts: { '1H': at }, alertSide: { '1H': 'short' }, createdAt: at, updatedAt: at }]));
+  renderAll(); }, new Date(Date.now() - 600e3).toISOString());
+await page.click('#swSeg [data-sw-pane="alert"]');
+check('アラートのカードの「📋 候補」に候補の条件が出る', (await page.textContent(`${card('al2')} .sw-cand`)).includes('グランビル✅') && (await page.textContent(`${card('al2')} .sw-cand`)).includes('MACD✖'));
+// → 監視へで条件を引き継ぐ
+await page.click('#swSeg [data-sw-pane="cand"]');
+await page.click(cdSel(c2.id) + ' [data-cd-tf="4H"]');
+await page.click(cdSel(c2.id) + ' [data-cd-go]');
+const w4 = await page.evaluate(() => loadTrades().find(t => t.kind === 'trendwatch' && t.pair === 'AUDUSD'));
+check('→ 監視へで条件を引き継ぐ', !!w4 && st(w4, 'granville') === 'ok' && st(w4, 'rci') === 'mid' && st(w4, 'macd') === 'ng' && st(w4, 'neck') === '');
+check('引き継いだ監視カードのボタンにも印が出る', (await page.textContent(`${card(w4.id)} [data-sw-ng="rci"]`)).includes('▲'));
+check('候補画面も 375px に収まる', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+await page.click('#swSeg [data-sw-pane="alert"]');
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

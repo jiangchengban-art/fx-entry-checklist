@@ -1039,6 +1039,10 @@
   .sw-cand { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 11px 4px 9px; padding: 4px 6px; border-radius: 6px; font-size: 11.5px; color: var(--ink-2);
              background: var(--accent-soft); border: 1px solid var(--accent); cursor: pointer; }
   .sw-cand > b { color: var(--accent); }
+  .sw-cand-cond { font-weight: 700; padding: 0 5px; border-radius: 999px; white-space: nowrap; }
+  .sw-cand-cond.ok  { color: var(--buy-ink);  background: rgba(18,161,80,.16); }
+  .sw-cand-cond.mid { color: var(--warn);     background: rgba(250,178,25,.16); }
+  .sw-cand-cond.ng  { color: var(--sell-ink); background: rgba(224,73,79,.16); }
   .sw-cand-note { flex-basis: 100%; color: var(--ink); }
   .sw-dir-btn { font-family: inherit; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1.5px dashed var(--border); }
   .sw-dir-btn.up.on   { color: var(--buy-ink);  border: 1.5px solid var(--buy);  background: rgba(18,161,80,.16); }
@@ -1320,8 +1324,9 @@
         週末の分析などで、<strong>アラートが鳴る前に気づいたことを通貨ごとに書いておく場所</strong>です。🔔 アラートの一覧には出ず、時間がたっても消えません。3端末で同期されます。<br>
         <strong>＋ 候補の通貨を追加</strong>：通貨を選ぶとカードができ、メモの欄が開きます。<br>
         <strong>▲買／▼売・1H／4H／日足／週足</strong>：見ている方向と時間足（任意。タップで選ぶ・もう一度で解除）。<br>
+        <strong>グランビル／RCI／MACD／ネック</strong>：監視カードと同じく、タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択。「→ 監視へ」で監視カードに引き継ぎます（候補のネックは自動では入りません）。<br>
         <strong>メモ</strong>：2行で省略されます。タップで全部表示。<strong>✎</strong> でメモと狙う価格を書き直します。狙う価格・📍の価格はタップでコピー。<br>
-        <strong>→ 監視へ</strong>：エントリーを考えるときに押すと、🔔 アラートの側に監視カードができます（方向・時間足・メモを引き継ぐ。時間足は必須）。候補カードは「👀 監視中」の印が付いて残ります。<br>
+        <strong>→ 監視へ</strong>：エントリーを考えるときに押すと、🔔 アラートの側に監視カードができます（方向・時間足・条件・メモを引き継ぐ。時間足は必須）。候補カードは「👀 監視中」の印が付いて残ります。<br>
         <strong>📋 候補あり</strong>：候補に入れている通貨で TradingView のアラートが鳴ると、そのアラートのカードに候補のメモが出ます（タップで全部表示）。<br>
         📌 は一番上に固定、🗑 は削除です。
       </div>
@@ -4231,6 +4236,7 @@ function makeWatchBoard() {
         '<b>📋 候補</b>' +
         (c.side ? '<span class="sw-dir ' + (c.side === 'long' ? 'up' : 'down') + '">' + (c.side === 'long' ? '▲買' : '▼売') + '</span>' : '') +
         (c.tf ? '<span class="sw-tfchip">' + esc(c.tf) + '</span>' : '') +
+        WATCH_NG.map(k => { const st = watchState(c, k.k); return st ? '<span class="sw-cand-cond ' + st + '">' + k.label + WATCH_MARK[st] + '</span>' : ''; }).join('') +
         (c.target ? '<span>狙い ' + zoneCopyHtml(c.target) + '</span>' : '') +
         (c.notes ? '<span class="sw-cand-note">' + esc(c.notes) + '</span>' : '') +
       '</div>').join('');
@@ -4627,6 +4633,12 @@ function makeCandidates() {
         '<span class="pos-time" title="書いた日">' + esc(fmtDatetime(c.createdAt)) + '</span>' +
       '</div>' +
       '<div class="trend-tf cd-tfs">' + tfBtn(c, '1H', '1H') + tfBtn(c, '4H', '4H') + tfBtn(c, 'D', '日足') + tfBtn(c, 'W', '週足') + '</div>' +
+      /* S120: グランビル／RCI／MACD／ネック（監視カードと同じ ✅→▲→✖→解除。ネックも手で選ぶ） */
+      '<div class="trend-tf sw-conds">' + WATCH_NG.map(k => {
+        const st = watchState(c, k.k);
+        return '<button type="button" class="sc-btn ' + (st || 'ng') + (st ? ' on' : '') + '" data-cd-ng="' + k.k +
+          '" title="' + k.label + '（タップで✅成立→▲微妙→✖不成立→解除）">' + k.label + (st ? '<span class="sw-mark">' + WATCH_MARK[st] + '</span>' : '') + '</button>';
+      }).join('') + '</div>' +
       (c.notes && !ed ? '<div class="cd-note' + (full.has(c.id) ? ' full' : '') + '" data-cd-note title="タップで全部表示">' + esc(c.notes) + '</div>' : '') +
       (c.target && !ed ? '<div class="pos-prices">狙う価格 ' + zoneCopyHtml(c.target) + '</div>' : '') +
       watchBoard.zoneLineHtml(c.pair, null) +
@@ -4680,7 +4692,9 @@ function makeCandidates() {
     const trades = loadTrades();
     if (trades.some(c => isCandidate(c) && c.pair === pair)) { render(); return; }
     const now = new Date().toISOString();
-    const c = { id: mvGenId('cd'), kind: 'candidate', pair, side: '', tf: '', notes: '', target: '', pin: false, watchId: '', createdAt: now, updatedAt: now };
+    const c4 = () => ({ granville: false, rci: false, macd: false, neck: false });
+    const c = { id: mvGenId('cd'), kind: 'candidate', pair, side: '', tf: '', notes: '', target: '', pin: false, watchId: '',
+                ng: c4(), mid: c4(), ok: c4(), createdAt: now, updatedAt: now };
     trades.push(c);
     if (!saveTrades(trades)) return;
     openEdit(c.id);
@@ -4693,6 +4707,17 @@ function makeCandidates() {
     if (sd) { if (save(id, c => { c.side = c.side === sd.dataset.cdSide ? '' : sd.dataset.cdSide; })) render(); return; }
     const tb = e.target.closest('[data-cd-tf]');
     if (tb) { if (save(id, c => { c.tf = c.tf === tb.dataset.cdTf ? '' : tb.dataset.cdTf; })) render(); return; }
+    const ngb = e.target.closest('[data-cd-ng]');
+    if (ngb) {
+      const k = ngb.dataset.cdNg;
+      if (save(id, c => {
+        const next = { '': 'ok', ok: 'mid', mid: 'ng', ng: '' }[watchState(c, k)];
+        c.ng = Object.assign({}, c.ng, { [k]: next === 'ng' });
+        c.mid = Object.assign({}, c.mid, { [k]: next === 'mid' });
+        c.ok = Object.assign({}, c.ok, { [k]: next === 'ok' });
+      })) render();
+      return;
+    }
     if (e.target.closest('[data-cd-note]')) { if (full.has(id)) full.delete(id); else full.add(id); render(); return; }
     if (e.target.closest('[data-cd-pin]')) { if (save(id, c => { c.pin = !c.pin; })) render(); return; }
     if (e.target.closest('[data-cd-edit]')) { if (editState[id]) { delete editState[id]; render(); } else openEdit(id); return; }
@@ -4736,7 +4761,8 @@ function makeCandidates() {
         const cls = TF_CLS[c.tf];
         const c4 = () => ({ granville: false, rci: false, macd: false, neck: false });
         w = { id: mvGenId(cls === 'scalp' ? 'sw' : 'tw'), kind: cls === 'scalp' ? 'scalpwatch' : 'trendwatch', pair: c.pair, tf: c.tf,
-              side: c.side || '', ng: c4(), mid: c4(), ok: c4(), notes: c.notes || '', cand: c.id, createdAt: now, updatedAt: now };
+              side: c.side || '', ng: Object.assign(c4(), c.ng), mid: Object.assign(c4(), c.mid), ok: Object.assign(c4(), c.ok),
+              notes: c.notes || '', cand: c.id, createdAt: now, updatedAt: now };
         if (cls !== 'scalp') w.cls = cls;
         trades.push(w);
       }

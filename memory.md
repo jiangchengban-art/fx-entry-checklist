@@ -1,7 +1,7 @@
 # ネックラインアラートシステム — Project Memory
 
-**Last Updated:** 2026-10-16（S119）
-**Current State:** ✅ 本番使用可能。最新 S119、`sw.js` CACHE = v92
+**Last Updated:** 2026-10-16（S120）
+**Current State:** ✅ 本番使用可能。最新 S120、`sw.js` CACHE = v93
 **Main Branch:** `master`（GitHub Pages は master のルートから配信）
 **仕様の正本:** `CLAUDE.md`（このファイルは全環境で共有する「現在地と運用メモ」）
 
@@ -9,6 +9,7 @@
 
 | Session | 内容 |
 |---|---|
+| S120 | 📋候補にも4つの条件（→監視へで引き継ぐ） |
 | S119 | 👀監視に「📋 候補」（`kind:'candidate'`）。→監視へ・候補の通貨のアラートにメモを表示 |
 | S118 | 長いメモは長押しで全部表示（もう一度で1行に） |
 | S117 | 手で足したカードに ▲買／▼売 の選択（`t.side`）。逆向き判定・入った・見送りに使う |
