@@ -119,7 +119,7 @@ export function atrOf(bars, upto, len = SIM.atrLen) {
    入る価格＝見送りを押した時刻の足の終値、損切り＝ATR×stopAtr、利確＝損切り幅×rr。期間はスキャ4h・デイ24h・スイング72h。
    同じ足で両方に触れたら負け（甘く見ない）。期間内にどちらにも届かなければ undecided */
 export function simulateSkip(log, bars, tfSec, cls) {
-  const dir = log.alert && log.alert.side;
+  const dir = (log.alert && log.alert.side) || log.side;
   if (!dir || !bars || bars.length < SIM.atrLen + 2) return { error: 'no data' };
   const atMs = Date.parse(log.datetime || '');
   let i = -1;

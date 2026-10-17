@@ -753,6 +753,8 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sw-note-text::before { content: '📝 '; }
+  .sw-note-text { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  .sw-note-text.full { white-space: pre-wrap; overflow: visible; text-overflow: clip; color: var(--ink); word-break: break-word; }
   .trend-help.sw-help { margin: 0 0 10px; }
   .trend-help-body {
     font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
@@ -1024,6 +1026,10 @@
   .sw-item.ok  { border-left-width: 5px; border-left-style: solid; border-top-color: var(--buy); border-right-color: var(--buy); border-bottom-color: var(--buy); }
   .sw-item.ng  { border-left-width: 5px; border-left-style: solid; opacity: 0.72; }
   .sw-item.mid { border-left-width: 5px; border-left-style: solid; }
+  .sw-sidepick { display: inline-flex; gap: 3px; flex: none; }
+  .sw-dir-btn { font-family: inherit; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1.5px dashed var(--border); }
+  .sw-dir-btn.up.on   { color: var(--buy-ink);  border: 1.5px solid var(--buy);  background: rgba(18,161,80,.16); }
+  .sw-dir-btn.down.on { color: var(--sell-ink); border: 1.5px solid var(--sell); background: rgba(224,73,79,.16); }
   .sw-dir { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; white-space: nowrap; flex: none; background: transparent; }
   .sw-dir.up   { color: var(--buy-ink);  border: 1.5px solid var(--buy); }
   .sw-dir.down { color: var(--sell-ink); border: 1.5px solid var(--sell); }
@@ -1267,7 +1273,9 @@
       <div class="trend-help-body">
         <strong>カードは TradingView のアラートで自動的に入ります</strong>（<strong>通貨×時間足で1枚</strong>。同じ通貨でも1時間足・4時間足・日足・週足は別のカードです）。同じ通貨の他の時間足でもアラートが鳴っていると、カードに「🔗 他の足」の行が出て、時間足・向き・経過時間が分かります。<strong>向きが逆のアラートがあると「⚠逆向き」の印が付き、その行が赤くなります</strong>（買いと売りが拮抗しているので注意）。種類はアラートの時間足で決まります：<strong>⚡スキャ＝1時間足／☀デイ＝4時間足／🌙スイング＝日足・週足</strong>。上のタブで種類を絞れます。並び順は 📌ピン止め → 🎯狙い目 → 条件が揃ったもの → それ以外 → ✖ありの順です。古くなったカードは自動で消えます（スキャ6時間・デイ24時間・スイング72時間。<strong>📌・⏳待ち・メモのどれかがあるカードは消えません</strong>）。消えたカードの取引を記録したいときは、下の「＋ 通貨を手で追加」で種類と通貨を選んで作り直し、「入った」を押します。<br>
         <strong>通貨名</strong>：タップで通貨名をコピー。▲／▼はアラートの方向、1H／4H／D／W は鳴った時間足、⏰は鳴ってからの時間、🎯はネックライン付近で方向も合っている印（表示だけ）。<br>
+        <strong>▲買／▼売（手で足したカード）</strong>：アラートが無いカードは方向が分からないので、通貨名の横の ▲買／▼売 をタップして自分で選びます（もう一度で解除）。選ぶと、他の足との逆向きの警告・「入った」の方向・見送りの記録にも使われます。<br>
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
+        <strong>メモ</strong>：長いメモは1行で省略されます。メモを<strong>長押し</strong>すると全部表示され、もう一度長押しで1行に戻ります（タップは編集）。<br>
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
         <strong>📌</strong>：ピン止め。一番上に固定され、時間がたっても自動で消えなくなります（もう一度で解除）。<strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
         <strong>見送り</strong>：欄が開くので「見送りとして記録」か「<strong>⭐ 惜しい</strong>」（入らなかったが入ってもよかったかも）を選びます。⭐ は一言メモと「入るならこの価格」（約定価格・2:1の価格・約定日時。損切り・3:1・4:1 は自動で出ます）を任意で入れられます。どちらもカードは消え、そのときの条件つきで記録され、📒記録の「🗂 見送った記録」で見返せます（あとで入っていたら勝てたかを検証）。<br>
@@ -3884,7 +3892,7 @@ function watchLatest(t) {
     if (at && (!best || at > best.at)) best = { tf, at };
   });
   if (best) {
-    best.side = (t.alertSide || {})[best.tf] || '';
+    best.side = (t.alertSide || {})[best.tf] || t.side || '';
     const p = Number((t.alertPrice || {})[best.tf]);
     best.price = p > 0 ? p : 0;
   }
@@ -4048,6 +4056,7 @@ function makeWatchBoard() {
   const countEl = document.getElementById('swCount');
   const noteTimers = {};
   const noteOpen = new Set();
+  const noteFull = new Set();   // S118: 長押しでメモを全部表示しているカード
   const entryState = {};
   const skipState = {};   // S116: 見送りの欄（見送り／⭐惜しい）
   const FKEY = 'mochipoyo_watch_cls';
@@ -4166,6 +4175,7 @@ function makeWatchBoard() {
     const log = { id: mvGenId('wl'), kind: 'watchlog', outcome: 'skip', src: w.kind, pair: w.pair, cls: watchCls(w), tf: watchTf(w), cond,
                   notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now,
                   alert: l ? { tf: l.tf, at: l.at, side: l.side, price: l.price || 0 } : null,
+                  side: (l && l.side) || w.side || '',
                   zone: zoneSnapshot(w.pair, (l && l.price) || undefined), autoFill: 'pending',
                   consider: !!star, considerNote: note || '' };
     if (plan) log.plan = plan;
@@ -4175,7 +4185,7 @@ function makeWatchBoard() {
     const cls = watchCls(t);
     const myTf = watchTf(t);
     const others = otherTfs(t, all || items());
-    const mySide = (t.alertSide || {})[myTf] || '';
+    const mySide = (t.alertSide || {})[myTf] || t.side || '';
     const conflict = !!mySide && others.some(o => o.side && o.side !== mySide);
     const l = watchLatest(t);
     const anyNg = WATCH_NG.some(c => watchState(t, c.k) === 'ng');
@@ -4196,8 +4206,11 @@ function makeWatchBoard() {
         '<div class="trend-head">' +
           '<span class="sw-pair" data-copy="' + esc(t.pair) + '" title="タップで通貨名をコピー">' + esc(t.pair) + '</span>' +
           '<span class="sw-cls ' + cls + '">' + clsText(cls) + '</span>' +
-          (l ? (l.side === 'long' ? '<span class="sw-dir up" title="アラートの方向">▲買</span>'
-              : l.side === 'short' ? '<span class="sw-dir down" title="アラートの方向">▼売</span>' : '') : '') +
+          (l && l.side && (t.alertSide || {})[myTf]
+            ? (l.side === 'long' ? '<span class="sw-dir up" title="アラートの方向">▲買</span>' : '<span class="sw-dir down" title="アラートの方向">▼売</span>')
+            : '<span class="sw-sidepick" title="アラートが無いカードは、買いか売りかを自分で選びます（もう一度で解除）">' +
+              '<button type="button" class="sw-dir-btn up' + (t.side === 'long' ? ' on' : '') + '" data-sw-side="long">▲買</button>' +
+              '<button type="button" class="sw-dir-btn down' + (t.side === 'short' ? ' on' : '') + '" data-sw-side="short">▼売</button></span>') +
           chips.map(c => '<span class="sw-tfchip">' + c + '</span>').join('') +
           (conflict ? '<span class="sw-conflict" title="同じ通貨の他の時間足で、逆向きのアラートが出ています">⚠逆向き</span>' : '') +
           (t.wait ? '<span class="sw-wait-badge" title="条件は見たが、下位足の形ができるのを待っている">⏳待ち</span>' : '') +
@@ -4227,7 +4240,7 @@ function makeWatchBoard() {
         '</div>' +
         (noteOpen.has(t.id)
           ? '<div class="trend-tf"><input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ（欄を離れると閉じます）" value="' + esc(t.notes || '') + '" enterkeyhint="done"></div>'
-          : t.notes ? '<button type="button" class="sw-note-text" data-sw-note-open title="タップで編集">' + esc(t.notes) + '</button>' : '') +
+          : t.notes ? '<button type="button" class="sw-note-text' + (noteFull.has(t.id) ? ' full' : '') + '" data-sw-note-open title="タップで編集・長押しで全部表示">' + esc(t.notes) + '</button>' : '') +
         (st ? entryPanelHtml(t, st) : '') +
         (skipState[t.id] ? skipPanelHtml(skipState[t.id]) : '') +
       '</div>');
@@ -4320,6 +4333,9 @@ function makeWatchBoard() {
       }, true);
       return;
     }
+    /* S117: 手で足したカード（アラートの方向が無い）は、買いか売りかを自分で選ぶ。もう一度で解除 */
+    const sd = e.target.closest('[data-sw-side]');
+    if (sd) { update(id, t => { t.side = t.side === sd.dataset.swSide ? '' : sd.dataset.swSide; }, false); render(); return; }
     /* S110: ⏳形成待ち（条件は揃っているが下位足の形を待つ。週足は何日もかかる）。待ちの間は期限切れで消さない */
     /* S111: 📌ピン止め。並びが変わるので全体を描き直す */
     if (e.target.closest('[data-sw-pin]')) { update(id, t => { t.pin = !t.pin; }, false); render(); return; }
@@ -4366,7 +4382,7 @@ function makeWatchBoard() {
       const l = watchLatest(w);
       const opts = entryOptions(cls, l && l.tf);
       const pref = lastEntryPrefs();
-      entryState[id] = { tf: opts.includes(pref['tf_' + cls]) ? pref['tf_' + cls] : opts[0], dir: l ? l.side : '',
+      entryState[id] = { tf: opts.includes(pref['tf_' + cls]) ? pref['tf_' + cls] : opts[0], dir: (l && l.side) || w.side || '',
                          entry: '', stop: '', at: '', order: pref.order || '', fibo: pref.fibo || '' };
       redrawRow(id);
       const inp = listEl.querySelector('[data-sw="' + id + '"] [data-sw-in="entry"]');
@@ -4408,6 +4424,8 @@ function makeWatchBoard() {
       showToast('📒 記録しました：' + w.pair + '（結果は📒記録タブで）');
       return;
     }
+    /* S118: 長押しでメモを開いた直後のクリックは、編集を開かずに捨てる */
+    if (Date.now() - noteLongAt < 400 && e.target.closest('.sw-note-text')) return;
     if (e.target.closest('[data-sw-note-open]')) {
       const open = row.querySelector('[data-sw-note]');
       if (open) { open.blur(); return; }
@@ -4418,6 +4436,33 @@ function makeWatchBoard() {
     }
   });
   /* 入力中に📝を押したとき、先にフォーカスが外れて閉じ→クリックで開き直す、とならないようにする */
+  /* S118: メモは1行で省略しているので、長押し（0.5秒）で全部表示する。もう一度長押しで1行に戻す。
+     タップは今までどおり編集。指が動いたらスクロールとみなして取り消す */
+  let noteLongAt = 0;   // 長押しのあと指を離した時刻（直後のクリックだけ捨てる。クリックが来ないこともあるので時刻で見る）
+  let notePressFired = false;
+  let notePress = null;
+  const clearNotePress = () => { if (notePress) { clearTimeout(notePress.timer); notePress = null; } };
+  listEl.addEventListener('pointerdown', e => {
+    const b = e.target.closest('.sw-note-text');
+    if (!b) return;
+    const id = b.closest('[data-sw]').dataset.sw;
+    clearNotePress();
+    notePressFired = false;
+    notePress = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+      notePress = null;
+      notePressFired = true;
+      if (noteFull.has(id)) noteFull.delete(id); else noteFull.add(id);
+      redrawRow(id);
+    }, 500) };
+  });
+  listEl.addEventListener('pointermove', e => {
+    if (notePress && (Math.abs(e.clientX - notePress.x) > 10 || Math.abs(e.clientY - notePress.y) > 10)) clearNotePress();
+  });
+  /* 長押しで表示が縮むと指を離す位置がカードの外になるので、離した瞬間はページ全体で拾う */
+  document.addEventListener('pointerup', () => { if (notePressFired) { noteLongAt = Date.now(); notePressFired = false; } clearNotePress(); });
+  document.addEventListener('pointercancel', () => { notePressFired = false; clearNotePress(); });
+  /* 長押しで iPhone の文字選択・メニューが出ないようにする */
+  listEl.addEventListener('contextmenu', e => { if (e.target.closest('.sw-note-text')) e.preventDefault(); });
   listEl.addEventListener('mousedown', e => {
     const b = e.target.closest('[data-sw-note-open]');
     if (b && b.closest('[data-sw]').querySelector('[data-sw-note]')) e.preventDefault();
@@ -4667,7 +4712,7 @@ function makeSkipList() {
       '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-sk-save>⭐ 保存</button><button type="button" class="btn-ghost" data-sk-cancel>やめる</button></div>' +
     '</div>';
   const rowHtml = l => {
-    const dir = (l.plan && l.plan.dir) || (l.alert && l.alert.side) || '';
+    const dir = (l.plan && l.plan.dir) || (l.alert && l.alert.side) || l.side || '';
     const tf = l.tf || (l.alert && l.alert.tf) || '';
     const ed = editState[l.id];
     return '<div class="trend-item sc-card sk-item' + (l.cls ? ' cls-' + l.cls : '') + (l.consider ? ' star' : '') + '" data-sk="' + esc(l.id) + '">' +

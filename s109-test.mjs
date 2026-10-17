@@ -353,6 +353,54 @@ check('一覧に「入っていたら：勝ち」', (await page.textContent(skRo
 await page.click(skRow(starLog.id) + ' [data-sk-del]');
 check('🗑で見送りの記録を消せる', !(await trades()).some(t => t.id === starLog.id));
 
+/* ---- S117: 手で足したカードは、買いか売りかを自分で選ぶ ---- */
+await page.click('.tab-btn[data-tab="watch"]');
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades([
+    { id: 'hand1', kind: 'trendwatch', cls: 'swing', tf: 'D', pair: 'EURGBP', ng: c, mid: c, ok: c, notes: '', createdAt: at, updatedAt: at },
+    { id: 'hand2', kind: 'scalpwatch', tf: '1H', pair: 'EURGBP', ng: c, mid: c, ok: c, notes: '', alerts: { '1H': at }, alertSide: { '1H': 'short' }, createdAt: at, updatedAt: at },
+  ]); watchBoard.render(); }, new Date(Date.now() - 600e3).toISOString());
+check('手で足したカード（方向なし）に ▲買／▼売 のボタンが出る', await page.locator(`${card('hand1')} [data-sw-side]`).count() === 2);
+check('アラートの方向があるカードにはボタンは出ない（印が出る）', await page.locator(`${card('hand2')} [data-sw-side]`).count() === 0 && await page.locator(`${card('hand2')} .sw-dir.down`).count() === 1);
+await page.click(`${card('hand1')} [data-sw-side="long"]`);
+check('▲買を選ぶと保存され、ボタンが点灯する', (await trades()).find(t => t.id === 'hand1').side === 'long' && await page.locator(`${card('hand1')} .sw-dir-btn.up.on`).count() === 1);
+check('売り（1H）のアラートと逆向きになるので ⚠逆向き が出る', await page.locator(`${card('hand1')} .sw-conflict`).count() === 1);
+await page.click(`${card('hand1')} [data-sw-side="short"]`);
+check('▼売に変えると逆向きの警告は消える（1Hも売り）', (await trades()).find(t => t.id === 'hand1').side === 'short' && await page.locator(`${card('hand1')} .sw-conflict`).count() === 0);
+await page.click(`${card('hand1')} [data-sw-side="short"]`);
+check('もう一度で解除', (await trades()).find(t => t.id === 'hand1').side === '');
+await page.click(`${card('hand1')} [data-sw-side="long"]`);
+await page.click(`${card('hand1')} [data-sw-in-open]`);
+check('入ったの方向に、選んだ ▲買 が入っている', await page.locator(`${card('hand1')} [data-sw-pick="dir"][data-v="long"].on`).count() === 1);
+await page.click(`${card('hand1')} [data-sw-cancel]`);
+await page.click(`${card('hand1')} [data-sw-skip]`);
+await page.click(`${card('hand1')} [data-sw-star]`);
+await page.click(`${card('hand1')} [data-sw-skip-go="star"]`);
+const handLog = (await trades()).find(t => t.kind === 'watchlog' && t.pair === 'EURGBP');
+check('⭐で価格を入れなくても、選んだ方向が見送りの記録に残る', !!handLog && handLog.side === 'long' && handLog.consider === true);
+await page.click('.tab-btn[data-tab="record"]');
+check('見送った記録に ▲買 が出る', await page.locator(`#skList [data-sk="${handLog.id}"] .sw-dir.up`).count() === 1);
+
+/* ---- S118: 長いメモは長押しで全部表示 ---- */
+await page.click('.tab-btn[data-tab="watch"]');
+const longNote = 'これはとても長いメモです。4時間足のネックラインで反発を待っていて、RCIの短期がまだ下限に来ていないので様子見。日足の向きとも合わせて確認する。';
+await page.evaluate(([at, note]) => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades([{ id: 'memo1', kind: 'scalpwatch', tf: '1H', pair: 'GBPUSD', ng: c, mid: c, ok: c, notes: note, alerts: { '1H': at }, alertSide: { '1H': 'long' }, createdAt: at, updatedAt: at }]);
+  watchBoard.render(); }, [new Date(Date.now() - 600e3).toISOString(), longNote]);
+const noteEl = `${card('memo1')} .sw-note-text`;
+const isClipped = () => page.$eval(noteEl, el => el.scrollWidth > el.clientWidth + 1);
+check('長いメモは1行で省略されている', await isClipped());
+const longPress = async () => { const bx = await page.locator(noteEl).boundingBox();
+  await page.mouse.move(bx.x + 20, bx.y + bx.height / 2); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); };
+await longPress();
+check('長押しで全部表示される（編集欄は開かない）', await page.locator(`${card('memo1')} .sw-note-text.full`).count() === 1 && !(await isClipped()) &&
+  await page.locator(`${card('memo1')} [data-sw-note]`).count() === 0);
+await longPress();
+check('もう一度長押しで1行に戻る', await page.locator(`${card('memo1')} .sw-note-text.full`).count() === 0 && await isClipped());
+await page.waitForTimeout(500);
+await page.click(noteEl);
+check('タップは今までどおり編集が開く', await page.locator(`${card('memo1')} [data-sw-note]`).count() === 1);
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);
