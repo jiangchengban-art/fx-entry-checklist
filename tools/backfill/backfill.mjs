@@ -140,6 +140,20 @@ export function simulateSkip(log, bars, tfSec, cls) {
   return { result: 'undecided', entry, stop, tp };
 }
 
+/* S116: ⭐惜しい（入るならこの価格 plan がある見送り）。自分の 2:1/3:1/4:1 のルールで判定する。
+   日時を入れていればその足から、無ければアラート〜見送りを押すまでの間で約定価格に触れた足から。
+   結果は result：損切り→loss、2:1以上→win、届かない・見つからない→undecided */
+export function simulatePlan(log, bars, tfEntry) {
+  const p = log && log.plan;
+  if (!p || p.entryPrice == null || p.stopPrice == null) return { error: 'no plan' };
+  const t = { tfEntry, direction: p.dir, entryPrice: p.entryPrice, stopPrice: p.stopPrice, tp2Price: p.tp2Price, tp3Price: p.tp3Price, tp4Price: p.tp4Price,
+              entryAtManual: !!p.entryAtIso, entryAtIso: p.entryAtIso || '', alertAt: (log.alert && log.alert.at) || '', createdAt: log.datetime };
+  const r = backfillTrade(t, bars);
+  if (r.error) return { result: 'undecided', reason: r.error };
+  const result = r.outcome === 'stoploss' ? 'loss' : ['reg', 'big', 'max'].includes(r.outcome) ? 'win' : 'undecided';
+  return Object.assign({ result }, r);
+}
+
 /* ---- CLI ----
  * node tools/backfill/backfill.mjs <trades.json> <ohlcv ディレクトリ…> [--out result.json]
  *   trades.json … 記録の配列（status:'closed'/'open' の記録と、kind:'watchlog' outcome:'skip' の見送りを突き合わせる）
@@ -177,7 +191,9 @@ async function main(argv) {
     if (!l || l.kind !== 'watchlog' || l.outcome !== 'skip' || l.autoFill === 'done') continue;
     const tfName = { scalp: '5分足', day: '15分足', swing: '1時間足' }[l.cls] || '15分足';   // 見送りの検証は粗めの足で十分
     const bars = byKey[l.pair + '|' + ENTRY_TF[tfName].interval];
-    res.skips[l.id] = bars ? simulateSkip(l, bars, ENTRY_TF[tfName].sec, l.cls) : { error: 'no bars' };
+    if (!bars) { res.skips[l.id] = { error: 'no bars' }; continue; }
+    /* S116: 「入るならこの価格」があれば自分のルール（2:1/3:1/4:1）で、無ければ固定ルールで */
+    res.skips[l.id] = l.plan ? simulatePlan(l, bars, tfName) : simulateSkip(l, bars, ENTRY_TF[tfName].sec, l.cls);
   }
   fs.writeFileSync(out, JSON.stringify(res, null, 1));
   console.log('backfill:', Object.keys(res.trades).length, 'trades,', Object.keys(res.skips).length, 'skips →', out);

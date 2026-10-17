@@ -98,6 +98,7 @@ check('受信側が付けた aim はそのまま 🎯', await page.locator(row('
 // 3. 見送りの記録に、アラートとゾーンを自動で残す
 await seed([mk('b', 'GOLD', { alerts: { '1H': ago(8 * 60e3) }, alertSide: { '1H': 'long' }, alertPrice: { '1H': 4201 } })]);
 await page.click(row('GOLD') + ' [data-sw-skip]');
+await page.click(row('GOLD') + ' [data-sw-skip-go="plain"]');
 const skip = (await trades()).find(t => t.kind === 'watchlog');
 check('見送りの記録にアラートの足・時刻・価格', skip && skip.alert.tf === '1H' && !!skip.alert.at && skip.alert.price === 4201);
 check('見送りの記録にゾーン（鳴った価格で判定）', skip.zone && skip.zone.conf.includes('1H') && skip.zone.lo === 4200);

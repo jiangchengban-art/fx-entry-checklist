@@ -1,5 +1,5 @@
 /* S109: 価格からの突き合わせ（tools/backfill/backfill.mjs の純関数）。ブラウザ不要 */
-import { findEntry, walkTrade, backfillTrade, simulateSkip, atrOf } from './tools/backfill/backfill.mjs';
+import { findEntry, walkTrade, backfillTrade, simulateSkip, simulatePlan, atrOf } from './tools/backfill/backfill.mjs';
 
 let pass = 0, fail = 0;
 function check(name, cond) {
@@ -87,6 +87,19 @@ sres = simulateSkip(log, withTail(Array.from({ length: 60 }, () => [100.6, 99.6]
 check('見送り：スキャは4時間（48本）を過ぎたら見ない', sres.result === 'undecided');
 check('見送り：データ不足はエラー', !!simulateSkip(log, mk(calm(5)), SEC, 'scalp').error && !!simulateSkip({ datetime: at(19) }, withTail([]), SEC, 'scalp').error);
 check('ATR', Math.abs(atrOf(mk(calm(20)), 19) - 1) < 1e-9);
+
+// S116: ⭐惜しい（入るならこの価格）は自分のルールで判定
+const plan = { dir: 'long', entryPrice: 100, stopPrice: 99, tp2Price: 102, tp3Price: 103, tp4Price: 104 };
+const pbars = mk([[101, 100.5], [100.4, 99.8], [102.3, 100.8], [103.2, 101.5], [101, 99.9]]);
+let pr = simulatePlan({ plan, alert: { at: at(-1) }, datetime: at(4) }, pbars, '5分足');
+check('⭐：約定価格に触れた足から → 2:1・3:1に届いて建値 → win（big）', pr.result === 'win' && pr.outcome === 'big' && pr.entryAt === at(1));
+pr = simulatePlan({ plan: Object.assign({}, plan, { entryAtIso: at(1) }), datetime: at(4) }, pbars, '5分足');
+check('⭐：日時を入れていればその足から', pr.result === 'win' && pr.entryAtSource === 'manual');
+pr = simulatePlan({ plan, alert: { at: at(-1) }, datetime: at(4) }, mk([[101, 100.5], [100.4, 99.8], [100.5, 98.5]]), '5分足');
+check('⭐：損切りが先 → loss', pr.result === 'loss');
+pr = simulatePlan({ plan, alert: { at: at(-1) }, datetime: at(4) }, mk([[105, 104], [106, 105]]), '5分足');
+check('⭐：約定価格に触れていなければ決着つかず', pr.result === 'undecided');
+check('⭐：価格が無ければエラー', !!simulatePlan({}, pbars, '5分足').error);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

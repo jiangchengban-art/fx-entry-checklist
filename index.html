@@ -962,6 +962,18 @@
   .sw-conds { gap: 4px; }
   .sw-conds .sc-btn { flex: 1 1 0; min-width: 0; padding: 0 1px; font-size: 11px; white-space: nowrap; letter-spacing: -0.02em; }
   .sw-res.skip { color: var(--ink-2); border: 1px solid var(--border); }
+  .sw-res.skip.on { background: var(--surface-2); border-color: var(--ink-muted); }
+  .sw-res.star { color: var(--warn); border: 1px solid var(--warn); }
+  .sw-res.star.on { background: var(--warn-soft); }
+  .sw-plan-preview { padding: 2px 11px 4px 9px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+  .sw-plan-preview:empty { display: none; }
+  .sk-item.star { box-shadow: inset 0 3px 0 var(--warn); }
+  .tgoto.sk-star { opacity: 0.4; }
+  .tgoto.sk-star.on { opacity: 1; border-color: var(--warn); background: var(--warn-soft); }
+  .sk-sim { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); }
+  .sk-sim.win { color: var(--buy-ink); }
+  .sk-sim.loss { color: var(--sell-ink); }
+  .sk-note { color: var(--ink); }
   .sw-other { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 11px 4px 9px; padding: 3px 6px; border-radius: 6px; font-size: 11px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border); }
   .sw-other.conflict { background: rgba(224,73,79,.12); border-color: var(--sell); color: var(--sell-ink); }
   .sw-other b { font-weight: 700; }
@@ -988,7 +1000,7 @@
     border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink);
   }
   .btn-primary.sw-go { width: auto; padding: 8px 16px; font-size: 13px; }
-  .pos-card .pos-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+  .sk-item .pos-time, .pos-card .pos-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
   .pos-prices { padding: 2px 11px 4px; font-size: 12px; color: var(--ink-2); line-height: 1.7; }
   .pos-prices .zcopy { color: var(--ink); font-weight: 700; padding: 2px 0; }
   .pos-card .tgoto { width: auto; min-width: 26px; padding: 0 7px; white-space: nowrap; font-size: 12px; }
@@ -1211,6 +1223,7 @@
         <div class="basis-rr" id="resultTagStats"></div>
         <div class="basis-rr" id="beTouchStats"></div>
         <div class="basis-rr" id="retroStats"></div>
+        <div class="basis-rr" id="skipStats"></div>
       </div>
     </details>
 
@@ -1257,7 +1270,7 @@
         <strong>グランビル／RCI／MACD／ネック</strong>：タップするたびに ✅成立 → ▲微妙 → ✖不成立 → 未選択 と回ります。ネックはアラートが届いた時点で自動で入るので、違うと思ったときだけ直します。<br>
         <strong>📍の価格</strong>：<strong>上</strong>（赤）は今の価格より上、<strong>下</strong>（緑）は下のネックライン。タップでコピー（TradingView にネックラインとして引けます）。<strong>📝</strong>：メモ欄を開きます。<br>
         <strong>📌</strong>：ピン止め。一番上に固定され、時間がたっても自動で消えなくなります（もう一度で解除）。<strong>⏳待ち</strong>：条件は見たが下位足の形ができるのを待つとき（週足など）。「⏳待ち」の印が付き、時間がたってもカードが自動で消えなくなります。もう一度で解除。<strong>🗑</strong>：カードをただ消します（記録には残しません）。<br>
-        <strong>見送り</strong>：カードを消し、そのときの条件つきで「見送り」を記録します（あとで入っていたら勝てたかを検証）。<br>
+        <strong>見送り</strong>：欄が開くので「見送りとして記録」か「<strong>⭐ 惜しい</strong>」（入らなかったが入ってもよかったかも）を選びます。⭐ は一言メモと「入るならこの価格」（約定価格・2:1の価格・約定日時。損切り・3:1・4:1 は自動で出ます）を任意で入れられます。どちらもカードは消え、そのときの条件つきで記録され、📒記録の「🗂 見送った記録」で見返せます（あとで入っていたら勝てたかを検証）。<br>
         <strong>入った</strong>：エントリー足（種類で候補が決まる）と<strong>約定価格</strong>を入れて「📒 記録する」。損切り価格・指値／逆指値・Fibo は任意です。押した時刻ではなく価格からエントリー時刻を突き合わせます。<strong>後から記録するときは「エントリー日時」も入れてください</strong>（入れた日時がそのまま記録され、突き合わせもその時刻を使います）。記録は📒記録タブに入り、カードは消えます。<br>
         ＋「通貨を手で追加」：TradingView 以外で気づいた通貨を、時間足を選んで足します。3端末で同期されます。
       </div>
@@ -1293,6 +1306,12 @@
   <section class="card">
     <h2>✅ 決済済み（直近15件）</h2>
     <div id="posClosed"></div>
+  </section>
+  <section class="card">
+    <h2>🗂 見送った記録<span class="sc-filter-count" id="skN"></span></h2>
+    <div class="section-note">👀監視で「見送り」したもの。⭐ は「入ってもよかったかも」の印です。✎ で一言メモと「入るならこの価格」（約定価格・2:1の価格・約定日時）を後から入れられ、損切り・3:1・4:1 は自動で出ます。</div>
+    <div class="sw-tabs" id="skTabs"></div>
+    <div id="skList"></div>
   </section>
   <section class="card" id="legacyScalpBox" hidden>
     <details>
@@ -3925,6 +3944,25 @@ function entryAtError(v) {
   if (ms > Date.now() + 60000) return 'エントリー日時が未来になっています';
   return '';
 }
+/* S116: ⭐惜しい（入らなかったが入ってもよかったかも）の「入るならこの価格」。約定価格と2:1の価格から 損切り・3:1・4:1 を出す。
+   全部空なら null（価格なしの⭐）、足りない・おかしいときは { error } */
+function planFromInput(f) {
+  const e = String(f.entry || '').trim(), t2 = String(f.tp2 || '').trim(), at = String(f.at || '').trim();
+  if (!e && !t2) return at ? { error: '約定価格と2:1の価格を入れてください' } : null;
+  if (!e) return { error: '約定価格を入れてください' };
+  if (!t2) return { error: '2:1の価格を入れてください' };
+  const c = rrCalc({ entry: e, tp2: t2 });
+  if (c.error) return { error: c.error };
+  if (at && entryAtError(at)) return { error: entryAtError(at) };
+  return { dir: c.dir, entryPrice: parsePrice(e), stopPrice: c.stop, tp2Price: c.tp2, tp3Price: c.tp3, tp4Price: c.tp4, priceDec: c.dec,
+           entryAt: at, entryAtIso: at ? new Date(at).toISOString() : '' };
+}
+function planPreview(f) {
+  const p = planFromInput(f);
+  if (!p) return '';
+  if (p.error) return String(f.entry || '').trim() && String(f.tp2 || '').trim() ? '⚠ ' + p.error : '';
+  return (p.dir === 'long' ? '▲買' : '▼売') + '　損切 ' + p.stopPrice + '　3:1 ' + p.tp3Price + '　4:1 ' + p.tp4Price;
+}
 /* ---- 「入った」→ 通常の記録（保有中）を作る ---- */
 function buildPosition(w, f) {
   const now = new Date();
@@ -4011,6 +4049,7 @@ function makeWatchBoard() {
   const noteTimers = {};
   const noteOpen = new Set();
   const entryState = {};
+  const skipState = {};   // S116: 見送りの欄（見送り／⭐惜しい）
   const FKEY = 'mochipoyo_watch_cls';
   let clsFilter = 'all';
   try { const g = localStorage.getItem(FKEY); if (g === 'all' || TRADE_CLS_BY[g]) clsFilter = g; } catch (e) { /* noop */ }
@@ -4101,6 +4140,37 @@ function makeWatchBoard() {
     }));
     return TF_ORDER.filter(k => best[k]).map(k => best[k]);
   };
+  /* S116: 見送りを押すと開く欄。ふつうの見送りか ⭐惜しい（入ってもよかったかも）を選ぶ。⭐ はメモと「入るならこの価格」を任意で */
+  const skipPanelHtml = sk =>
+    '<div class="sw-entry sw-skip-panel">' +
+      '<div class="trend-tf">' +
+        '<button type="button" class="sw-res skip" data-sw-skip-go="plain" title="条件が合わないので見送る（記録する）">見送りとして記録</button>' +
+        '<button type="button" class="sw-res star' + (sk.star ? ' on' : '') + '" data-sw-star title="入らなかったが、入ってもよかったかもしれない">⭐ 惜しい</button>' +
+        '<button type="button" class="btn-ghost" data-sw-skip-cancel>やめる</button>' +
+      '</div>' +
+      (sk.star
+        ? '<div class="trend-tf"><input type="text" class="sc-note" data-sw-sk="note" maxlength="200" placeholder="一言メモ（任意）例：RCIがまだ下限に来ていなかった" value="' + esc(sk.note) + '"></div>' +
+          '<div class="trend-tf">' +
+            '<label class="sw-in"><span>約定価格<small>任意</small></span><input type="text" inputmode="decimal" autocomplete="off" data-sw-sk="entry" value="' + esc(sk.entry) + '"></label>' +
+            '<label class="sw-in"><span>2:1の価格</span><input type="text" inputmode="decimal" autocomplete="off" data-sw-sk="tp2" value="' + esc(sk.tp2) + '"></label>' +
+          '</div>' +
+          '<div class="trend-tf"><label class="sw-in"><span>約定日時<small>任意</small></span><input type="datetime-local" data-sw-sk="at" value="' + esc(sk.at) + '"></label></div>' +
+          '<div class="sw-plan-preview">' + esc(planPreview(sk)) + '</div>' +
+          '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-sw-skip-go="star">⭐ 惜しいとして記録</button></div>'
+        : '') +
+    '</div>';
+  const skipLog = (w, l, star, note, plan) => {
+    const now = new Date().toISOString();
+    const cond = {};
+    WATCH_NG.forEach(c => { cond[c.k] = watchState(w, c.k); });
+    const log = { id: mvGenId('wl'), kind: 'watchlog', outcome: 'skip', src: w.kind, pair: w.pair, cls: watchCls(w), tf: watchTf(w), cond,
+                  notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now,
+                  alert: l ? { tf: l.tf, at: l.at, side: l.side, price: l.price || 0 } : null,
+                  zone: zoneSnapshot(w.pair, (l && l.price) || undefined), autoFill: 'pending',
+                  consider: !!star, considerNote: note || '' };
+    if (plan) log.plan = plan;
+    return log;
+  };
   const itemHtml = (t, all) => {
     const cls = watchCls(t);
     const myTf = watchTf(t);
@@ -4152,18 +4222,19 @@ function makeWatchBoard() {
           '<button type="button" class="tgoto sw-wait' + (t.wait ? ' on' : '') + '" data-sw-wait title="下位足の形成待ち（もう一度で解除）。待ちの間は時間がたってもカードを消しません">⏳待ち</button>' +
           '<button type="button" class="tclear" data-sw-del title="カードを削除（記録には残しません）">🗑</button>' +
           '<span class="spacer"></span>' +
-          '<button type="button" class="sw-res skip" data-sw-skip title="見送る（カードを消し、条件つきで「見送り」を記録）">見送り</button>' +
+          '<button type="button" class="sw-res skip' + (skipState[t.id] ? ' on' : '') + '" data-sw-skip title="見送る（ふつうの見送りか ⭐惜しい を選んで記録）">見送り</button>' +
           '<button type="button" class="sw-res in' + (st ? ' on' : '') + '" data-sw-in-open title="入った → エントリー足と約定価格だけ入れて記録">入った</button>' +
         '</div>' +
         (noteOpen.has(t.id)
           ? '<div class="trend-tf"><input type="text" class="sc-note" data-sw-note maxlength="200" placeholder="メモ（欄を離れると閉じます）" value="' + esc(t.notes || '') + '" enterkeyhint="done"></div>'
           : t.notes ? '<button type="button" class="sw-note-text" data-sw-note-open title="タップで編集">' + esc(t.notes) + '</button>' : '') +
         (st ? entryPanelHtml(t, st) : '') +
+        (skipState[t.id] ? skipPanelHtml(skipState[t.id]) : '') +
       '</div>');
   };
   const render = () => {
     /* メモや価格を打っている最中に同期で描き直すと入力が飛ぶので、欄を離れるまで待つ */
-    if (listEl.contains(document.activeElement) && document.activeElement.matches('[data-sw-note], [data-sw-in]')) {
+    if (listEl.contains(document.activeElement) && document.activeElement.matches('[data-sw-note], [data-sw-in], [data-sw-sk]')) {
       pendingRender = true;
       return;
     }
@@ -4255,30 +4326,40 @@ function makeWatchBoard() {
     if (e.target.closest('[data-sw-wait]')) { update(id, t => { t.wait = !t.wait; }, true); return; }
     /* S110: 🗑 ただ消す（見送りの記録は作らない）。墓標で他端末からの復活を防ぐ */
     if (e.target.closest('[data-sw-del]')) { remove(id); render(); return; }
+    /* S116: 見送り → 欄を開いて「見送りとして記録」か「⭐ 惜しい」を選ぶ */
     if (e.target.closest('[data-sw-skip]')) {
+      if (skipState[id]) delete skipState[id];
+      else { skipState[id] = { star: false, note: '', entry: '', tp2: '', at: '' }; delete entryState[id]; }
+      redrawRow(id);
+      return;
+    }
+    if (e.target.closest('[data-sw-star]')) { if (skipState[id]) { skipState[id].star = !skipState[id].star; redrawRow(id); } return; }
+    if (e.target.closest('[data-sw-skip-cancel]')) { delete skipState[id]; redrawRow(id); return; }
+    const sg = e.target.closest('[data-sw-skip-go]');
+    if (sg) {
       blurActive();
+      const sk = skipState[id] || {};
+      const star = sg.dataset.swSkipGo === 'star';
       const trades = loadTrades();
       const w = trades.find(x => x.id === id);
       if (!w) return;
       const l = watchLatest(w);
-      /* アラートの無い手動カードは記録せず消すだけ。見送りは「そのとき入っていたらどうだったか」を後で検証する材料 */
-      if (l) {
-        const now = new Date().toISOString();
-        const cond = {};
-        WATCH_NG.forEach(c => { cond[c.k] = watchState(w, c.k); });
-        trades.push({ id: mvGenId('wl'), kind: 'watchlog', outcome: 'skip', src: w.kind, pair: w.pair, cls: watchCls(w), cond,
-                      notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now,
-                      alert: { tf: l.tf, at: l.at, side: l.side, price: l.price || 0 },
-                      zone: zoneSnapshot(w.pair, l.price || undefined), autoFill: 'pending' });
+      const plan = star ? planFromInput(sk) : null;
+      if (plan && plan.error) { showToast('⚠ ' + plan.error); return; }
+      /* アラートの無い手動カードのふつうの見送りは記録せず消すだけ（⭐は記録する） */
+      if (l || star) {
+        trades.push(skipLog(w, l, star, star ? (sk.note || '').trim() : '', plan));
         if (!saveTrades(trades)) return;
       }
+      delete skipState[id];
       remove(id);
-      render();
-      showToast(w.pair + ' を見送りました' + (l ? '（記録済み）' : ''));
+      renderAll();
+      showToast(star ? '⭐ 惜しいとして記録しました：' + w.pair + '（📒記録の「見送った記録」）' : w.pair + ' を見送りました' + (l ? '（記録済み）' : ''));
       return;
     }
     if (e.target.closest('[data-sw-in-open]')) {
       if (entryState[id]) { delete entryState[id]; redrawRow(id); return; }
+      delete skipState[id];
       const w = loadTrades().find(x => x.id === id);
       if (!w) return;
       const cls = watchCls(w);
@@ -4345,14 +4426,23 @@ function makeWatchBoard() {
     if (e.key === 'Enter' && e.target.matches('[data-sw-note]')) e.target.blur();
   });
   /* S115: iOS の日時の入力欄は input が来ないことがあるので change でも拾う */
+  const syncSk = (id, el) => {
+    const sk = skipState[id];
+    if (!sk) return;
+    sk[el.dataset.swSk] = el.value;
+    const pv = el.closest('[data-sw]').querySelector('.sw-plan-preview');
+    if (pv) pv.textContent = planPreview(sk);
+  };
   listEl.addEventListener('change', e => {
-    if (!e.target.matches('[data-sw-in]')) return;
+    if (!e.target.matches('[data-sw-in], [data-sw-sk]')) return;
     const id = e.target.closest('[data-sw]').dataset.sw;
+    if (e.target.matches('[data-sw-sk]')) { syncSk(id, e.target); return; }
     if (entryState[id]) entryState[id][e.target.dataset.swIn] = e.target.value;
   });
   listEl.addEventListener('input', e => {
     const id = e.target.closest('[data-sw]') && e.target.closest('[data-sw]').dataset.sw;
     if (!id) return;
+    if (e.target.matches('[data-sw-sk]')) { syncSk(id, e.target); return; }
     if (e.target.matches('[data-sw-in]')) {
       if (entryState[id]) entryState[id][e.target.dataset.swIn] = e.target.value;
       return;
@@ -4363,7 +4453,7 @@ function makeWatchBoard() {
     noteTimers[id] = setTimeout(() => update(id, t => { t.notes = v; }, false), 600);
   });
   listEl.addEventListener('focusout', e => {
-    if (!e.target.matches('[data-sw-note], [data-sw-in]')) return;
+    if (!e.target.matches('[data-sw-note], [data-sw-in], [data-sw-sk]')) return;
     const id = e.target.closest('[data-sw]').dataset.sw;
     if (e.target.matches('[data-sw-note]')) {
       if (noteTimers[id]) {
@@ -4543,6 +4633,159 @@ function makePositions() {
 }
 const positions = makePositions();
 
+/* ---- S116: 🗂 見送った記録（📒記録タブ）と📚の集計 ----
+   見送り（watchlog・outcome:'skip'）を新しい順に。⭐（consider）の付け外し、✎で一言メモと「入るならこの価格」（plan）を後から入れる。
+   「入っていたらどうだったか」（sim）はあとで Claude がローソク足で判定して書き込む（tools/backfill/ の simulateSkip / simulatePlan） */
+const isSkipLog = t => !!t && t.kind === 'watchlog' && t.outcome === 'skip';
+function skipSimText(l) {
+  const r = l.sim && l.sim.result;
+  if (r === 'win') return '<span class="sk-sim win">入っていたら：勝ち</span>';
+  if (r === 'loss') return '<span class="sk-sim loss">入っていたら：負け</span>';
+  if (r === 'undecided') return '<span class="sk-sim">入っていたら：決着つかず</span>';
+  return (l.alert || l.plan) ? '<span class="sk-sim">判定待ち</span>' : '';
+}
+function makeSkipList() {
+  const listEl = document.getElementById('skList');
+  const tabsEl = document.getElementById('skTabs');
+  const nEl = document.getElementById('skN');
+  const KEY = 'mochipoyo_skip_filter';
+  let filter = 'all';
+  try { if (localStorage.getItem(KEY) === 'star') filter = 'star'; } catch (e) { /* noop */ }
+  const editState = {};
+  const MAX = 30;
+  const condText = c => WATCH_NG.map(k => c && c[k.k] ? k.label + WATCH_MARK[c[k.k]] : '').filter(Boolean).join(' ');
+  const px = v => v == null || v === '' ? '' : zoneCopyHtml(v);
+  const editHtml = ed =>
+    '<div class="sw-entry">' +
+      '<div class="trend-tf"><input type="text" class="sc-note" data-sk-in="note" maxlength="200" placeholder="一言メモ（任意）" value="' + esc(ed.note) + '"></div>' +
+      '<div class="trend-tf">' +
+        '<label class="sw-in"><span>約定価格<small>任意</small></span><input type="text" inputmode="decimal" autocomplete="off" data-sk-in="entry" value="' + esc(ed.entry) + '"></label>' +
+        '<label class="sw-in"><span>2:1の価格</span><input type="text" inputmode="decimal" autocomplete="off" data-sk-in="tp2" value="' + esc(ed.tp2) + '"></label>' +
+      '</div>' +
+      '<div class="trend-tf"><label class="sw-in"><span>約定日時<small>任意</small></span><input type="datetime-local" data-sk-in="at" value="' + esc(ed.at) + '"></label></div>' +
+      '<div class="sw-plan-preview">' + esc(planPreview(ed)) + '</div>' +
+      '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-sk-save>⭐ 保存</button><button type="button" class="btn-ghost" data-sk-cancel>やめる</button></div>' +
+    '</div>';
+  const rowHtml = l => {
+    const dir = (l.plan && l.plan.dir) || (l.alert && l.alert.side) || '';
+    const tf = l.tf || (l.alert && l.alert.tf) || '';
+    const ed = editState[l.id];
+    return '<div class="trend-item sc-card sk-item' + (l.cls ? ' cls-' + l.cls : '') + (l.consider ? ' star' : '') + '" data-sk="' + esc(l.id) + '">' +
+      '<div class="trend-head">' +
+        '<span class="sw-pair">' + esc(l.pair) + '</span>' +
+        (l.cls ? '<span class="sw-cls ' + l.cls + '">' + clsText(l.cls) + '</span>' : '') +
+        (dir ? '<span class="sw-dir ' + (dir === 'long' ? 'up' : 'down') + '">' + (dir === 'long' ? '▲買' : '▼売') + '</span>' : '') +
+        (tf ? '<span class="sw-tfchip">' + esc(tf) + '</span>' : '') +
+        '<span class="spacer"></span><span class="pos-time">' + esc(fmtDatetime(l.datetime)) + '</span>' +
+      '</div>' +
+      (condText(l.cond) ? '<div class="pos-prices">' + esc(condText(l.cond)) + '</div>' : '') +
+      (l.considerNote ? '<div class="pos-prices sk-note">📝 ' + esc(l.considerNote) + '</div>' : '') +
+      (l.plan ? '<div class="pos-prices">入 ' + px(l.plan.entryPrice) + (l.plan.entryAt ? '（' + esc(fmtDatetime(l.plan.entryAt)) + '）' : '') +
+        ' ・損切 ' + px(l.plan.stopPrice) + ' ・2:1 ' + px(l.plan.tp2Price) + ' ・3:1 ' + px(l.plan.tp3Price) + ' ・4:1 ' + px(l.plan.tp4Price) + '</div>' : '') +
+      '<div class="trend-tf">' + skipSimText(l) + '<span class="spacer"></span>' +
+        '<button type="button" class="tgoto sk-star' + (l.consider ? ' on' : '') + '" data-sk-star title="⭐ 惜しい（入ってもよかったかも）の印。もう一度で外す">⭐</button>' +
+        '<button type="button" class="tgoto" data-sk-edit title="一言メモ・約定価格・2:1の価格・約定日時を入れる">✎</button>' +
+        '<button type="button" class="tclear" data-sk-del title="この見送りの記録を消す">🗑</button>' +
+      '</div>' +
+      (ed ? editHtml(ed) : '') +
+    '</div>';
+  };
+  const render = () => {
+    if (listEl.contains(document.activeElement) && document.activeElement.matches('input')) return;
+    const all = loadTrades().filter(isSkipLog).sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+    const stars = all.filter(l => l.consider);
+    nEl.textContent = all.length ? '（' + all.length + '）' : '';
+    tabsEl.innerHTML = [['all', 'すべて', all.length], ['star', '⭐ 惜しい', stars.length]].map(([k, lab, n]) =>
+      '<button type="button" class="sw-tab' + (filter === k ? ' active' : '') + '" data-sk-filter="' + k + '">' + lab + '<b>' + n + '</b></button>').join('');
+    const list = filter === 'star' ? stars : all;
+    listEl.innerHTML = list.length
+      ? list.slice(0, MAX).map(rowHtml).join('') + (list.length > MAX ? '<div class="section-note">ほか ' + (list.length - MAX) + ' 件（古いものは📚の集計にだけ入ります）</div>' : '')
+      : '<div class="empty-state">' + (filter === 'star' ? '⭐ の付いた見送りはまだありません。' : 'まだ見送った記録はありません。👀監視の「見送り」から入ります。') + '</div>';
+  };
+  const save = (id, fn) => {
+    const trades = loadTrades();
+    const l = trades.find(x => x.id === id);
+    if (!l) return false;
+    const r = fn(l);
+    if (r) { showToast('⚠ ' + r); return false; }
+    l.updatedAt = new Date().toISOString();
+    return saveTrades(trades);
+  };
+  tabsEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-sk-filter]');
+    if (!b) return;
+    filter = b.dataset.skFilter;
+    try { localStorage.setItem(KEY, filter); } catch (err) { /* noop */ }
+    render();
+  });
+  listEl.addEventListener('click', e => {
+    const row = e.target.closest('[data-sk]');
+    if (!row) return;
+    const id = row.dataset.sk;
+    if (e.target.closest('[data-sk-star]')) { if (save(id, l => { l.consider = !l.consider; })) renderAll(); return; }
+    if (e.target.closest('[data-sk-edit]')) {
+      if (editState[id]) { delete editState[id]; render(); return; }
+      const l = loadTrades().find(x => x.id === id);
+      if (!l) return;
+      const pl = l.plan || {};
+      editState[id] = { note: l.considerNote || '', entry: pl.entryPrice == null ? '' : String(pl.entryPrice), tp2: pl.tp2Price == null ? '' : String(pl.tp2Price), at: pl.entryAt || '' };
+      render();
+      return;
+    }
+    if (e.target.closest('[data-sk-cancel]')) { delete editState[id]; render(); return; }
+    if (e.target.closest('[data-sk-save]')) {
+      blurActive();
+      const ed = editState[id];
+      if (!ed) return;
+      const plan = planFromInput(ed);
+      if (plan && plan.error) { showToast('⚠ ' + plan.error); return; }
+      /* ✎で入れたものは ⭐（惜しい）の詳細なので、⭐ も付ける。価格が変われば判定し直す */
+      if (save(id, l => {
+        l.considerNote = (ed.note || '').trim();
+        l.consider = true;
+        if (plan) l.plan = plan; else delete l.plan;
+        l.autoFill = 'pending';
+        delete l.sim;
+      })) { delete editState[id]; renderAll(); showToast('⭐ 保存しました'); }
+      return;
+    }
+    if (e.target.closest('[data-sk-del]')) {
+      markDeleted('trades', id);
+      saveTrades(loadTrades().filter(t => t.id !== id));
+      renderAll();
+      showToast('見送りの記録を消しました');
+    }
+  });
+  const syncEd = el => {
+    const id = el.closest('[data-sk]').dataset.sk;
+    const ed = editState[id];
+    if (!ed) return;
+    ed[el.dataset.skIn] = el.value;
+    const pv = el.closest('[data-sk]').querySelector('.sw-plan-preview');
+    if (pv) pv.textContent = planPreview(ed);
+  };
+  listEl.addEventListener('input', e => { if (e.target.matches('[data-sk-in]')) syncEd(e.target); });
+  listEl.addEventListener('change', e => { if (e.target.matches('[data-sk-in]')) syncEd(e.target); });
+  render();
+  return { render };
+}
+const skipList = makeSkipList();
+/* 📚 見送りの検証：⭐惜しい と ふつうの見送り を分けて、「入っていたら」の勝ち負け（判定済みのものだけ） */
+function renderSkipStats() {
+  const el = document.getElementById('skipStats');
+  if (!el) return;
+  const all = loadTrades().filter(isSkipLog);
+  const row = (name, list) => {
+    const w = list.filter(l => l.sim && l.sim.result === 'win').length;
+    const lo = list.filter(l => l.sim && l.sim.result === 'loss').length;
+    return '<div class="row"><span class="name">' + name + '</span><span class="n">' + list.length + '件</span><span class="rr">' +
+      (w + lo ? '入っていたら 勝' + w + '・負' + lo + '（' + Math.round(w * 100 / (w + lo)) + '%）' : '判定待ち') + '</span></div>';
+  };
+  el.innerHTML = '<h3>見送りの検証（👀監視の見送り）</h3>' + (all.length
+    ? row('⭐ 惜しい', all.filter(l => l.consider)) + row('ふつうの見送り', all.filter(l => !l.consider))
+    : '<div class="empty-state">まだ見送った記録はありません。</div>');
+}
+
 /* 旧⚡タブの記録（kind:'scalp'）は📚の統計には混ぜない。見返す・消すだけできるよう📒記録タブの下に残す */
 function renderLegacyScalp() {
   const list = loadTrades().filter(isScalpTrade).sort((a, b) =>
@@ -4645,7 +4888,7 @@ document.querySelectorAll('#reviewClsFilter [data-cls]').forEach(b => b.classLis
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); }
 document.querySelectorAll('#reviewTypeFilter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);

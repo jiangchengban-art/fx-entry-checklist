@@ -88,6 +88,8 @@ check('条件タップで ✅', (await page.textContent(`${row('EURUSD')} [data-
 
 /* ---- 見送り ---- */
 await page.click(`${row('USDJPY')} [data-sw-skip]`);
+check('見送りで欄が開く（まだ消えない）', (await pairs()).includes('USDJPY') && await page.locator(`${row('USDJPY')} [data-sw-skip-go="plain"]`).count() === 1);
+await page.click(`${row('USDJPY')} [data-sw-skip-go="plain"]`);
 check('見送りでカードが消える', !(await pairs()).includes('USDJPY'));
 let ts = await trades();
 const skip = ts.find(t => t.kind === 'watchlog' && t.outcome === 'skip');
@@ -286,6 +288,70 @@ const past2 = await page.evaluate(() => toDatetimeLocalValue(new Date(Date.now()
 await page.fill(`${lateCard} [data-pos-fix-in="at"]`, past2);
 await page.click(`${lateCard} [data-pos-fix-save]`);
 check('直した日時が保存される', (await trades()).find(t => t.id === late.id).datetime === past2);
+
+/* ---- S116: ⭐ 惜しい（入らなかったが入ってもよかったかも） ---- */
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().concat([{ id: 'st1', kind: 'trendwatch', cls: 'day', tf: '4H', pair: 'CADJPY', ng: c, mid: c, ok: Object.assign({}, c, { granville: true }), notes: '',
+    alerts: { '4H': at }, alertSide: { '4H': 'long' }, createdAt: at, updatedAt: at }]));
+  watchBoard.render(); }, new Date(Date.now() - 3600e3).toISOString());
+await page.click('.tab-btn[data-tab="watch"]');
+await page.click(`${card('st1')} [data-sw-skip]`);
+await page.click(`${card('st1')} [data-sw-star]`);
+check('⭐を押すとメモ・約定価格・2:1の価格・約定日時の欄が出る', await page.locator(`${card('st1')} [data-sw-sk]`).count() === 4);
+await page.fill(`${card('st1')} [data-sw-sk="note"]`, 'RCIがまだ下限');
+await page.fill(`${card('st1')} [data-sw-sk="entry"]`, '108.50');
+await page.fill(`${card('st1')} [data-sw-sk="tp2"]`, '109.10');
+check('入力すると損切り・3:1・4:1 がその場で出る（買い・R=0.30）', /損切 108\.2.*3:1 109\.4.*4:1 109\.7/.test(await page.textContent(`${card('st1')} .sw-plan-preview`)));
+await page.fill(`${card('st1')} [data-sw-sk="tp2"]`, '');
+await page.click(`${card('st1')} [data-sw-skip-go="star"]`);
+check('約定価格だけで2:1が無いと記録できない', (await toast()).includes('2:1') && await page.locator(card('st1')).count() === 1);
+await page.fill(`${card('st1')} [data-sw-sk="tp2"]`, '109.10');
+const starAt = await page.evaluate(() => toDatetimeLocalValue(new Date(Date.now() - 30 * 60e3)));
+await page.fill(`${card('st1')} [data-sw-sk="at"]`, starAt);
+await page.click(`${card('st1')} [data-sw-skip-go="star"]`);
+const starLog = (await trades()).find(t => t.kind === 'watchlog' && t.pair === 'CADJPY');
+check('⭐として記録（consider・メモ・条件・アラートつき）・カードは消える', !!starLog && starLog.consider === true && starLog.considerNote === 'RCIがまだ下限' &&
+  starLog.cond.granville === 'ok' && starLog.alert.tf === '4H' && await page.locator(card('st1')).count() === 0);
+check('入るならこの価格：損切108.2・2:1=109.1・3:1=109.4・4:1=109.7・方向は買い・日時つき', starLog.plan && starLog.plan.dir === 'long' && starLog.plan.stopPrice === 108.2 &&
+  starLog.plan.tp2Price === 109.1 && starLog.plan.tp3Price === 109.4 && starLog.plan.tp4Price === 109.7 && starLog.plan.entryAt === starAt && !!starLog.plan.entryAtIso);
+check('見送りは📚の統計（mainTrades）には入らない', await page.evaluate(() => mainTrades().every(t => t.kind !== 'watchlog')));
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().concat([{ id: 'pl1', kind: 'scalpwatch', tf: '1H', pair: 'USDJPY', ng: c, mid: c, ok: c, notes: '', alerts: { '1H': at }, alertSide: { '1H': 'short' }, createdAt: at, updatedAt: at }]));
+  watchBoard.render(); }, new Date(Date.now() - 1800e3).toISOString());
+await page.click(`${card('pl1')} [data-sw-skip]`);
+await page.click(`${card('pl1')} [data-sw-skip-go="plain"]`);
+
+await page.click('.tab-btn[data-tab="record"]');
+const skRow = id => `#skList [data-sk="${id}"]`;
+check('📒の「見送った記録」に出る（⭐・メモ・価格）', (await page.textContent(skRow(starLog.id))).includes('RCIがまだ下限') && (await page.textContent(skRow(starLog.id))).includes('109.7') &&
+  await page.locator(skRow(starLog.id) + ' .sk-star.on').count() === 1);
+check('判定待ちの表示', (await page.textContent(skRow(starLog.id))).includes('判定待ち'));
+const plainLog = (await trades()).find(t => t.kind === 'watchlog' && !t.consider);
+check('ふつうの見送りも一覧に出る', !!plainLog && await page.locator(skRow(plainLog.id)).count() === 1);
+await page.click('#skTabs [data-sk-filter="star"]');
+check('⭐で絞り込める', await page.locator('#skList [data-sk]').count() === 1);
+await page.click('#skTabs [data-sk-filter="all"]');
+// 後から⭐を付けて、✎で価格を入れる（売り）
+await page.click(skRow(plainLog.id) + ' [data-sk-star]');
+check('後から⭐を付けられる', (await trades()).find(t => t.id === plainLog.id).consider === true);
+await page.click(skRow(plainLog.id) + ' [data-sk-star]');
+check('もう一度で外せる', (await trades()).find(t => t.id === plainLog.id).consider === false);
+await page.click(skRow(plainLog.id) + ' [data-sk-edit]');
+await page.fill(skRow(plainLog.id) + ' [data-sk-in="note"]', '後から見たら入れた');
+await page.fill(skRow(plainLog.id) + ' [data-sk-in="entry"]', '157.40');
+await page.fill(skRow(plainLog.id) + ' [data-sk-in="tp2"]', '156.80');
+check('✎でも損切り・3:1・4:1 がその場で出る（売り）', /▼売.*損切 157\.7.*3:1 156\.5.*4:1 156\.2/.test(await page.textContent(skRow(plainLog.id) + ' .sw-plan-preview')));
+await page.click(skRow(plainLog.id) + ' [data-sk-save]');
+const edited = (await trades()).find(t => t.id === plainLog.id);
+check('✎で保存すると⭐が付き、メモと価格が入る', edited.consider === true && edited.considerNote === '後から見たら入れた' && edited.plan.dir === 'short' && edited.plan.stopPrice === 157.7 && edited.plan.tp4Price === 156.2);
+await page.click('.tab-btn[data-tab="review"]');
+check('📚に⭐惜しい／ふつうの見送りの件数', /⭐ 惜しい\s*2件/.test(await page.textContent('#skipStats')) && (await page.textContent('#skipStats')).includes('判定待ち'));
+await page.evaluate(id => { const ts = loadTrades(); ts.find(t => t.id === id).sim = { result: 'win' }; saveTrades(ts); renderAll(); }, starLog.id);
+check('判定が入ると勝率が出る', (await page.textContent('#skipStats')).includes('勝1・負0（100%）'));
+await page.click('.tab-btn[data-tab="record"]');
+check('一覧に「入っていたら：勝ち」', (await page.textContent(skRow(starLog.id))).includes('入っていたら：勝ち'));
+await page.click(skRow(starLog.id) + ' [data-sk-del]');
+check('🗑で見送りの記録を消せる', !(await trades()).some(t => t.id === starLog.id));
 
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
