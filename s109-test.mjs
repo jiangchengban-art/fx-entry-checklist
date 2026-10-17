@@ -401,6 +401,66 @@ await page.waitForTimeout(500);
 await page.click(noteEl);
 check('タップは今までどおり編集が開く', await page.locator(`${card('memo1')} [data-sw-note]`).count() === 1);
 
+/* ---- S119: 📋 候補（週末の分析などで、アラートが鳴る前に書いておく） ---- */
+await page.evaluate(() => { saveTrades([]); renderAll(); });
+await page.click('.tab-btn[data-tab="watch"]');
+check('👀監視に「🔔 アラート｜📋 候補」の切り替え', await page.locator('#swSeg [data-sw-pane]').count() === 2);
+await page.click('#swSeg [data-sw-pane="cand"]');
+check('📋 候補に切り替えるとアラートの一覧は隠れる', await page.$eval('#swPaneAlert', el => el.hidden) && !(await page.$eval('#swPaneCand', el => el.hidden)));
+await page.selectOption('#cdAdd', 'GBPJPY');
+const cd = () => page.evaluate(() => loadTrades().find(t => t.kind === 'candidate'));
+const cdSel = id => `#cdList [data-cd="${id}"]`;
+let c1 = await cd();
+check('通貨を選ぶと候補ができ、メモの欄が開く', !!c1 && c1.pair === 'GBPJPY' && await page.locator(cdSel(c1.id) + ' textarea[data-cd-in="notes"]').count() === 1);
+const memo = '週足のネックライン付近。\n4Hで逆三尊ができたら買い。日足のRCIも下限から反転待ち。もう少し様子を見る。';
+await page.fill(cdSel(c1.id) + ' [data-cd-in="notes"]', memo);
+await page.fill(cdSel(c1.id) + ' [data-cd-in="target"]', '208.50');
+await page.click(cdSel(c1.id) + ' [data-cd-save]');
+c1 = await cd();
+check('メモ（複数行）と狙う価格が保存される', c1.notes === memo && c1.target === '208.50');
+check('候補は📚・CSV（mainTrades）に入らない', await page.evaluate(() => mainTrades().every(t => t.kind !== 'candidate')));
+await page.click(cdSel(c1.id) + ' [data-cd-side="long"]');
+await page.click(cdSel(c1.id) + ' [data-cd-tf="W"]');
+c1 = await cd();
+check('方向と時間足を選べる', c1.side === 'long' && c1.tf === 'W');
+check('メモは2行で省略・タップで全部表示', await page.$eval(cdSel(c1.id) + ' .cd-note', el => el.scrollHeight > el.clientHeight + 1));
+await page.click(cdSel(c1.id) + ' .cd-note');
+check('タップ後は全部見える', await page.$eval(cdSel(c1.id) + ' .cd-note', el => el.classList.contains('full') && el.scrollHeight <= el.clientHeight + 1));
+check('候補はアラートの一覧（監視カード）には入らない', await page.evaluate(() => loadTrades().filter(t => t.kind === 'scalpwatch' || t.kind === 'trendwatch').length === 0) &&
+  (await page.textContent('#swSegAlertN')) === '' && (await page.textContent('#swSegCandN')) === '1');
+// 候補の通貨にアラートが鳴ると、そのアラートのカードに候補のメモが出る
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades(loadTrades().concat([{ id: 'al1', kind: 'trendwatch', cls: 'day', tf: '4H', pair: 'GBPJPY', ng: c, mid: c, ok: c, notes: '', alerts: { '4H': at }, alertSide: { '4H': 'long' }, createdAt: at, updatedAt: at }]));
+  renderAll(); }, new Date(Date.now() - 600e3).toISOString());
+await page.click('#swSeg [data-sw-pane="alert"]');
+check('アラートのカードに「📋 候補」とメモ・狙う価格が出る', (await page.textContent(`${card('al1')} .sw-cand`)).includes('週足のネックライン付近') && (await page.textContent(`${card('al1')} .sw-cand`)).includes('208.50'));
+await page.click(`${card('al1')} .sw-cand b`);
+check('タップで候補のメモを全部表示', await page.locator(`${card('al1')} .sw-cand.full`).count() === 1);
+// → 監視へ
+await page.click('#swSeg [data-sw-pane="cand"]');
+await page.click(cdSel(c1.id) + ' [data-cd-tf="W"]');
+await page.click(cdSel(c1.id) + ' [data-cd-go]');
+check('時間足が無いと監視へ送れない', (await toast()).includes('時間足'));
+await page.click(cdSel(c1.id) + ' [data-cd-tf="W"]');
+await page.click(cdSel(c1.id) + ' [data-cd-go]');
+const ws = await page.evaluate(() => loadTrades().filter(t => t.kind === 'trendwatch' && t.tf === 'W'));
+check('→ 監視へで週足の監視カードができる（方向・メモを引き継ぐ）', ws.length === 1 && ws[0].pair === 'GBPJPY' && ws[0].side === 'long' && ws[0].notes === memo && ws[0].cls === 'swing');
+check('アラートの画面に切り替わる', !(await page.$eval('#swPaneAlert', el => el.hidden)));
+check('候補から作ったカードには「📋 候補」の行を重ねて出さない', await page.locator(`${card(ws[0].id)} .sw-cand`).count() === 0);
+await page.click('#swSeg [data-sw-pane="cand"]');
+check('候補は残り「👀 監視中」の印が付く', (await page.textContent(cdSel(c1.id))).includes('監視中') && (await cd()).watchId === ws[0].id);
+await page.click(cdSel(c1.id) + ' [data-cd-goto]');
+check('「監視中を見る」でアラートの画面へ', !(await page.$eval('#swPaneAlert', el => el.hidden)));
+await page.click(`${card(ws[0].id)} [data-sw-del]`);
+await page.click('#swSeg [data-sw-pane="cand"]');
+check('監視カードを消すと、候補は「→ 監視へ」に戻る', await page.locator(cdSel(c1.id) + ' [data-cd-go]').count() === 1);
+await page.click(cdSel(c1.id) + ' [data-cd-pin]');
+check('📌で固定できる', (await cd()).pin === true);
+await page.click(cdSel(c1.id) + ' [data-cd-del]');
+check('🗑で候補を消せる', !(await cd()));
+check('候補の画面も 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+await page.click('#swSeg [data-sw-pane="alert"]');
+
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

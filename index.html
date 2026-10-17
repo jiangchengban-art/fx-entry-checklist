@@ -1002,7 +1002,7 @@
     border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink);
   }
   .btn-primary.sw-go { width: auto; padding: 8px 16px; font-size: 13px; }
-  .sk-item .pos-time, .pos-card .pos-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+  .cd-item .pos-time, .sk-item .pos-time, .pos-card .pos-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
   .pos-prices { padding: 2px 11px 4px; font-size: 12px; color: var(--ink-2); line-height: 1.7; }
   .pos-prices .zcopy { color: var(--ink); font-weight: 700; padding: 2px 0; }
   .pos-card .tgoto { width: auto; min-width: 26px; padding: 0 7px; white-space: nowrap; font-size: 12px; }
@@ -1027,6 +1027,19 @@
   .sw-item.ng  { border-left-width: 5px; border-left-style: solid; opacity: 0.72; }
   .sw-item.mid { border-left-width: 5px; border-left-style: solid; }
   .sw-sidepick { display: inline-flex; gap: 3px; flex: none; }
+  .sw-tfpick { font-family: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1.5px dashed var(--border); }
+  .sw-tfpick.on { color: var(--ink); border: 1.5px solid var(--ink-muted); background: var(--surface); }
+  .cd-tfs { gap: 4px; }
+  .cd-item.pinned { box-shadow: inset 0 3px 0 var(--accent); }
+  .cd-watching { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; color: var(--accent); background: var(--accent-soft); white-space: nowrap; flex: none; }
+  .cd-note, .sw-cand-note { white-space: pre-wrap; word-break: break-word; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .cd-note { margin: 2px 11px 4px 9px; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+  .cd-note.full, .sw-cand.full .sw-cand-note { display: block; -webkit-line-clamp: unset; }
+  .cd-text { width: 100%; box-sizing: border-box; font-size: 16px; line-height: 1.5; resize: vertical; }
+  .sw-cand { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 11px 4px 9px; padding: 4px 6px; border-radius: 6px; font-size: 11.5px; color: var(--ink-2);
+             background: var(--accent-soft); border: 1px solid var(--accent); cursor: pointer; }
+  .sw-cand > b { color: var(--accent); }
+  .sw-cand-note { flex-basis: 100%; color: var(--ink); }
   .sw-dir-btn { font-family: inherit; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1.5px dashed var(--border); }
   .sw-dir-btn.up.on   { color: var(--buy-ink);  border: 1.5px solid var(--buy);  background: rgba(18,161,80,.16); }
   .sw-dir-btn.down.on { color: var(--sell-ink); border: 1.5px solid var(--sell); background: rgba(224,73,79,.16); }
@@ -1268,6 +1281,11 @@
   <div class="tab-panel" id="tabPanel-watch">
   <section class="card">
     <h2>👀 監視</h2>
+    <div class="sc-seg" id="swSeg" role="tablist">
+      <button type="button" class="sc-seg-btn" data-sw-pane="alert" role="tab">🔔 アラート<b class="sc-seg-n" id="swSegAlertN"></b></button>
+      <button type="button" class="sc-seg-btn" data-sw-pane="cand" role="tab">📋 候補<b class="sc-seg-n" id="swSegCandN"></b></button>
+    </div>
+    <div id="swPaneAlert">
     <details class="trend-help sw-help">
       <summary>📖 使い方（どこをタップすると何が起きるか）</summary>
       <div class="trend-help-body">
@@ -1293,6 +1311,27 @@
       <span class="check-count" id="swCount"></span>
     </div>
     <div id="swList"></div>
+    </div>
+    <!-- S119: 📋 候補（週末の分析などで、アラートが鳴る前に書いておく通貨。アラートの一覧には出さない） -->
+    <div id="swPaneCand" hidden>
+    <details class="trend-help sw-help">
+      <summary>📖 使い方</summary>
+      <div class="trend-help-body">
+        週末の分析などで、<strong>アラートが鳴る前に気づいたことを通貨ごとに書いておく場所</strong>です。🔔 アラートの一覧には出ず、時間がたっても消えません。3端末で同期されます。<br>
+        <strong>＋ 候補の通貨を追加</strong>：通貨を選ぶとカードができ、メモの欄が開きます。<br>
+        <strong>▲買／▼売・1H／4H／日足／週足</strong>：見ている方向と時間足（任意。タップで選ぶ・もう一度で解除）。<br>
+        <strong>メモ</strong>：2行で省略されます。タップで全部表示。<strong>✎</strong> でメモと狙う価格を書き直します。狙う価格・📍の価格はタップでコピー。<br>
+        <strong>→ 監視へ</strong>：エントリーを考えるときに押すと、🔔 アラートの側に監視カードができます（方向・時間足・メモを引き継ぐ。時間足は必須）。候補カードは「👀 監視中」の印が付いて残ります。<br>
+        <strong>📋 候補あり</strong>：候補に入れている通貨で TradingView のアラートが鳴ると、そのアラートのカードに候補のメモが出ます（タップで全部表示）。<br>
+        📌 は一番上に固定、🗑 は削除です。
+      </div>
+    </details>
+    <div class="list-toolbar">
+      <select class="sc-pair sw-add" id="cdAdd" aria-label="候補の通貨を追加"></select>
+      <span class="spacer"></span>
+    </div>
+    <div id="cdList"></div>
+    </div>
   </section>
   </div>
 
@@ -2473,7 +2512,9 @@ function isScalpWatch(t) { return !!t && t.kind === 'scalpwatch'; }
 function isTrendWatch(t) { return !!t && t.kind === 'trendwatch'; }
 /* S105: 監視リストの勝ち／負け（kind:'watchlog'）。📚の統計・履歴・CSV には混ぜない */
 function isWatchLog(t) { return !!t && t.kind === 'watchlog'; }
-function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t) && !isWatchLog(t)); }
+/* S119: 📋候補（kind:'candidate'）も📚・CSVには混ぜない */
+function isCandidate(t) { return !!t && t.kind === 'candidate'; }
+function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t) && !isWatchLog(t) && !isCandidate(t)); }
 /* S109: 種類（スキャ／デイ／スイング）フィルター。種類の無い旧記録は上位足の時間足から決める（tradeCls） */
 const CLS_FILTER_KEY = 'mochipoyo_cls_filter';
 let clsFilterRv = 'all';
@@ -4181,7 +4222,20 @@ function makeWatchBoard() {
     if (plan) log.plan = plan;
     return log;
   };
-  const itemHtml = (t, all) => {
+  const candFull = new Set();   // S119: 📋候補のメモを全部表示しているカード
+  const candRowHtml = (t, cands) => {
+    const mine = cands.filter(c => c.pair === t.pair && c.id !== t.cand);
+    if (!mine.length) return '';
+    return mine.map(c =>
+      '<div class="sw-cand' + (candFull.has(t.id) ? ' full' : '') + '" data-sw-cand-toggle title="週末などに書いた📋候補のメモ（タップで全部表示）">' +
+        '<b>📋 候補</b>' +
+        (c.side ? '<span class="sw-dir ' + (c.side === 'long' ? 'up' : 'down') + '">' + (c.side === 'long' ? '▲買' : '▼売') + '</span>' : '') +
+        (c.tf ? '<span class="sw-tfchip">' + esc(c.tf) + '</span>' : '') +
+        (c.target ? '<span>狙い ' + zoneCopyHtml(c.target) + '</span>' : '') +
+        (c.notes ? '<span class="sw-cand-note">' + esc(c.notes) + '</span>' : '') +
+      '</div>').join('');
+  };
+  const itemHtml = (t, all, cands) => {
     const cls = watchCls(t);
     const myTf = watchTf(t);
     const others = otherTfs(t, all || items());
@@ -4218,6 +4272,7 @@ function makeWatchBoard() {
           (aimHit ? '<span class="aim-badge" title="ネックライン付近で方向も合っているアラート（価格は下の📍の行）">🎯' + esc(aimHit.conf.join('·')) + '</span>' : '') +
           (l ? '<span class="sw-pend-age ' + ageCls(t, l) + '" title="' + esc(fmtDatetime(l.at)) + ' にアラート">⏰' + watchElapsed(l.at) + '</span>' : '') +
         '</div>' +
+        candRowHtml(t, cands || loadTrades().filter(isCandidate)) +
         (others.length ? '<div class="sw-other' + (conflict ? ' conflict' : '') + '" title="同じ通貨の他の時間足で鳴っているアラート">' +
           (conflict ? '<b>⚠ 他の足と逆向き</b>' : '<span class="sw-other-lab">🔗 他の足</span>') +
           others.map(o => '<span class="sw-ochip' + (o.side === 'long' ? ' up' : o.side === 'short' ? ' down' : '') + (mySide && o.side && o.side !== mySide ? ' opp' : '') +
@@ -4260,7 +4315,8 @@ function makeWatchBoard() {
     tabBadge.textContent = all.length ? String(all.length) : '';
     countEl.textContent = all.length ? all.length + ' 件' : '';
     const shown = sorted(all.filter(t => clsFilter === 'all' || watchCls(t) === clsFilter));
-    listEl.innerHTML = shown.length ? shown.map(t => itemHtml(t, all)).join('')
+    const cands = loadTrades().filter(isCandidate);
+    listEl.innerHTML = shown.length ? shown.map(t => itemHtml(t, all, cands)).join('')
       : '<div class="empty-state">' + (all.length ? 'この種類のカードはありません。' : 'アラートが鳴ると、ここに自動でカードが入ります。') + '</div>';
     const has = new Set(all.map(t => t.pair + '|' + watchTf(t)));
     const addTf = TF_CLS[addClsEl.value] ? addClsEl.value : '1H';
@@ -4331,6 +4387,12 @@ function makeWatchBoard() {
         t.mid = Object.assign({}, t.mid, { [k]: next === 'mid' });
         t.ok = Object.assign({}, t.ok, { [k]: next === 'ok' });
       }, true);
+      return;
+    }
+    /* S119: 📋候補のメモはタップで全部表示（価格のコピーはそのまま） */
+    if (e.target.closest('[data-sw-cand-toggle]') && !e.target.closest('[data-copy]')) {
+      if (candFull.has(id)) candFull.delete(id); else candFull.add(id);
+      redrawRow(id);
       return;
     }
     /* S117: 手で足したカード（アラートの方向が無い）は、買いか売りかを自分で選ぶ。もう一度で解除 */
@@ -4517,9 +4579,194 @@ function makeWatchBoard() {
   setInterval(() => { if (!document.hidden && !pendingRender && !listEl.contains(document.activeElement)) render(); }, 60000);
   zonesListeners.push(() => render());
   render();
-  return { render };
+  return { render, zoneLineHtml };
 }
 const watchBoard = makeWatchBoard();
+
+/* ---- S119: 📋 候補（週末の分析などで、アラートが鳴る前に書いておく通貨） ----
+   trades に kind:'candidate' で置く（同期・墓標をそのまま使う）。アラートの一覧には出さず、時間がたっても消さない。
+   「→ 監視へ」で監視カード（kind:'scalpwatch'|'trendwatch'、cand に候補の id）を作り、候補には watchId を控える（監視カードが残っている間は「👀 監視中」）。
+   候補の通貨でアラートが鳴ると、そのアラートのカードに「📋 候補」の行（watchBoard の candRowHtml）が出る */
+const WATCH_PANE_KEY = 'mochipoyo_watch_pane';
+function setWatchPane(name) {
+  if (name !== 'cand') name = 'alert';
+  try { localStorage.setItem(WATCH_PANE_KEY, name); } catch (e) { /* noop */ }
+  document.getElementById('swPaneAlert').hidden = name !== 'alert';
+  document.getElementById('swPaneCand').hidden = name !== 'cand';
+  document.querySelectorAll('#swSeg [data-sw-pane]').forEach(b => {
+    const on = b.dataset.swPane === name;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+}
+function makeCandidates() {
+  const listEl = document.getElementById('cdList');
+  const addEl = document.getElementById('cdAdd');
+  const editState = {};
+  const full = new Set();
+  const isWatchItem = t => !!t && (t.kind === 'scalpwatch' || t.kind === 'trendwatch');
+  const tfBtn = (c, tf, label) => '<button type="button" class="sw-tfpick' + (c.tf === tf ? ' on' : '') + '" data-cd-tf="' + tf + '">' + label + '</button>';
+  const editHtml = ed =>
+    '<div class="sw-entry">' +
+      '<div class="trend-tf"><textarea class="sc-note cd-text" data-cd-in="notes" rows="4" maxlength="1000" placeholder="気づいたこと・狙い（例：週足のネックライン付近。4Hで逆三尊ができたら買い）">' + esc(ed.notes) + '</textarea></div>' +
+      '<div class="trend-tf"><label class="sw-in"><span>狙う価格<small>任意</small></span><input type="text" inputmode="decimal" autocomplete="off" data-cd-in="target" value="' + esc(ed.target) + '"></label></div>' +
+      '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-cd-save>保存</button><button type="button" class="btn-ghost" data-cd-cancel>やめる</button></div>' +
+    '</div>';
+  const cardHtml = (c, liveIds) => {
+    const watching = !!c.watchId && liveIds.has(c.watchId);
+    const ed = editState[c.id];
+    return '<div class="trend-item sc-card cd-item' + (c.tf ? ' cls-' + TF_CLS[c.tf] : '') + (c.pin ? ' pinned' : '') + '" data-cd="' + esc(c.id) + '">' +
+      '<div class="trend-head">' +
+        '<span class="sw-pair" data-copy="' + esc(c.pair) + '" title="タップで通貨名をコピー">' + esc(c.pair) + '</span>' +
+        '<span class="sw-sidepick">' +
+          '<button type="button" class="sw-dir-btn up' + (c.side === 'long' ? ' on' : '') + '" data-cd-side="long">▲買</button>' +
+          '<button type="button" class="sw-dir-btn down' + (c.side === 'short' ? ' on' : '') + '" data-cd-side="short">▼売</button>' +
+        '</span>' +
+        (watching ? '<span class="cd-watching">👀 監視中</span>' : '') +
+        '<span class="spacer"></span>' +
+        '<span class="pos-time" title="書いた日">' + esc(fmtDatetime(c.createdAt)) + '</span>' +
+      '</div>' +
+      '<div class="trend-tf cd-tfs">' + tfBtn(c, '1H', '1H') + tfBtn(c, '4H', '4H') + tfBtn(c, 'D', '日足') + tfBtn(c, 'W', '週足') + '</div>' +
+      (c.notes && !ed ? '<div class="cd-note' + (full.has(c.id) ? ' full' : '') + '" data-cd-note title="タップで全部表示">' + esc(c.notes) + '</div>' : '') +
+      (c.target && !ed ? '<div class="pos-prices">狙う価格 ' + zoneCopyHtml(c.target) + '</div>' : '') +
+      watchBoard.zoneLineHtml(c.pair, null) +
+      '<div class="trend-tf">' +
+        '<button type="button" class="tgoto sw-pin' + (c.pin ? ' on' : '') + '" data-cd-pin title="一番上に固定（もう一度で解除）">📌</button>' +
+        '<button type="button" class="tgoto' + (ed ? ' on' : '') + '" data-cd-edit title="メモと狙う価格を書く">✎</button>' +
+        '<button type="button" class="tclear" data-cd-del title="この候補を消す">🗑</button>' +
+        '<span class="spacer"></span>' +
+        (watching
+          ? '<button type="button" class="sw-res skip" data-cd-goto title="🔔 アラートの側の監視カードを見る">👀 監視中を見る</button>'
+          : '<button type="button" class="sw-res in" data-cd-go title="🔔 アラートの側に監視カードを作る（方向・時間足・メモを引き継ぐ）">→ 監視へ</button>') +
+      '</div>' +
+      (ed ? editHtml(ed) : '') +
+    '</div>';
+  };
+  const render = () => {
+    if (listEl.contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
+    const all = loadTrades();
+    const cands = all.filter(isCandidate).sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const watches = all.filter(isWatchItem);
+    const liveIds = new Set(watches.map(t => t.id));
+    document.getElementById('swSegCandN').textContent = cands.length ? String(cands.length) : '';
+    document.getElementById('swSegAlertN').textContent = watches.length ? String(watches.length) : '';
+    listEl.innerHTML = cands.length ? cands.map(c => cardHtml(c, liveIds)).join('')
+      : '<div class="empty-state">まだ候補はありません。上の「＋ 候補の通貨を追加」から、週末の分析で気づいた通貨を書いておけます。</div>';
+    const has = new Set(cands.map(c => c.pair));
+    addEl.innerHTML = '<option value="">＋ 候補の通貨を追加</option>' + MV_PAIR_GROUPS.map(g =>
+      '<optgroup label="' + esc(g.label) + '">' + g.pairs.filter(p => !has.has(p)).map(p =>
+        '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
+  };
+  const save = (id, fn) => {
+    const trades = loadTrades();
+    const c = trades.find(x => x.id === id);
+    if (!c) return false;
+    const r = fn(c, trades);
+    if (r) { showToast('⚠ ' + r); return false; }
+    c.updatedAt = new Date().toISOString();
+    return saveTrades(trades);
+  };
+  const openEdit = id => {
+    const c = loadTrades().find(x => x.id === id);
+    if (!c) return;
+    editState[id] = { notes: c.notes || '', target: c.target || '' };
+    render();
+    const ta = listEl.querySelector('[data-cd="' + id + '"] [data-cd-in="notes"]');
+    if (ta) ta.focus();
+  };
+  addEl.addEventListener('change', () => {
+    const pair = addEl.value;
+    if (!pair) return;
+    const trades = loadTrades();
+    if (trades.some(c => isCandidate(c) && c.pair === pair)) { render(); return; }
+    const now = new Date().toISOString();
+    const c = { id: mvGenId('cd'), kind: 'candidate', pair, side: '', tf: '', notes: '', target: '', pin: false, watchId: '', createdAt: now, updatedAt: now };
+    trades.push(c);
+    if (!saveTrades(trades)) return;
+    openEdit(c.id);
+  });
+  listEl.addEventListener('click', e => {
+    const card = e.target.closest('[data-cd]');
+    if (!card) return;
+    const id = card.dataset.cd;
+    const sd = e.target.closest('[data-cd-side]');
+    if (sd) { if (save(id, c => { c.side = c.side === sd.dataset.cdSide ? '' : sd.dataset.cdSide; })) render(); return; }
+    const tb = e.target.closest('[data-cd-tf]');
+    if (tb) { if (save(id, c => { c.tf = c.tf === tb.dataset.cdTf ? '' : tb.dataset.cdTf; })) render(); return; }
+    if (e.target.closest('[data-cd-note]')) { if (full.has(id)) full.delete(id); else full.add(id); render(); return; }
+    if (e.target.closest('[data-cd-pin]')) { if (save(id, c => { c.pin = !c.pin; })) render(); return; }
+    if (e.target.closest('[data-cd-edit]')) { if (editState[id]) { delete editState[id]; render(); } else openEdit(id); return; }
+    if (e.target.closest('[data-cd-cancel]')) { delete editState[id]; render(); return; }
+    if (e.target.closest('[data-cd-save]')) {
+      blurActive();
+      const ed = editState[id];
+      if (!ed) return;
+      const tgt = String(ed.target || '').trim();
+      if (tgt && parsePrice(tgt) == null) { showToast('⚠ 狙う価格が数字になっていません'); return; }
+      if (save(id, c => { c.notes = (ed.notes || '').trim(); c.target = tgt; })) { delete editState[id]; renderAll(); showToast('📋 候補を保存しました'); }
+      return;
+    }
+    if (e.target.closest('[data-cd-del]')) {
+      delete editState[id];
+      markDeleted('trades', id);
+      saveTrades(loadTrades().filter(t => t.id !== id));
+      renderAll();
+      showToast('候補を消しました');
+      return;
+    }
+    if (e.target.closest('[data-cd-goto]')) {
+      const c = loadTrades().find(x => x.id === id);
+      setWatchPane('alert');
+      const el = c && document.querySelector('#swList [data-sw="' + c.watchId + '"]');
+      if (el) { el.scrollIntoView({ block: 'center' }); el.classList.remove('sw-flash'); void el.offsetWidth; el.classList.add('sw-flash'); }
+      else showToast('この種類のタブでは見えていません（「すべて」で見てください）');
+      return;
+    }
+    if (e.target.closest('[data-cd-go]')) {
+      blurActive();
+      const trades = loadTrades();
+      const c = trades.find(x => x.id === id);
+      if (!c) return;
+      if (!c.tf) { showToast('⚠ 時間足（1H／4H／日足／週足）を選んでください'); return; }
+      const now = new Date().toISOString();
+      /* 同じ通貨・時間足の監視カードがもうあれば、それにつなぐだけ */
+      const same = trades.find(t => isWatchItem(t) && t.pair === c.pair && watchTf(t) === c.tf);
+      let w = same;
+      if (!w) {
+        const cls = TF_CLS[c.tf];
+        const c4 = () => ({ granville: false, rci: false, macd: false, neck: false });
+        w = { id: mvGenId(cls === 'scalp' ? 'sw' : 'tw'), kind: cls === 'scalp' ? 'scalpwatch' : 'trendwatch', pair: c.pair, tf: c.tf,
+              side: c.side || '', ng: c4(), mid: c4(), ok: c4(), notes: c.notes || '', cand: c.id, createdAt: now, updatedAt: now };
+        if (cls !== 'scalp') w.cls = cls;
+        trades.push(w);
+      }
+      c.watchId = w.id;
+      c.updatedAt = now;
+      if (!saveTrades(trades)) return;
+      renderAll();
+      setWatchPane('alert');
+      showToast(same ? c.pair + ' はもう監視中です（つなぎました）' : '👀 ' + c.pair + ' を監視に追加しました');
+    }
+  });
+  const syncEd = el => {
+    const id = el.closest('[data-cd]').dataset.cd;
+    if (editState[id]) editState[id][el.dataset.cdIn] = el.value;
+  };
+  listEl.addEventListener('input', e => { if (e.target.matches('[data-cd-in]')) syncEd(e.target); });
+  listEl.addEventListener('change', e => { if (e.target.matches('[data-cd-in]')) syncEd(e.target); });
+  document.getElementById('swSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-sw-pane]');
+    if (!b) return;
+    setWatchPane(b.dataset.swPane);
+    if (b.dataset.swPane === 'cand') render();   // 監視側で消した・入った などを「👀 監視中」の印に反映する
+  });
+  let pane = 'alert';
+  try { if (localStorage.getItem(WATCH_PANE_KEY) === 'cand') pane = 'cand'; } catch (e) { /* noop */ }
+  setWatchPane(pane);
+  render();
+  return { render };
+}
+const candidates = makeCandidates();
 
 /* ---- 📒 記録（保有中 / 決済済み） ---- */
 function makePositions() {
@@ -4933,7 +5180,7 @@ document.querySelectorAll('#reviewClsFilter [data-cls]').forEach(b => b.classLis
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); candidates.render(); }
 document.querySelectorAll('#reviewTypeFilter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);
