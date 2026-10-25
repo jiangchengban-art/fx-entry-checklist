@@ -105,5 +105,30 @@ check('⭐：価格が無ければエラー', !!simulatePlan({}, pbars, '5分足
 sres = simulateSkip({ datetime: at(19), side: 'long' }, withTail([[100.6, 99.6], [103.6, 100.5]]), SEC, 'scalp');
 check('見送り：アラートが無くても、選んだ方向（side）で判定できる', sres.result === 'win');
 
+// S121: 📅アラート台帳（アラートの時刻で入ったら）
+{
+  const { simulateAlert, ledgerRows } = await import('./tools/backfill/backfill.mjs');
+  const { liveTrades, barJobs, applyResult } = await import('./tools/backfill/sync.mjs');
+  let v = simulateAlert({ at: at(19), side: 'long' }, withTail([[100.6, 99.6], [103.6, 100.5]]), SEC, 'scalp');
+  check('台帳：アラートの時刻で入って勝ち', v.result === 'win');
+  v = simulateAlert({ at: new Date(Date.UTC(2020, 0, 1)).toISOString(), side: 'long' }, withTail([[100.6, 99.6]]), SEC, 'scalp');
+  check('台帳：取得した足より前のアラートは nodata', v.result === 'nodata');
+  const rows = ledgerRows([
+    { id: 'a', kind: 'watchlog', outcome: 'deleted', pair: 'EURUSD', cls: 'scalp', alert: { at: '2026-10-20T00:00:00Z', side: 'short' } },
+    { id: 'b', kind: 'watchlog', outcome: 'skip', pair: 'EURUSD', side: 'long' },               // アラートなし → 載らない
+    { id: 'c', pair: 'GBPUSD', cls: 'day', alertAt: '2026-10-20T00:00:00Z', alertSide: 'long', cond: {} },
+    { id: 'd', pair: 'GBPUSD', cls: 'day', alertAt: '2026-10-20T00:00:00Z', cond: {}, direction: 'short', vsim: { result: 'win' } },
+  ]);
+  check('台帳に載るのはアラートのある見送り・🗑・期限切れと入った記録', rows.map(r => r.id).join() === 'a,c,d' && rows[0].side === 'short' && rows[2].done);
+  const live = liveTrades([{ id: 't:x', data: { id: 'x', updatedAt: '2026-10-01T00:00:00Z' } }, { id: 't:y', data: { id: 'y', updatedAt: '2026-10-05T00:00:00Z' } },
+    { id: 'tomb', data: { trades: { x: '2026-10-02T00:00:00Z', y: '2026-10-02T00:00:00Z' } } }]);
+  check('削除済み（墓標より古い）記録は除く', live.map(t => t.id).join() === 'y');
+  const jobs = barJobs([{ id: 'a', kind: 'watchlog', outcome: 'deleted', pair: 'EURUSD', cls: 'scalp', alert: { at: '2026-10-20T00:00:00Z', side: 'short' } }], Date.parse('2026-10-21T00:00:00Z'));
+  check('取得するローソク足：EURUSD の 5分足・アラートから今まで＋余裕', jobs.length === 1 && jobs[0].symbol && jobs[0].interval === '5m' && jobs[0].count === 288 + 34);
+  check('判定の期間がまだ終わっていないものは取らない', barJobs([{ id: 'a', kind: 'watchlog', outcome: 'deleted', pair: 'EURUSD', cls: 'scalp', alert: { at: '2026-10-20T00:00:00Z', side: 'short' } }], Date.parse('2026-10-20T01:00:00Z')).length === 0);
+  const u = applyResult({ id: 'a', updatedAt: 'old' }, 'vsims', { result: 'win' }, '2026-10-21T00:00:00.000Z');
+  check('書き戻しは vsim を足して updatedAt を今にする', u.vsim.result === 'win' && u.updatedAt === '2026-10-21T00:00:00.000Z');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

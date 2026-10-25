@@ -140,6 +140,27 @@ export function simulateSkip(log, bars, tfSec, cls) {
   return { result: 'undecided', entry, stop, tp };
 }
 
+/* S121: 📅アラート台帳の「もし入っていたら」（vsim）。見送り・🗑・期限切れ・入った のすべてを同じ物差しで比べるため、
+   入る時刻は（見送りを押した時刻ではなく）アラートが鳴った時刻。ルールは simulateSkip と同じ（ATR×1.5・2:1）。
+   取得できた足より前のアラートは nodata（何度取り直しても判定できないので、それ以上は待たない） */
+export const SIM_TF = { scalp: '5分足', day: '15分足', swing: '1時間足' };   // 粗めの足で十分
+export function simulateAlert(row, bars, tfSec, cls) {
+  const at = row && row.at;
+  const r = simulateSkip({ datetime: at, side: row && row.side }, bars, tfSec, cls);
+  if (r.error === 'no data' && bars && bars.length && Date.parse(at) < (bars[0].t + tfSec * (SIM.atrLen + 1)) * 1000) return { result: 'nodata' };
+  return r;
+}
+/* trades の中から台帳に載るもの（アラートのある見送り・🗑・期限切れ・入った記録）を { id, at, side, cls, pair } にする。アプリの alertLedger() と同じ選び方 */
+export function ledgerRows(all) {
+  const out = [];
+  for (const t of all || []) {
+    if (!t) continue;
+    if (t.kind === 'watchlog' && t.alert && t.alert.at) out.push({ id: t.id, at: t.alert.at, side: t.alert.side || t.side || '', cls: t.cls || 'day', pair: t.pair, done: !!t.vsim });
+    else if (!t.kind && t.alertAt && t.cond) out.push({ id: t.id, at: t.alertAt, side: t.alertSide || t.direction || '', cls: t.cls || 'day', pair: t.pair, done: !!t.vsim });
+  }
+  return out;
+}
+
 /* S116: ⭐惜しい（入るならこの価格 plan がある見送り）。自分の 2:1/3:1/4:1 のルールで判定する。
    日時を入れていればその足から、無ければアラート〜見送りを押すまでの間で約定価格に触れた足から。
    結果は result：損切り→loss、2:1以上→win、届かない・見つからない→undecided */
@@ -180,23 +201,39 @@ async function main(argv) {
       if (!byKey[key] || byKey[key].length < j.bars.length) byKey[key] = j.bars.slice().sort((a, b) => a.t - b.t);
     }
   }
-  const res = { trades: {}, skips: {} };
+  const res = { trades: {}, skips: {}, vsims: {} };
+  const nowMs = Date.now();
   for (const t of all) {
-    if (!t || t.kind || !t.status || !ENTRY_TF[t.tfEntry]) continue;
+    if (!t || t.kind || t.status !== 'closed' || t.fill || !ENTRY_TF[t.tfEntry]) continue;
     const bars = byKey[t.pair + '|' + ENTRY_TF[t.tfEntry].interval];
     if (!bars) { res.trades[t.id] = { error: 'no bars' }; continue; }
     res.trades[t.id] = backfillTrade(t, bars);
   }
   for (const l of all) {
     if (!l || l.kind !== 'watchlog' || l.outcome !== 'skip' || l.autoFill === 'done') continue;
-    const tfName = { scalp: '5分足', day: '15分足', swing: '1時間足' }[l.cls] || '15分足';   // 見送りの検証は粗めの足で十分
+    if (l.sim) continue;
+    const tfName = SIM_TF[l.cls] || '15分足';   // 見送りの検証は粗めの足で十分
     const bars = byKey[l.pair + '|' + ENTRY_TF[tfName].interval];
     if (!bars) { res.skips[l.id] = { error: 'no bars' }; continue; }
     /* S116: 「入るならこの価格」があれば自分のルール（2:1/3:1/4:1）で、無ければ固定ルールで */
-    res.skips[l.id] = l.plan ? simulatePlan(l, bars, tfName) : simulateSkip(l, bars, ENTRY_TF[tfName].sec, l.cls);
+    const sr = l.plan ? simulatePlan(l, bars, tfName) : simulateSkip(l, bars, ENTRY_TF[tfName].sec, l.cls);
+    /* 決着がついていないものは、判定の期間が過ぎるまで書き戻さない */
+    if (sr.result === 'undecided' && nowMs < Date.parse(l.datetime || '') + (SIM.horizonH[l.cls] || 24) * 3600000) continue;
+    res.skips[l.id] = sr;
   }
+  /* S121: 📅アラート台帳。判定の期間（スキャ4h・デイ24h・スイング72h）が過ぎたものだけ */
+  for (const r of ledgerRows(all)) {
+    if (r.done || !r.side || nowMs < Date.parse(r.at) + (SIM.horizonH[r.cls] || 24) * 3600000) continue;
+    const tfName = SIM_TF[r.cls] || '15分足';
+    const bars = byKey[r.pair + '|' + ENTRY_TF[tfName].interval];
+    if (!bars) continue;
+    const v = simulateAlert(r, bars, ENTRY_TF[tfName].sec, r.cls);
+    if (v.result) res.vsims[r.id] = v;
+  }
+  /* 失敗（error）は書き戻さない（次回また試す） */
+  for (const k of ['trades', 'skips']) for (const id of Object.keys(res[k])) if (res[k][id].error) delete res[k][id];
   fs.writeFileSync(out, JSON.stringify(res, null, 1));
-  console.log('backfill:', Object.keys(res.trades).length, 'trades,', Object.keys(res.skips).length, 'skips →', out);
+  console.log('backfill:', Object.keys(res.trades).length, 'trades,', Object.keys(res.skips).length, 'skips,', Object.keys(res.vsims).length, 'ledger →', out);
 }
 const isMain = async () => { try { const u = await import('node:url'); return import.meta.url === u.pathToFileURL(process.argv[1]).href; } catch { return false; } };
 if (await isMain()) main(process.argv.slice(2));

@@ -973,6 +973,36 @@
   .tgoto.sk-star { opacity: 0.4; }
   .tgoto.sk-star.on { opacity: 1; border-color: var(--warn); background: var(--warn-soft); }
   .sk-sim { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); }
+  /* S121: 📅 アラート台帳 */
+  .ld-sub { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin: 12px 0 2px; }
+  .ld-day { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .ld-day-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 5px 8px; background: var(--surface-2, rgba(127,127,127,.08)); font-size: 12.5px; }
+  .ld-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 4px 8px; border-top: 1px solid var(--border); font-size: 12px; }
+  .ld-time { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .ld-pair { font-weight: 700; }
+  .ld-cond { letter-spacing: 1px; font-size: 11px; }
+  .ld-how { color: var(--ink-muted); font-size: 11.5px; }
+  .ld-in { font-weight: 700; color: var(--accent); }
+  .ld-g { font-weight: 700; padding: 0 5px; border-radius: 999px; font-size: 11.5px; white-space: nowrap; }
+  .ld-g.ok   { color: var(--buy-ink);  background: rgba(18,161,80,.16); }
+  .ld-g.mid  { color: var(--warn);     background: rgba(250,178,25,.16); }
+  .ld-g.ng   { color: var(--sell-ink); background: rgba(224,73,79,.16); }
+  .ld-g.none { color: var(--ink-muted); border: 1px dashed var(--border); }
+  .ld-more { margin-top: 8px; width: 100%; }
+  /* S122: 🔬 勝ち負けの分析・📒の R と負けた理由 */
+  .wl-src { margin: 4px 0 6px; }
+  .wl-all .name { font-weight: 700; }
+  .wl-few, .wl-hint { font-size: 10.5px; color: var(--ink-muted); font-weight: 400; }
+  .wl-also { display: block; font-size: 10.5px; color: var(--ink-muted); font-weight: 400; }
+  .wl-warn { font-size: 11px; color: var(--sell-ink); font-weight: 700; }
+  .wl-factor { border-top: 1px solid var(--border); padding: 4px 0; }
+  .wl-factor summary { cursor: pointer; font-size: 12.5px; font-weight: 700; padding: 3px 0; }
+  .wl-few-row { opacity: .6; }
+  .pos-r { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pos-r.pos { color: var(--buy-ink); }
+  .pos-r.neg { color: var(--sell-ink); }
+  .pos-r.manual { text-decoration: underline dotted; }
+  .pos-loss .sc-btn { font-size: 11px; padding: 3px 6px; }
   .sk-sim.win { color: var(--buy-ink); }
   .sk-sim.loss { color: var(--sell-ink); }
   .sk-note { color: var(--ink); }
@@ -1230,6 +1260,20 @@
       <button type="button" class="type-filter-btn" data-cls="swing">🌙スイング</button>
     </div>
     <div class="stats-grid" id="statsGrid"></div>
+
+    <details class="stats-group" open>
+      <summary>📅 アラート台帳（フィルターの強さの検証）</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="alertLedger"></div>
+      </div>
+    </details>
+
+    <details class="stats-group" open>
+      <summary>🔬 勝ち負けの分析（負けやすい局面・勝ちやすい局面）</summary>
+      <div class="stats-group-body">
+        <div class="basis-rr" id="winLoss"></div>
+      </div>
+    </details>
 
     <details class="stats-group" open>
       <summary>🔍 根拠・確度の検証</summary>
@@ -1681,6 +1725,13 @@ const RESULT_TAGS = [
   { v: 'other',         label: 'その他' },
 ];
 const RESULT_TAG_LABELS = Object.fromEntries(RESULT_TAGS.map(b => [b.v, b.label]));
+/* S122: R（1トレードのリスク＝1R）。3枚同量・2:1の後は建値の前提（詳しくは 🔬勝ち負けの分析 の所） */
+const R_OF_TAG = { stoploss: -1, breakeven: 0, reg: 2 / 3, big: 5 / 3, max: 3 };
+const LOSS_REASONS = ['早すぎた', '指標・ニュース', 'ネック抜け', 'ダマシ', '上位足と逆', 'その他'];
+function autoR(t) { return t && t.resultTag in R_OF_TAG ? Math.round(R_OF_TAG[t.resultTag] * 100) / 100 : null; }
+function tradeR(t) { return t && typeof t.rManual === 'number' ? t.rManual : autoR(t); }
+function fmtR(r) { return r == null ? '−R' : (r > 0 ? '+' : r < 0 ? '−' : '±') + Math.abs(Math.round(r * 100) / 100) + 'R'; }
+
 
 const RESULT_OTHER_REASONS = [
   'RCI(上限OR下限)にて決済',
@@ -4064,6 +4115,7 @@ function buildPosition(w, f) {
     alertAt: latest ? latest.at : '',
     alertPrice: latest ? latest.price : 0,
     alertSide: latest ? latest.side : '',
+    alertTfKey: latest ? latest.tf : '',   // S121: 📅アラート台帳用
     zone: zoneSnapshot(w.pair, latest && latest.price || undefined),
     autoFill: '',
     createdAt: now.toISOString(),
@@ -4121,13 +4173,23 @@ function makeWatchBoard() {
     const l = watchLatest(t);
     return !!l && !t.wait && !t.pin && !(t.notes || '').trim() && nowMs - Date.parse(l.at) > TRADE_CLS_BY[watchCls(t)].expireH * 3600000;
   };
+  /* S121: 🗑・期限切れで消えるカードも、アラートがあれば条件つきで残す（📚の📅アラート台帳で「フィルターを甘くしたら」を検証するため）。
+     期限切れは複数の端末で同時に起きうるので、id をカードとアラート時刻から決めて同期で1件にまとまるようにする */
+  const leaveLog = (w, outcome) => {
+    const l = watchLatest(w);
+    if (!l) return null;
+    return skipLog(w, l, false, '', null, outcome, 'wlx_' + w.id + '_' + (Date.parse(l.at) || 0).toString(36));
+  };
   const prune = list => {
     const nowMs = Date.now();
     const dead = list.filter(t => expired(t, nowMs));
     if (!dead.length) return list;
     dead.forEach(t => markDeleted('trades', t.id));
     const ids = new Set(dead.map(t => t.id));
-    if (!saveTrades(loadTrades().filter(t => !ids.has(t.id)))) return list;
+    const rest = loadTrades().filter(t => !ids.has(t.id));
+    const have = new Set(rest.map(t => t.id));
+    dead.map(t => leaveLog(t, 'expired')).forEach(g => { if (g && !have.has(g.id)) rest.push(g); });
+    if (!saveTrades(rest)) return list;
     return list.filter(t => !ids.has(t.id));
   };
   const rank = t => {
@@ -4214,18 +4276,26 @@ function makeWatchBoard() {
           '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-sw-skip-go="star">⭐ 惜しいとして記録</button></div>'
         : '') +
     '</div>';
-  const skipLog = (w, l, star, note, plan) => {
+  const skipLog = (w, l, star, note, plan, outcome, id) => {
     const now = new Date().toISOString();
     const cond = {};
     WATCH_NG.forEach(c => { cond[c.k] = watchState(w, c.k); });
-    const log = { id: mvGenId('wl'), kind: 'watchlog', outcome: 'skip', src: w.kind, pair: w.pair, cls: watchCls(w), tf: watchTf(w), cond,
+    const log = { id: id || mvGenId('wl'), kind: 'watchlog', outcome: outcome || 'skip', src: w.kind, pair: w.pair, cls: watchCls(w), tf: watchTf(w), cond,
                   notes: w.notes || '', datetime: now, createdAt: now, updatedAt: now,
                   alert: l ? { tf: l.tf, at: l.at, side: l.side, price: l.price || 0 } : null,
                   side: (l && l.side) || w.side || '',
                   zone: zoneSnapshot(w.pair, (l && l.price) || undefined), autoFill: 'pending',
-                  consider: !!star, considerNote: note || '' };
+                  consider: !!star, considerNote: note || '', ctx: watchCtx(w, items()) };
     if (plan) log.plan = plan;
     return log;
+  };
+  /* S122: その時点の局面（🔬勝ち負けの分析で使う）。他の足の逆向き・🎯・⏳待ち・📋候補から来たか・📌 */
+  const watchCtx = (w, all) => {
+    const tf = watchTf(w);
+    const mySide = (w.alertSide || {})[tf] || w.side || '';
+    const others = otherTfs(w, all);
+    return { conflict: !!mySide && others.some(o => o.side && o.side !== mySide), others: others.length, aim: watchAimTfs(w).length > 0,
+             wait: !!w.wait, pin: !!w.pin, cand: !!w.cand || loadTrades().some(c => isCandidate(c) && c.pair === w.pair) };
   };
   const candFull = new Set();   // S119: 📋候補のメモを全部表示しているカード
   const candRowHtml = (t, cands) => {
@@ -4294,7 +4364,7 @@ function makeWatchBoard() {
           '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-sw-note-open title="メモ">📝</button>' +
           '<button type="button" class="tgoto sw-pin' + (t.pin ? ' on' : '') + '" data-sw-pin title="ピン止め（一番上に固定・時間がたっても消さない。もう一度で解除）">📌</button>' +
           '<button type="button" class="tgoto sw-wait' + (t.wait ? ' on' : '') + '" data-sw-wait title="下位足の形成待ち（もう一度で解除）。待ちの間は時間がたってもカードを消しません">⏳待ち</button>' +
-          '<button type="button" class="tclear" data-sw-del title="カードを削除（記録には残しません）">🗑</button>' +
+          '<button type="button" class="tclear" data-sw-del title="カードを削除（📒の記録には入りません。📚のアラート台帳には条件つきで残ります）">🗑</button>' +
           '<span class="spacer"></span>' +
           '<button type="button" class="sw-res skip' + (skipState[t.id] ? ' on' : '') + '" data-sw-skip title="見送る（ふつうの見送りか ⭐惜しい を選んで記録）">見送り</button>' +
           '<button type="button" class="sw-res in' + (st ? ' on' : '') + '" data-sw-in-open title="入った → エントリー足と約定価格だけ入れて記録">入った</button>' +
@@ -4409,7 +4479,13 @@ function makeWatchBoard() {
     if (e.target.closest('[data-sw-pin]')) { update(id, t => { t.pin = !t.pin; }, false); render(); return; }
     if (e.target.closest('[data-sw-wait]')) { update(id, t => { t.wait = !t.wait; }, true); return; }
     /* S110: 🗑 ただ消す（見送りの記録は作らない）。墓標で他端末からの復活を防ぐ */
-    if (e.target.closest('[data-sw-del]')) { remove(id); render(); return; }
+    if (e.target.closest('[data-sw-del]')) {
+      const trades = loadTrades();
+      const w = trades.find(x => x.id === id);
+      const g = w && leaveLog(w, 'deleted');
+      if (g && !trades.some(x => x.id === g.id)) { trades.push(g); saveTrades(trades); }
+      remove(id); renderAll(); return;
+    }
     /* S116: 見送り → 欄を開いて「見送りとして記録」か「⭐ 惜しい」を選ぶ */
     if (e.target.closest('[data-sw-skip]')) {
       if (skipState[id]) delete skipState[id];
@@ -4483,6 +4559,7 @@ function makeWatchBoard() {
         if (c.dir !== st.dir) { showToast('⚠ 損切り価格が売買方向と合いません'); return; }
       }
       const pos = buildPosition(w, st);
+      pos.ctx = watchCtx(w, trades.filter(isWatch));
       saveEntryPrefs(Object.assign(lastEntryPrefs(), { ['tf_' + watchCls(w)]: st.tf, order: st.order, fibo: st.fibo }));
       trades.push(pos);
       markDeleted('trades', id);
@@ -4842,9 +4919,11 @@ function makePositions() {
               '<button type="button" class="btn-primary sw-go" data-pos-fix-save>保存</button></div>' : '') +
     '</div>';
   };
+  const rEdit = new Set();   // S122: R を手で直している記録
   const closedHtml = t => {
     const tag = t.resultTag;
     const rrTags = ['reg', 'big', 'max'];
+    const r = tradeR(t);
     return '<div class="trend-item sc-card pos-card closed cls-' + tradeCls(t) + '" data-pos="' + esc(t.id) + '">' + head(t) +
       (t.stopPrice != null ? levels(t) : '<div class="pos-prices">入 ' + px(t.entryPrice) + '</div>') +
       '<div class="trend-tf">' +
@@ -4855,13 +4934,21 @@ function makePositions() {
           : '') +
         (tag === 'reg' && t.autoFill !== 'done' ? '<span class="pos-hint">3:1・4:1 に届いたかは自動判定待ち</span>' : '') +
         '<span class="spacer"></span>' +
+        '<button type="button" class="tgoto pos-r' + (r == null ? '' : r > 0 ? ' pos' : r < 0 ? ' neg' : '') + (typeof t.rManual === 'number' ? ' manual' : '') +
+          '" data-pos-r title="この記録のR（3枚同量・2:1の後は建値の前提で自動。量を変えたときはタップで直す）">' + fmtR(r) + '</button>' +
         '<button type="button" class="tgoto" data-pos-reopen title="保有中に戻す">↩</button>' +
         '<button type="button" class="tgoto" data-pos-edit title="詳細を編集（✎）">✎</button>' +
         '<button type="button" class="tclear" data-pos-del title="削除">🗑</button>' +
-      '</div></div>';
+      '</div>' +
+      (rEdit.has(t.id) ? '<div class="trend-tf"><label class="sw-in"><span>R<small>空で自動に戻す</small></span><input type="text" inputmode="decimal" autocomplete="off" data-pos-r-in value="' +
+          esc(typeof t.rManual === 'number' ? String(t.rManual) : '') + '" placeholder="' + esc(autoR(t) == null ? '例 0.5' : String(autoR(t))) + '"></label>' +
+          '<button type="button" class="btn-primary sw-go" data-pos-r-save>保存</button></div>' : '') +
+      (tag === 'stoploss' ? '<div class="trend-tf pos-loss"><span class="sw-lab">負けた理由<small>任意</small></span>' + LOSS_REASONS.map(x =>
+          '<button type="button" class="sc-btn' + (t.lossReason === x ? ' on' : '') + '" data-pos-loss="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
+      '</div>';
   };
   const render = () => {
-    if (document.activeElement && (openEl.contains(document.activeElement)) && document.activeElement.matches('input')) return;
+    if (document.activeElement && (openEl.contains(document.activeElement) || closedEl.contains(document.activeElement)) && document.activeElement.matches('input')) return;
     const all = loadTrades().filter(isPos);
     const open = all.filter(t => t.status === 'open').sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     const closed = all.filter(t => t.status === 'closed').sort((a, b) => (b.closedAt || '').localeCompare(a.closedAt || '')).slice(0, 15);
@@ -4898,6 +4985,17 @@ function makePositions() {
     const tag = e.target.closest('[data-pos-tag]');
     if (tag) {
       if (save(id, t => { t.resultTag = tag.dataset.posTag; t.exitResult = POS_TAG_RR[tag.dataset.posTag]; })) renderAll();
+      return;
+    }
+    /* S122: 負けた理由（もう一度で外す）・R の手直し */
+    const lr = e.target.closest('[data-pos-loss]');
+    if (lr) { if (save(id, t => { t.lossReason = t.lossReason === lr.dataset.posLoss ? '' : lr.dataset.posLoss; })) renderAll(); return; }
+    if (e.target.closest('[data-pos-r]')) { rEdit.has(id) ? rEdit.delete(id) : rEdit.add(id); render(); return; }
+    if (e.target.closest('[data-pos-r-save]')) {
+      blurActive();
+      const v = card.querySelector('[data-pos-r-in]').value.trim().replace('＋', '+').replace(/[−ー]/, '-');
+      if (v && !Number.isFinite(Number(v))) { showToast('⚠ R は数字で入れてください（例 0.5、-1）'); return; }
+      if (save(id, t => { if (v) t.rManual = Number(v); else delete t.rManual; })) { rEdit.delete(id); renderAll(); }
       return;
     }
     if (e.target.closest('[data-pos-reopen]')) {
@@ -5089,6 +5187,265 @@ function makeSkipList() {
 }
 const skipList = makeSkipList();
 /* 📚 見送りの検証：⭐惜しい と ふつうの見送り を分けて、「入っていたら」の勝ち負け（判定済みのものだけ） */
+/* ---- S121: 📅 アラート台帳（📚振り返り） ----
+   鳴ったアラートを、カードが消えた時点の条件で ⭕（4つとも✅）／▲（✖なし・▲あり）／✖（✖あり）／未判定（未選択が残る）に分け、
+   日ごとに並べる。「もし入っていたら」（vsim）は、アラートの足の終値で入り 損切り＝ATR×1.5・利確＝2:1 の固定ルールで
+   Claude があとからローソク足で判定して書き込む（tools/backfill/ の simulateAlert）。勝ち＝+2R・負け＝−1R。
+   元データ：見送り・🗑・期限切れ（watchlog）と、入った記録（cond と alertAt があるもの） */
+const LEDGER_GRADES = [
+  { k: 'ok',   label: '⭕', name: '⭕ 4つとも✅' },
+  { k: 'mid',  label: '▲',  name: '▲ ✖なし・▲あり' },
+  { k: 'ng',   label: '✖',  name: '✖ ✖あり' },
+  { k: 'none', label: '未判定', name: '未判定（未選択が残る）' },
+];
+const LEDGER_HOW = { entered: '入った', skip: '見送り', deleted: '🗑', expired: '期限切れ', win: '入った', loss: '入った' };
+const ALERT_TF_KEY = { '1時間足': '1H', '4時間足': '4H', '日足': 'D', '週足': 'W' };
+function ledgerGrade(cond) {
+  const ks = WATCH_NG.map(c => c.k).filter(k => cond && k in cond);
+  const v = ks.map(k => cond[k] || '');
+  if (!ks.length) return 'none';
+  if (v.includes('ng')) return 'ng';
+  if (v.includes('')) return 'none';
+  return v.every(x => x === 'ok') ? 'ok' : 'mid';
+}
+function alertLedger() {
+  const out = [];
+  loadTrades().forEach(t => {
+    if (!t) return;
+    if (t.kind === 'watchlog') {
+      const a = t.alert;
+      if (!a || !a.at) return;
+      out.push({ id: t.id, at: a.at, pair: t.pair, cls: t.cls || '', tf: t.tf || a.tf || '', side: a.side || t.side || '', cond: t.cond || {},
+                 how: t.outcome, sim: t.vsim || null, real: t.outcome === 'win' || t.outcome === 'loss' ? t.outcome : '' });
+    } else if (!t.kind && t.alertAt && t.cond) {
+      out.push({ id: t.id, at: t.alertAt, pair: t.pair, cls: t.cls || '', tf: t.alertTfKey || ALERT_TF_KEY[t.alertTf] || '', side: t.alertSide || t.direction || '',
+                 cond: t.cond, how: 'entered', sim: t.vsim || null,
+                 real: t.status !== 'closed' ? '' : t.resultTag === 'stoploss' ? 'loss' : ['reg', 'big', 'max'].includes(t.resultTag) ? 'win' : 'be' });
+    }
+  });
+  out.forEach(r => { r.grade = ledgerGrade(r.cond); });
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+function ledgerSimText(r) {
+  const v = r.sim && r.sim.result;
+  if (v === 'win') return '<span class="sk-sim win">勝 +2R</span>';
+  if (v === 'loss') return '<span class="sk-sim loss">負 −1R</span>';
+  if (v === 'undecided') return '<span class="sk-sim">決着なし</span>';
+  if (v === 'nodata') return '<span class="sk-sim">足が取れず</span>';
+  return '<span class="sk-sim">判定待ち</span>';
+}
+/* ---- S122: R（1トレードのリスク＝1R）と 🔬 勝ち負けの分析 ----
+   3枚同量で入り、2:1の後は残りを建値に移す前提：損切 −1R・建値 0・REG（2:1）+0.67R・BIG（3:1まで）+1.67R・MAX（4:1まで）+3R。
+   量を変えたなどで合わないときは記録ごとに rManual で直す。微益・その他は自動では数えない（直せば入る） */
+const WL_SESS = h => h >= 8 && h < 16 ? '東京（8〜16時）' : h >= 16 && h < 21 ? 'ロンドン（16〜21時）' : h >= 21 || h < 2 ? 'NY（21〜2時）' : '深夜・早朝（2〜8時）';
+const WL_CLS_NAME = { scalp: '⚡スキャ', day: '☀デイ', swing: '🌙スイング' };
+const WL_ORDER = ['種類', '時間足', '方向', '条件', 'グランビル', 'RCI', 'MACD', 'ネック', '🎯', '他の足', '時間帯', '曜日', '通貨', '注文', '入るまで', '⏳待ち', '📋候補'];
+/* 1件の記録 → { r, at, f: { 局面: 値 } }。分からない局面は入れない（その表から外れるだけ） */
+function wlFactors(o) {
+  const f = {};
+  if (o.cls) f['種類'] = WL_CLS_NAME[o.cls] || o.cls;
+  if (o.tf) f['時間足'] = o.tf;
+  if (o.side) f['方向'] = o.side === 'long' ? '▲買い' : '▼売り';
+  if (o.cond && Object.keys(o.cond).length) {
+    f['条件'] = { ok: '⭕4つとも✅', mid: '▲あり（✖なし）', ng: '✖あり', none: '未判定あり' }[ledgerGrade(o.cond)];
+    WATCH_NG.forEach(c => { if (c.k in o.cond) f[c.label] = o.cond[c.k] ? WATCH_MARK[o.cond[c.k]] : '未選択'; });
+  }
+  const ctx = o.ctx;
+  if (ctx) {
+    f['🎯'] = ctx.aim ? '🎯あり' : '🎯なし';
+    f['他の足'] = ctx.conflict ? '逆向きあり' : ctx.others ? '同じ向きだけ' : '他の足なし';
+    f['⏳待ち'] = ctx.wait ? '⏳待ちだった' : '待ちなし';
+    f['📋候補'] = ctx.cand ? '📋候補あり' : '候補なし';
+  }
+  const d = new Date(o.at);
+  if (Number.isFinite(d.getTime())) { f['時間帯'] = WL_SESS(d.getHours()); f['曜日'] = '日月火水木金土'[d.getDay()] + '曜'; }
+  if (o.pair) f['通貨'] = o.pair;
+  if (o.order) f['注文'] = o.order;
+  if (o.lagMin != null) f['入るまで'] = o.lagMin <= 30 ? '30分以内' : o.lagMin <= 120 ? '30分〜2時間' : '2時間超';
+  return f;
+}
+function wlRealRows() {
+  return filterByType(mainTrades()).filter(t => t.status === 'closed' && tradeR(t) != null).map(t => {
+    const at = t.entryAtIso || (t.fill && t.fill.entryAt) || (t.datetime ? new Date(t.datetime).toISOString() : '');
+    const ot = t.mvChecks && t.mvChecks.entry && t.mvChecks.entry.entryOrderType;
+    const fibo = t.mvChecks && t.mvChecks.entry && t.mvChecks.entry.entryFibo;
+    const lag = t.alertAt && at ? Math.round((Date.parse(at) - Date.parse(t.alertAt)) / 60000) : null;
+    return { id: t.id, r: tradeR(t), t, f: wlFactors({ cls: tradeCls(t), tf: t.alertTfKey || ALERT_TF_KEY[t.alertTf] || '', side: t.direction, cond: t.cond, ctx: t.ctx, at, pair: t.pair,
+      order: ot ? ot + (ot === '指値' && fibo ? ' ' + fibo : '') : '', lagMin: lag != null && lag >= 0 ? lag : null }) };
+  });
+}
+function wlSimRows() {
+  const byId = Object.fromEntries(loadTrades().map(t => [t.id, t]));
+  return alertLedger().filter(r => (clsFilterRv === 'all' || r.cls === clsFilterRv) && r.sim && (r.sim.result === 'win' || r.sim.result === 'loss'))
+    .map(r => ({ id: r.id, r: r.sim.result === 'win' ? 2 : -1, f: wlFactors({ cls: r.cls, tf: r.tf, side: r.side, cond: r.cond, ctx: (byId[r.id] || {}).ctx, at: r.at, pair: r.pair }) }));
+}
+function wlStat(list) {
+  const n = list.length, w = list.filter(x => x.r > 0).length, sum = list.reduce((a, x) => a + x.r, 0);
+  return { n, w, l: list.filter(x => x.r < 0).length, rate: n ? w / n : 0, avg: n ? sum / n : 0, sum };
+}
+const WL_MIN = 5;   // これより少ない局面は傾向として出さない（偶然の可能性が高い）
+function wlStatText(st) {
+  return '<span class="n">' + st.n + '件</span><span class="rr' + (st.avg > 0.001 ? ' pos' : st.avg < -0.001 ? ' neg' : '') + '">勝率' + Math.round(st.rate * 100) + '%・1回 ' + fmtR(st.avg) + '（計 ' + fmtR(st.sum) + '）</span>';
+}
+/* 1つの局面と、2つの局面の組み合わせから、平均から大きく外れたもの（件数 WL_MIN 以上）を負け・勝ちそれぞれ上位3つ */
+function wlPatterns(rows) {
+  const groups = {};
+  const add = (key, x) => { (groups[key] ||= []).push(x); };
+  /* 全部の記録が同じ値の局面（例：全部 ☀デイ）は何も分けないので組み合わせに使わない */
+  const cnt = {};
+  rows.forEach(x => WL_ORDER.forEach(k => { if (k in x.f) cnt[k + '|' + x.f[k]] = (cnt[k + '|' + x.f[k]] || 0) + 1; }));
+  rows.forEach(x => {
+    const ks = WL_ORDER.filter(k => k in x.f && k !== '通貨' && k !== '曜日' && cnt[k + '|' + x.f[k]] < rows.length);
+    ks.forEach((a, i) => {
+      add(a + '：' + x.f[a], x);
+      ks.slice(i + 1).forEach(b => add(a + '：' + x.f[a] + ' × ' + b + '：' + x.f[b], x));
+    });
+    if (x.f['通貨']) add('通貨：' + x.f['通貨'], x);
+  });
+  const all = wlStat(rows);
+  const list = Object.entries(groups).map(([k, v]) => ({ k, st: wlStat(v) })).filter(g => g.st.n >= WL_MIN && g.st.n < rows.length);
+  /* 同じ記録の集まりを言い換えただけの組み合わせは1つにまとめる */
+  const sigOf = g => g.st.n + '|' + g.st.sum.toFixed(3) + '|' + g.st.w + '|' + groups[g.k].map(x => x.id).sort().join();
+  const uniq = arr => {
+    const seen = {};
+    return arr.filter(g => {
+      const sig = sigOf(g);
+      /* 同じ記録の集まりの別の言い方は、1局面だけのものを「同じ記録」として添える */
+      if (seen[sig]) { if (!g.k.includes(' × ') && seen[sig].also.length < 4) seen[sig].also.push(g.k); return false; }
+      seen[sig] = g; g.also = []; return true;
+    });
+  };
+  /* 同じ成績なら、件数の多い方 → 言い方の短い（局面の少ない）方を残す */
+  const tie = (a, b) => b.st.n - a.st.n || a.k.split(' × ').length - b.k.split(' × ').length;
+  const worst = uniq(list.filter(g => g.st.avg < all.avg - 0.2).sort((a, b) => a.st.avg - b.st.avg || tie(a, b))).slice(0, 3);
+  const best = uniq(list.filter(g => g.st.avg > all.avg + 0.2).sort((a, b) => b.st.avg - a.st.avg || tie(a, b))).slice(0, 3);
+  return { worst, best };
+}
+let wlSrc = 'real';
+try { if (localStorage.getItem('mochipoyo_wl_src') === 'sim') wlSrc = 'sim'; } catch (e) { /* noop */ }
+function renderWinLoss() {
+  const el = document.getElementById('winLoss');
+  if (!el) return;
+  const rows = wlSrc === 'sim' ? wlSimRows() : wlRealRows();
+  const all = wlStat(rows);
+  let html = '<h3>🔬 勝ち負けの分析</h3>' +
+    '<div class="type-filter wl-src">' +
+      '<button type="button" class="type-filter-btn' + (wlSrc === 'real' ? ' active' : '') + '" data-wl-src="real">実際のエントリー</button>' +
+      '<button type="button" class="type-filter-btn' + (wlSrc === 'sim' ? ' active' : '') + '" data-wl-src="sim">もし入っていたら（台帳）</button></div>' +
+    '<div class="section-note">' + (wlSrc === 'real'
+      ? '決済した記録を R で数えます（3枚同量・2:1の後は建値：損切 −1R／建値 0／REG +0.67R／BIG +1.67R／MAX +3R）。📒で R を直した記録はその値。'
+      : '📅アラート台帳の「もし入っていたら」（アラートの価格で入り ATR×1.5・2:1。勝 +2R／負 −1R）。件数が多いので傾向が早く見えます。') +
+      ' 1回あたりの R（期待値）がマイナスの局面は、入るほど減ります。' + WL_MIN + '件未満の局面は傾向に出しません。</div>';
+  if (!rows.length) {
+    el.innerHTML = html + '<div class="empty-state">' + (wlSrc === 'real' ? 'まだ決済した記録がありません。📒記録で 2:1利確／損切／建値 を付けるとここに入ります。' : 'まだ判定済みのアラートがありません（毎朝の突き合わせで埋まります）。') + '</div>';
+    return;
+  }
+  html += '<div class="row wl-all"><span class="name">全体</span>' + wlStatText(all) + '</div>';
+  const pt = wlPatterns(rows);
+  const patHtml = g => '<div class="row"><span class="name">' + esc(g.k) + (g.st.n < 10 ? ' <small class="wl-few">参考</small>' : '') +
+    (g.also && g.also.length ? '<small class="wl-also">同じ記録：' + esc(g.also.join('／')) + '</small>' : '') + '</span>' + wlStatText(g.st) + '</div>';
+  html += '<div class="ld-sub">⚠ 負けやすい局面</div>' + (pt.worst.length ? pt.worst.map(patHtml).join('') : '<div class="section-note">まだ見つかりません（同じ局面が ' + WL_MIN + '件以上たまると出ます）。</div>') +
+    '<div class="ld-sub">✅ 勝ちやすい局面</div>' + (pt.best.length ? pt.best.map(patHtml).join('') : '<div class="section-note">まだ見つかりません。</div>');
+  /* 負け方（実際のエントリーだけ。毎朝の突き合わせの fill で分ける） */
+  if (wlSrc === 'real') {
+    const loss = rows.filter(x => x.r < 0);
+    const filled = loss.filter(x => x.t.fill && typeof x.t.fill.mfeR === 'number');
+    const kind = x => x.t.fill.mfeR >= 1 ? 'up' : x.t.fill.mfeR < 0.3 ? 'fast' : 'mid';
+    const regs = rows.filter(x => x.t.resultTag === 'reg' || x.t.resultTag === 'big' || x.t.resultTag === 'max');
+    const regFilled = regs.filter(x => x.t.fill && x.t.fill.outcome);
+    html += '<div class="ld-sub">負け方（' + loss.length + '件）</div>' +
+      (filled.length
+        ? [['fast', 'すぐ逆行（含み益 0.3R 未満）', '入る位置・タイミングの見直し'], ['mid', '少し乗ってから損切り', ''], ['up', '+1R 以上乗ってから損切り', '利確・建値に移すルールの見直し']].map(([k, lab, hint]) => {
+            const n = filled.filter(x => kind(x) === k).length;
+            return '<div class="row"><span class="name">' + lab + (hint && n ? ' <small class="wl-hint">→ ' + hint + '</small>' : '') + '</span><span class="n">' + n + '件</span><span class="rr">' + Math.round(n * 100 / filled.length) + '%</span></div>';
+          }).join('')
+        : '') +
+      (loss.length - filled.length ? '<div class="section-note">判定待ち ' + (loss.length - filled.length) + '件（毎朝の突き合わせで埋まります）</div>' : '');
+    const reasons = {};
+    loss.forEach(x => { if (x.t.lossReason) reasons[x.t.lossReason] = (reasons[x.t.lossReason] || 0) + 1; });
+    if (Object.keys(reasons).length) html += '<div class="ld-sub">負けた理由（📒で付けたもの）</div>' + Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      '<div class="row"><span class="name">' + esc(k) + '</span><span class="n">' + n + '件</span><span class="rr">' + Math.round(n * 100 / loss.length) + '%</span></div>').join('');
+    if (regs.length) {
+      const r3 = regFilled.filter(x => x.t.fill.tp3At).length;
+      html += '<div class="ld-sub">2:1 の後（' + regs.length + '件）</div>' + (regFilled.length
+        ? '<div class="row"><span class="name">3:1 まで届いた</span><span class="n">' + r3 + '件</span><span class="rr">' + Math.round(r3 * 100 / regFilled.length) + '%</span></div>' +
+          '<div class="row"><span class="name">建値に戻った</span><span class="n">' + (regFilled.length - r3) + '件</span><span class="rr">' + Math.round((regFilled.length - r3) * 100 / regFilled.length) + '%</span></div>'
+        : '<div class="section-note">判定待ち（毎朝の突き合わせで埋まります）</div>');
+    }
+  }
+  /* 局面ごとの表（期待値の低い順） */
+  html += '<div class="ld-sub">局面ごと（1回あたりの R が低い順）</div>' + WL_ORDER.map(k => {
+    const by = {};
+    rows.forEach(x => { if (k in x.f) (by[x.f[k]] ||= []).push(x); });
+    const ents = Object.entries(by).map(([v, list]) => ({ v, st: wlStat(list) })).sort((a, b) => a.st.avg - b.st.avg);
+    if (!ents.length) return '';
+    const worst = ents.find(e => e.st.n >= WL_MIN && e.st.avg < 0);
+    return '<details class="wl-factor"><summary>' + esc(k) + (worst ? ' <small class="wl-warn">⚠ ' + esc(worst.v) + ' ' + fmtR(worst.st.avg) + '</small>' : '') + '</summary>' +
+      ents.map(e => '<div class="row' + (e.st.n < WL_MIN ? ' wl-few-row' : '') + '"><span class="name">' + esc(e.v) + '</span>' + wlStatText(e.st) + '</div>').join('') + '</details>';
+  }).join('');
+  el.innerHTML = html;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-wl-src]');
+  if (!b) return;
+  wlSrc = b.dataset.wlSrc;
+  try { localStorage.setItem('mochipoyo_wl_src', wlSrc); } catch (err) { /* noop */ }
+  renderWinLoss();
+});
+
+let ledgerDays = 7;
+function renderAlertLedger() {
+  const el = document.getElementById('alertLedger');
+  if (!el) return;
+  const all = alertLedger().filter(r => clsFilterRv === 'all' || r.cls === clsFilterRv);
+  const tally = list => {
+    const w = list.filter(r => r.sim && r.sim.result === 'win').length;
+    const lo = list.filter(r => r.sim && r.sim.result === 'loss').length;
+    const R = w * 2 - lo;
+    return '<span class="n">' + list.length + '件</span><span class="rr' + (w + lo ? (R > 0 ? ' pos' : R < 0 ? ' neg' : '') : '') + '">' +
+      (w + lo ? '勝' + w + '・負' + lo + '（' + Math.round(w * 100 / (w + lo)) + '%）' + (R > 0 ? '+' : '') + R + 'R' : '判定待ち') + '</span>';
+  };
+  const row = (name, list) => '<div class="row"><span class="name">' + name + '</span>' + tally(list) + '</div>';
+  const g = k => all.filter(r => r.grade === k);
+  const only = k => all.filter(r => r.grade === 'ng' && WATCH_NG.every(c => (r.cond[c.k] === 'ng') === (c.k === k)));
+  let html = '<h3>📅 アラート台帳</h3>' +
+    '<div class="section-note">鳴ったアラートを、カードが消えた時点の条件で分けています。「もし入っていたら」は、アラートの価格で入り 損切り＝ATR×1.5・利確＝2:1 で判定します（勝 +2R・負 −1R。判定は Claude があとから書き込み）。</div>';
+  if (!all.length) { el.innerHTML = html + '<div class="empty-state">まだ記録がありません。👀監視のカードを 入った／見送り／🗑 したときと、時間切れで消えたときに入ります。</div>'; return; }
+  html += '<div class="ld-sub">入る基準を変えたら</div>' +
+    row('⭕だけ', g('ok')) +
+    row('⭕＋▲', all.filter(r => r.grade === 'ok' || r.grade === 'mid')) +
+    row('⭕＋▲＋未判定', all.filter(r => r.grade !== 'ng')) +
+    row('全部（✖でも入る）', all) +
+    '<div class="ld-sub">条件の分け方ごと</div>' + LEDGER_GRADES.map(x => row(x.name, g(x.k))).join('') +
+    '<div class="ld-sub">1つだけ✖だったとき</div>' + WATCH_NG.map(c => row(c.label + ' だけ✖', only(c.k))).join('');
+  /* 日ごと */
+  const dayOf = iso => { const d = new Date(iso); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const days = [];
+  all.forEach(r => { const k = dayOf(r.at); let d = days[days.length - 1]; if (!d || d.k !== k) days.push(d = { k, list: [] }); d.list.push(r); });
+  const WD = '日月火水木金土';
+  html += '<div class="ld-sub">日ごと</div>' + days.slice(0, ledgerDays).map(d => {
+    const dt = new Date(d.k + 'T00:00:00');
+    const cnt = LEDGER_GRADES.map(x => { const n = d.list.filter(r => r.grade === x.k).length; return n ? '<span class="ld-g ' + x.k + '">' + x.label + n + '</span>' : ''; }).join('');
+    const nIn = d.list.filter(r => r.how === 'entered' || r.real).length;
+    return '<div class="ld-day"><div class="ld-day-head"><b>' + (dt.getMonth() + 1) + '/' + dt.getDate() + '(' + WD[dt.getDay()] + ')</b><span>' + d.list.length + '件</span>' + cnt +
+      (nIn ? '<span class="ld-in">入った' + nIn + '</span>' : '') + '</div>' +
+      d.list.map(r => {
+        const t = new Date(r.at);
+        return '<div class="ld-row" data-ld="' + esc(r.id) + '"><span class="ld-time">' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + '</span>' +
+          '<span class="ld-pair">' + esc(r.pair) + '</span>' +
+          (r.tf ? '<span class="sw-tfchip">' + esc(r.tf) + '</span>' : '') +
+          (r.side ? '<span class="sw-dir ' + (r.side === 'long' ? 'up' : 'down') + '">' + (r.side === 'long' ? '▲' : '▼') + '</span>' : '') +
+          '<span class="ld-g ' + r.grade + '">' + LEDGER_GRADES.find(x => x.k === r.grade).label + '</span>' +
+          '<span class="ld-cond">' + WATCH_NG.map(c => r.cond[c.k] ? WATCH_MARK[r.cond[c.k]] : '・').join('') + '</span>' +
+          '<span class="ld-how">' + (LEDGER_HOW[r.how] || '') + (r.real === 'win' ? '（勝）' : r.real === 'loss' ? '（負）' : r.real === 'be' ? '（建値）' : '') + '</span>' +
+          '<span class="spacer"></span>' + ledgerSimText(r) + '</div>';
+      }).join('') + '</div>';
+  }).join('') +
+  (days.length > ledgerDays ? '<button type="button" class="btn-ghost ld-more" data-ld-more>もっと前の日を表示（あと ' + (days.length - ledgerDays) + ' 日）</button>' : '');
+  el.innerHTML = html;
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-ld-more]')) { ledgerDays += 7; renderAlertLedger(); } });
+
 function renderSkipStats() {
   const el = document.getElementById('skipStats');
   if (!el) return;
@@ -5206,7 +5563,7 @@ document.querySelectorAll('#reviewClsFilter [data-cls]').forEach(b => b.classLis
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); candidates.render(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); renderAlertLedger(); renderWinLoss(); candidates.render(); }
 document.querySelectorAll('#reviewTypeFilter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);

@@ -198,10 +198,11 @@ await page.click(`${row('CADJPY')} [data-sw-wait]`);
 check('⏳待ちをタップで wait=true・印が付く', (await trades()).find(t => t.id === 'x2').wait === true && await page.locator(row('CADJPY') + ' .sw-wait-badge').count() === 1);
 await page.click(`${row('CADJPY')} [data-sw-wait]`);
 check('もう一度で解除', (await trades()).find(t => t.id === 'x2').wait === false && await page.locator(row('CADJPY') + ' .sw-wait-badge').count() === 0);
-const logsBefore = (await trades()).filter(t => t.kind === 'watchlog').length;
+const logsBefore = (await trades()).filter(t => t.kind === 'watchlog' && t.outcome === 'skip').length;
 await page.click(`${row('CHFJPY')} [data-sw-del]`);
 check('🗑でカードが消える', !(await pairs()).includes('CHFJPY') && !(await trades()).some(t => t.id === 'x3'));
-check('🗑は見送りの記録を作らない', (await trades()).filter(t => t.kind === 'watchlog').length === logsBefore);
+check('🗑は見送りの記録を作らない（S121: 台帳用の deleted だけ残る）', (await trades()).filter(t => t.kind === 'watchlog' && t.outcome === 'skip').length === logsBefore &&
+  (await trades()).filter(t => t.kind === 'watchlog' && t.outcome === 'deleted').length <= 1);
 check('🗑は墓標を残す（他端末から復活しない）', await page.evaluate(() => !!(JSON.parse(localStorage.getItem('mochipoyo_tombstones_v1') || '{}').trades || {}).x3));
 check('ボタンを足しても 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth &&
   [...document.querySelectorAll('#swList .trend-tf')].every(r => r.scrollWidth <= r.clientWidth + 1)));
@@ -493,6 +494,145 @@ check('→ 監視へで条件を引き継ぐ', !!w4 && st(w4, 'granville') === '
 check('引き継いだ監視カードのボタンにも印が出る', (await page.textContent(`${card(w4.id)} [data-sw-ng="rci"]`)).includes('▲'));
 check('候補画面も 375px に収まる', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 await page.click('#swSeg [data-sw-pane="alert"]');
+
+/* ---- S121: 📅 アラート台帳 ---- */
+await page.evaluate(() => { saveTrades([]); renderAll(); });
+await page.click('.tab-btn[data-tab="watch"]');
+await page.click('#swSeg [data-sw-pane="alert"]');
+await page.evaluate(([at, old]) => {
+  const C = (ok, mid, ng) => ({ granville: false, rci: false, macd: false, neck: false, ...ok });
+  const mk = (id, pair, tf, side, at2, st) => {
+    const ng = {}, mid = {}, ok = {};
+    ['granville', 'rci', 'macd', 'neck'].forEach(k => { ng[k] = st[k] === 'ng'; mid[k] = st[k] === 'mid'; ok[k] = st[k] === 'ok'; });
+    return { id, kind: tf === '1H' ? 'scalpwatch' : 'trendwatch', cls: tf === '1H' ? undefined : 'day', tf, pair, ng, mid, ok, notes: '', alerts: { [tf]: at2 }, alertSide: { [tf]: side }, createdAt: at2, updatedAt: at2 };
+  };
+  saveTrades([
+    mk('lg1', 'EURUSD', '1H', 'long', at, { granville: 'ok', rci: 'ng', macd: 'ok', neck: 'ok' }),
+    mk('lg2', 'GBPUSD', '1H', 'short', old, { granville: 'ok', rci: 'mid', macd: 'ok', neck: 'ok' }),   // 期限切れで消える
+  ]);
+  watchBoard.render();
+}, [new Date(Date.now() - 600e3).toISOString(), new Date(Date.now() - 7 * 3600e3).toISOString()]);
+let ls = await trades();
+const ex = ls.find(t => t.kind === 'watchlog' && t.outcome === 'expired');
+check('期限切れで消えたカードも、条件つきで記録が残る', !!ex && ex.pair === 'GBPUSD' && ex.cond.rci === 'mid' && !ls.some(t => t.id === 'lg2'));
+check('期限切れの記録の id はカードとアラート時刻から決まる（端末が違っても1件）', ex.id.startsWith('wlx_lg2_'));
+await page.click(`${card('lg1')} [data-sw-del]`);
+ls = await trades();
+const dl = ls.find(t => t.kind === 'watchlog' && t.outcome === 'deleted');
+check('🗑で消したカードも、条件つきで記録が残る', !!dl && dl.pair === 'EURUSD' && dl.cond.rci === 'ng' && dl.alert.side === 'long' && !ls.some(t => t.id === 'lg1'));
+check('🗑・期限切れの記録は「見送った記録」には出ない', await page.evaluate(() => loadTrades().filter(isSkipLog).length === 0));
+check('🗑・期限切れの記録は📚の統計・CSV（mainTrades）に入らない', await page.evaluate(() => mainTrades().length === 0));
+// 判定結果（vsim）を書き込んだ想定で台帳を見る
+await page.evaluate(() => {
+  const at = new Date(Date.now() - 3 * 3600e3).toISOString();
+  const L = (id, cond, how, res, side) => ({ id, kind: 'watchlog', outcome: how, pair: 'AUDUSD', cls: 'scalp', tf: '1H', cond, alert: { tf: '1H', at, side: side || 'long', price: 0 }, datetime: at, createdAt: at, updatedAt: at, vsim: res ? { result: res } : undefined });
+  const all = { granville: 'ok', rci: 'ok', macd: 'ok', neck: 'ok' };
+  const t = loadTrades().map(x => x.kind === 'watchlog' ? Object.assign(x, { vsim: { result: x.outcome === 'deleted' ? 'loss' : 'win' } }) : x);
+  saveTrades(t.concat([
+    L('v1', all, 'skip', 'win'),
+    L('v2', { ...all, macd: 'mid' }, 'skip', 'loss'),
+    L('v3', { ...all, rci: '' }, 'skip', 'win'),
+    L('v4', { ...all, macd: 'ng' }, 'deleted', 'win'),
+    L('v5', all, 'skip', ''),
+  ]));
+  renderAll();
+});
+await page.click('.tab-btn[data-tab="review"]');
+const lg = () => page.textContent('#alertLedger');
+const lrow = name => page.$$eval('#alertLedger .row', (rs, n) => { const r = rs.find(x => x.querySelector('.name').textContent === n); return r ? r.textContent : ''; }, name);
+check('📚に📅アラート台帳が出る', (await lg()).includes('アラート台帳'));
+check('⭕だけ：2件（判定済み1件・勝1）', (await lrow('⭕だけ')).includes('2件') && (await lrow('⭕だけ')).includes('勝1・負0') && (await lrow('⭕だけ')).includes('+2R'));
+check('⭕＋▲：4件（▲は v2 と期限切れの GBPUSD）', (await lrow('⭕＋▲')).includes('4件') && (await lrow('⭕＋▲')).includes('勝2・負1'));
+check('⭕＋▲＋未判定：5件', (await lrow('⭕＋▲＋未判定')).includes('5件'));
+check('全部（✖でも入る）：7件・勝4負2で +6R', (await lrow('全部（✖でも入る）')).includes('7件') && (await lrow('全部（✖でも入る）')).includes('勝4・負2') && (await lrow('全部（✖でも入る）')).includes('+6R'));
+check('未判定は別枠', (await lrow('未判定（未選択が残る）')).includes('1件'));
+check('「RCI だけ✖」「MACD だけ✖」が分かれる', (await lrow('RCI だけ✖')).includes('1件') && (await lrow('MACD だけ✖')).includes('1件') && (await lrow('MACD だけ✖')).includes('勝1'));
+check('日ごとの見出しに件数と⭕▲✖', await page.locator('#alertLedger .ld-day').count() >= 1 && (await page.textContent('#alertLedger .ld-day-head')).includes('件'));
+check('行に条件の印・どうしたか・もし入っていたら', (await page.textContent('#alertLedger [data-ld="v4"]')).includes('🗑') && (await page.textContent('#alertLedger [data-ld="v4"]')).includes('勝 +2R') &&
+  (await page.textContent('#alertLedger [data-ld="v5"]')).includes('判定待ち'));
+// 入った記録も台帳に載る
+await page.evaluate(() => {
+  const at = new Date(Date.now() - 5 * 3600e3).toISOString();
+  saveTrades(loadTrades().concat([{ id: 'en1', pair: 'NZDUSD', cls: 'day', status: 'closed', resultTag: 'reg', alertAt: at, alertTf: '4時間足', alertSide: 'short', direction: 'short',
+    cond: { granville: 'ok', rci: 'ok', macd: 'ok', neck: 'ok' }, datetime: at, createdAt: at, updatedAt: at }]));
+  renderAll();
+});
+check('入った記録も台帳に載る（4H・▼・入った（勝））', (await page.textContent('#alertLedger [data-ld="en1"]')).includes('4H') && (await page.textContent('#alertLedger [data-ld="en1"]')).includes('入った（勝）'));
+await page.click('#reviewClsFilter [data-cls="day"]');
+check('📚の種類フィルタで台帳も絞れる（☀デイだけ＝入った1件）', (await lrow('全部（✖でも入る）')).includes('1件'));
+await page.click('#reviewClsFilter [data-cls="all"]');
+check('台帳も 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+
+/* ---- S122: R・負けた理由・🔬 勝ち負けの分析 ---- */
+check('R の数え方：損切 −1／建値 0／REG +0.67／BIG +1.67／MAX +3・手直しが優先', await page.evaluate(() =>
+  tradeR({ resultTag: 'stoploss' }) === -1 && tradeR({ resultTag: 'breakeven' }) === 0 && tradeR({ resultTag: 'reg' }) === 0.67 &&
+  tradeR({ resultTag: 'big' }) === 1.67 && tradeR({ resultTag: 'max' }) === 3 && tradeR({ resultTag: 'small_profit' }) === null && tradeR({ resultTag: 'reg', rManual: 0.4 }) === 0.4));
+// 入った時点の局面（ctx）が残る
+await page.evaluate(() => { saveTrades([]); renderAll(); });
+await page.click('.tab-btn[data-tab="watch"]');
+await page.evaluate(at => { const c = { granville: false, rci: false, macd: false, neck: false };
+  saveTrades([
+    { id: 'cx1', kind: 'scalpwatch', tf: '1H', pair: 'EURJPY', ng: c, mid: c, ok: { ...c, granville: true }, notes: '', alerts: { '1H': at }, alertSide: { '1H': 'long' }, wait: true, createdAt: at, updatedAt: at },
+    { id: 'cx2', kind: 'trendwatch', cls: 'day', tf: '4H', pair: 'EURJPY', ng: c, mid: c, ok: c, notes: '', alerts: { '4H': at }, alertSide: { '4H': 'short' }, createdAt: at, updatedAt: at },
+    { id: 'cdx', kind: 'candidate', pair: 'EURJPY', side: '', tf: '', notes: 'x', target: '', pin: false, watchId: '', createdAt: at, updatedAt: at },
+  ]); renderAll(); }, new Date(Date.now() - 600e3).toISOString());
+await page.click('#swSeg [data-sw-pane="alert"]');
+await page.click(`${card('cx1')} [data-sw-in-open]`);
+await page.click(`${card('cx1')} [data-sw-pick="tf"]`);
+await page.fill(`${card('cx1')} [data-sw-in="entry"]`, '160.50');
+await page.click(`${card('cx1')} [data-sw-go]`);
+let pos = (await trades()).find(t => !t.kind && t.pair === 'EURJPY');
+check('「入った」で局面が残る（他の足の逆向き・⏳待ち・📋候補）', !!pos && pos.ctx && pos.ctx.conflict === true && pos.ctx.wait === true && pos.ctx.cand === true && pos.ctx.aim === false);
+await page.click(`${card('cx2')} [data-sw-del]`);
+const dlog = (await trades()).find(t => t.kind === 'watchlog' && t.pair === 'EURJPY');
+check('🗑・見送りの記録にも局面が残る', !!dlog && dlog.ctx && dlog.ctx.others === 0);
+// 📒：損切 → 負けた理由・R
+await page.click('.tab-btn[data-tab="record"]');
+await page.click(`#posOpen [data-pos="${pos.id}"] [data-pos-res="stop"]`);
+const pc = `#posClosed [data-pos="${pos.id}"]`;
+check('損切りの記録に R（−1R）と負けた理由のボタン', (await page.textContent(`${pc} [data-pos-r]`)).includes('−1R') && await page.locator(`${pc} [data-pos-loss]`).count() === 6);
+await page.click(`${pc} [data-pos-loss="ダマシ"]`);
+check('負けた理由をタップで付ける', (await trades()).find(t => t.id === pos.id).lossReason === 'ダマシ' && await page.locator(`${pc} [data-pos-loss="ダマシ"].on`).count() === 1);
+await page.click(`${pc} [data-pos-loss="ダマシ"]`);
+check('もう一度で外す', (await trades()).find(t => t.id === pos.id).lossReason === '');
+await page.click(`${pc} [data-pos-loss="早すぎた"]`);
+await page.click(`${pc} [data-pos-r]`);
+await page.fill(`${pc} [data-pos-r-in]`, '-0.5');
+await page.click(`${pc} [data-pos-r-save]`);
+check('R を手で直せる（−0.5R）', (await trades()).find(t => t.id === pos.id).rManual === -0.5 && (await page.textContent(`${pc} [data-pos-r]`)).includes('−0.5R'));
+await page.click(`${pc} [data-pos-r]`);
+await page.fill(`${pc} [data-pos-r-in]`, '');
+await page.click(`${pc} [data-pos-r-save]`);
+check('空にすると自動の R に戻る', !('rManual' in (await trades()).find(t => t.id === pos.id)));
+// 🔬 分析（実際のエントリー）
+await page.evaluate(() => {
+  const C = st => ({ granville: 'ok', rci: 'ok', macd: 'ok', neck: 'ok', ...st });
+  const mk = (i, tag, cond, ctx, hour, extra) => { const d = new Date(); d.setDate(d.getDate() - 1 - i); d.setHours(hour, 0, 0, 0); const at = d.toISOString();
+    return Object.assign({ id: 'w' + i, pair: 'GBPJPY', cls: 'day', status: 'closed', resultTag: tag, direction: 'long', alertAt: at, alertTfKey: '4H', entryAtIso: at, datetime: at.slice(0, 16),
+      cond: C(cond), ctx, createdAt: at, updatedAt: at, mvChecks: { higher: {}, entry: { entryOrderType: '指値', entryFibo: '61%' } } }, extra || {}); };
+  const bad = { conflict: true, others: 1, aim: false, wait: false, pin: false, cand: false };
+  const good = { conflict: false, others: 0, aim: true, wait: false, pin: false, cand: false };
+  const list = [];
+  for (let i = 0; i < 6; i++) list.push(mk(i, 'stoploss', { rci: 'mid' }, bad, 17, { lossReason: i < 4 ? 'ダマシ' : '', fill: { mfeR: i < 3 ? 0.1 : 1.4 } }));
+  for (let i = 6; i < 12; i++) list.push(mk(i, i < 11 ? 'big' : 'stoploss', {}, good, 10, i < 11 ? { fill: { outcome: 'big', tp3At: 'x' } } : {}));
+  saveTrades(list); renderAll();
+});
+await page.click('.tab-btn[data-tab="review"]');
+await page.click('#winLoss [data-wl-src="real"]');
+const wl = () => page.textContent('#winLoss');
+check('📚に🔬勝ち負けの分析が出る（全体 12件）', (await wl()).includes('勝ち負けの分析') && (await page.textContent('#winLoss .wl-all')).includes('12件'));
+const worstTxt = await page.$$eval('#winLoss .ld-sub', subs => { const s = subs.find(x => x.textContent.includes('負けやすい')); let t = '', n = s.nextElementSibling; while (n && !n.classList.contains('ld-sub')) { t += n.textContent + '\n'; n = n.nextElementSibling; } return t; });
+check('負けやすい局面に「逆向きあり」や「RCI ▲」「ロンドン」の局面が出る', /逆向きあり|RCI：▲|ロンドン/.test(worstTxt) && worstTxt.includes('6件'));
+const bestTxt = await page.$$eval('#winLoss .ld-sub', subs => { const s = subs.find(x => x.textContent.includes('勝ちやすい')); let t = '', n = s.nextElementSibling; while (n && !n.classList.contains('ld-sub')) { t += n.textContent + '\n'; n = n.nextElementSibling; } return t; });
+check('勝ちやすい局面に「🎯あり」や「東京」が出る', /🎯あり|東京|⭕4つとも✅/.test(bestTxt));
+check('負け方：すぐ逆行 3件・+1R以上乗ってから 3件', /すぐ逆行[^件]*3件/.test(await wl()) && /\+1R 以上乗ってから損切り[^件]*3件/.test(await wl()));
+check('負けた理由の集計（ダマシ 4件）', /ダマシ4件/.test((await wl()).replace(/\s/g, '')));
+check('2:1 の後：3:1 まで届いた 5件', /3:1 まで届いた5件/.test((await wl()).replace(/ (?=\d+件)/g, '')));
+check('局面ごとの表（他の足・時間帯…）', await page.locator('#winLoss .wl-factor').count() >= 8);
+await page.click('#winLoss [data-wl-src="sim"]');
+check('「もし入っていたら（台帳）」に切り替えられる', (await wl()).includes('ATR×1.5') && await page.locator('#winLoss [data-wl-src="sim"].active').count() === 1);
+await page.click('#winLoss [data-wl-src="real"]');
+check('分析も 375px で横にはみ出さない', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
 check('JSエラーなし', errors.length === 0);
 if (errors.length) console.log(errors.join('\n'));
