@@ -3872,16 +3872,22 @@ const zoneConfText = conf => conf.join('·');
 /* S108: 表示はネックライン1本の価格（古い zones.json で line が無いときは範囲の中央） */
 function zoneLineOf(z) { return Number.isFinite(z.line) ? z.line : Number(((z.lo + z.hi) / 2).toPrecision(8)); }
 const zoneRangeText = h => String(zoneLineOf(h));
-/* 現在値の上・下それぞれ一番近いネックライン1本ずつ（4H・日足でも意識されているものを優先） */
+/* 現在値の上・下それぞれ一番近いネックラインと、その先のもう1本（S123）。どちらも4H・日足でも意識されているものを優先。
+   2本目は1本目より遠いものから選ぶ（level=2） */
 function zoneLines(pair) {
   const r = zonesDoc && zonesDoc.pairs && zonesDoc.pairs[pair];
   if (!r) return [];
   const all = zoneHits(pair, undefined, true).map(h => Object.assign({}, h, { up: zoneLineOf(h) > r.price }));
+  const dist = h => Math.abs(zoneLineOf(h) - r.price);
+  const best = side => side.find(h => h.conf.some(c => c !== '1H')) || side[0] || null;
   const pick = up => {
-    const side = all.filter(h => h.up === up).sort((a, b) => Math.abs(zoneLineOf(a) - r.price) - Math.abs(zoneLineOf(b) - r.price));
-    return side.find(h => h.conf.some(c => c !== '1H')) || side[0] || null;
+    const side = all.filter(h => h.up === up).sort((a, b) => dist(a) - dist(b));
+    const first = best(side);
+    if (!first) return [];
+    const second = best(side.filter(h => dist(h) > dist(first)));
+    return [Object.assign(first, { level: 1 })].concat(second ? [Object.assign(second, { level: 2 })] : []);
   };
-  return [pick(true), pick(false)].filter(Boolean);
+  return pick(true).concat(pick(false));
 }
 /* タップで価格をコピーできる表示 */
 const zoneCopyHtml = (v, cls) => '<span class="zcopy' + (cls ? ' ' + cls : '') + '" data-copy="' + esc(String(v)) + '" title="タップでコピー">' + esc(String(v)) + '</span>';
@@ -4210,7 +4216,7 @@ function makeWatchBoard() {
   };
   /* S113: 📍の行に 上のライン・下のライン・🎯（ネック✅を出したライン）を価格の高い順に並べる。🎯が上/下のラインと同じ価格なら、そのラインに🎯を付けて重複させない */
   const zoneLineHtml = (pair, aim) => {
-    const items = zoneLines(pair).map(h => ({ price: zoneLineOf(h), up: h.up, conf: h.conf, aim: false }));
+    const items = zoneLines(pair).map(h => ({ price: zoneLineOf(h), up: h.up, level: h.level, conf: h.conf, aim: false }));
     if (aim) {
       const same = items.find(x => Math.abs(x.price - aim.line) <= Math.abs(aim.line) * 1e-9);
       if (same) same.aim = true; else items.push({ price: aim.line, up: null, conf: aim.conf, aim: true });
@@ -4220,7 +4226,7 @@ function makeWatchBoard() {
     return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + items.map(x =>
       '<span class="' + (x.up === null ? 'zaim' : x.up ? 'zup' : 'zdown') + (x.conf.length >= 2 ? ' multi' : '') + '">' +
       (x.aim ? '<em class="zam" title="ネック✅を出したライン">🎯</em>' : '') +
-      (x.up === null ? '' : '<i>' + (x.up ? '上' : '下') + '</i>') + zoneCopyHtml(x.price) + ' <b>' + esc(zoneConfText(x.conf)) + '</b></span>').join('') +
+      (x.up === null ? '' : '<i>' + (x.up ? '上' : '下') + (x.level === 2 ? '2' : '') + '</i>') + zoneCopyHtml(x.price) + ' <b>' + esc(zoneConfText(x.conf)) + '</b></span>').join('') +
       '</div>';
   };
   const pick = (name, v, on, label) =>
