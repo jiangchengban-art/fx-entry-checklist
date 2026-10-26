@@ -362,6 +362,10 @@
   .sw-zone-line b { font-weight: 700; }
   .zcopy { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; -webkit-tap-highlight-color: rgba(57,135,229,.3); }
   .sw-zone-line .zcopy { color: var(--ink); font-weight: 700; padding: 2px 0; }
+  .sw-zone-line .zt { background: none; border: 0; padding: 2px 0; font: inherit; color: var(--ink-muted); cursor: pointer; }
+  .sw-zone-line .zt-arrow { margin-left: 4px; }
+  .sw-zone-line .zitems { display: none; }
+  .sw-zone-line.open .zitems { display: contents; }
   .tab-bar .tab-btn { position: relative; }
   .tab-badge {
     position: absolute; top: 3px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px;
@@ -3903,7 +3907,23 @@ function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
   else fallback();
 }
+const zoneOpen = new Set();
 document.addEventListener('click', e => {
+  const zt = e.target.closest && e.target.closest('[data-zone-toggle]');
+  if (zt) {
+    e.preventDefault();
+    const pair = zt.closest('.sw-zone-line').dataset.zonePair;
+    const open = !zoneOpen.has(pair);
+    if (open) zoneOpen.add(pair); else zoneOpen.delete(pair);
+    /* 同じ通貨の📍（候補とアラートのカード）はそろえて開閉する */
+    document.querySelectorAll('.sw-zone-line[data-zone-pair="' + CSS.escape(pair) + '"]').forEach(b => {
+      b.classList.toggle('open', open);
+      const t = b.querySelector('[data-zone-toggle]');
+      t.setAttribute('aria-expanded', open);
+      t.querySelector('.zt-arrow').textContent = open ? '▾' : '▸';
+    });
+    return;
+  }
   const c = e.target.closest && e.target.closest('[data-copy]');
   if (c) { e.preventDefault(); copyText(c.dataset.copy); }
 });
@@ -4223,11 +4243,15 @@ function makeWatchBoard() {
     }
     if (!items.length) return '';
     items.sort((x, y) => y.price - x.price);
-    return '<div class="sw-zone-line" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">📍' + items.map(x =>
+    /* S124: 数値は既定で閉じる。📍をタップで開く／閉じる（開いた通貨は zoneOpen に控え、描き直しても開いたまま） */
+    const open = zoneOpen.has(pair);
+    return '<div class="sw-zone-line' + (open ? ' open' : '') + '" data-zone-pair="' + esc(pair) + '" title="ネックライン（' + esc(zoneUpdatedText()) + '）。価格をタップでコピー">' +
+      '<button type="button" class="zt" data-zone-toggle aria-expanded="' + open + '">📍 ネックライン ' + items.length + '本' +
+      (items.some(x => x.aim) ? ' 🎯' : '') + '<span class="zt-arrow">' + (open ? '▾' : '▸') + '</span></button><span class="zitems">' + items.map(x =>
       '<span class="' + (x.up === null ? 'zaim' : x.up ? 'zup' : 'zdown') + (x.conf.length >= 2 ? ' multi' : '') + '">' +
       (x.aim ? '<em class="zam" title="ネック✅を出したライン">🎯</em>' : '') +
       (x.up === null ? '' : '<i>' + (x.up ? '上' : '下') + (x.level === 2 ? '2' : '') + '</i>') + zoneCopyHtml(x.price) + ' <b>' + esc(zoneConfText(x.conf)) + '</b></span>').join('') +
-      '</div>';
+      '</span></div>';
   };
   const pick = (name, v, on, label) =>
     '<button type="button" class="sc-btn' + (on ? ' on' : '') + '" data-sw-pick="' + name + '" data-v="' + esc(v) + '">' + label + '</button>';

@@ -73,16 +73,23 @@ await seed([
 check('USDJPY のカードにゾーン行', (await page.textContent(row('USDJPY'))).includes('📍'));
 check('ゾーン行に上のネックラインと時間足', (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('上') && (await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('1H·4H·D'));
 check('S108: 遠い通貨でも上下のネックライン価格を出す（コピー用）', await page.locator(row('GOLD') + ' .sw-zone-line .zcopy').count() >= 1);
+check('S124: ネックラインの数値は既定で閉じている', !(await page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first().isVisible()) && (await page.textContent(row('USDJPY') + ' .sw-zone-line .zt')).includes('本'));
+await page.click(row('USDJPY') + ' .sw-zone-line .zt');
+check('S124: 📍をタップで数値が開く', await page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first().isVisible());
+await page.evaluate(() => watchBoard.render());
+check('S124: 描き直しても開いたまま', await page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first().isVisible());
 await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
 const zc = page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first();
 const zcText = (await zc.textContent()).trim();
 await zc.click();
 check('S108: 価格をタップでコピー', (await page.evaluate(() => navigator.clipboard.readText()).catch(() => zcText)) === zcText && /^\d+(\.\d+)?$/.test(zcText));
 check('S108: 範囲（–）は出さない', !(await page.textContent(row('USDJPY') + ' .sw-zone-line')).includes('–'));
-const zlabels = await page.$$eval(row('USDJPY') + ' .sw-zone-line span', els => els.filter(e => e.querySelector('i')).map(e => e.querySelector('i').textContent + ':' + e.querySelector('.zcopy').textContent));
+const zlabels = await page.$$eval(row('USDJPY') + ' .sw-zone-line .zitems > span', els => els.filter(e => e.querySelector('i')).map(e => e.querySelector('i').textContent + ':' + e.querySelector('.zcopy').textContent));
 check('S123: 上のラインのもう1つ上（上2）も出す', zlabels.length === 3 && zlabels[0].startsWith('上2:') && Number(zlabels[0].split(':')[1]) > Number(zlabels[1].split(':')[1]));
 check('S123: 先にあるラインが無い側は1本だけ（4Hの下より遠いものは無い）', zlabels.filter(s => s.startsWith('下')).length === 1);
 check('S123: 1Hだけの近いラインより4H以上のラインを優先', zlabels.some(s => s.startsWith('下:') && Number(s.split(':')[1]) < 157));
+await page.click(row('USDJPY') + ' .sw-zone-line .zt');
+check('S124: もう一度タップで閉じる', !(await page.locator(row('USDJPY') + ' .sw-zone-line .zcopy').first().isVisible()));
 
 // 2. 🎯狙い目（ゾーン付近＋方向が合う）。上に並ぶ
 check('short・上のゾーン手前 → 🎯', await page.locator(row('USDJPY') + ' .aim-badge').count() === 1);
