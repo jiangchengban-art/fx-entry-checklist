@@ -38,7 +38,7 @@ async function recordViaCard(page, pair, dir) {
 console.log('\n[①] 🎯タブが存在しない・既定タブは監視');
 {
   const page = await newPage();
-  eq('タブは4つ（監視/記録/振り返り/設定）', await page.locator('.tab-btn').count(), 4);
+  eq('タブは5つ（監視/目線/記録/振り返り/設定）', await page.locator('.tab-btn').count(), 5);
   eq('🎯タブが無い', await page.locator('[data-tab="trade"]').count(), 0);
   ok('既定で監視タブがアクティブ', await page.locator('[data-tab="watch"]').evaluate(el => el.classList.contains('active')));
   await page.context().close();

@@ -1101,6 +1101,41 @@
   .sw-zone-line span.multi b { color: var(--cls-day-ink); }
   .aim-badge { background: var(--buy); padding: 2px 7px; font-size: 11px; }
   .sw-zone-line em.zam { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 0 4px; border-radius: 4px; margin-right: 3px; background: var(--buy); color: #fff; }
+
+  /* ===== S125: 🧭目線タブ ===== */
+  .bs-item { border-left: 5px solid var(--cls-day); }
+  .bs-item.tf-1H { border-left-color: var(--cls-scalp); }
+  .bs-grid { margin: 2px 9px 4px 7px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .bs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 6px; border-top: 1px solid var(--border); }
+  .bs-row:first-child { border-top: none; }
+  .bs-row.with { background: rgba(18,161,80,.07); }
+  .bs-row.opp  { background: rgba(224,73,79,.10); }
+  .bs-tf { flex: none; width: 34px; font-size: 12px; font-weight: 700; color: var(--ink); }
+  .bs-dir { font-family: inherit; font-size: 12px; font-weight: 700; width: 28px; height: 26px; padding: 0; border-radius: 6px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1.5px dashed var(--border); }
+  .bs-dir.up.on   { color: var(--buy-ink);  border: 1.5px solid var(--buy);  background: rgba(18,161,80,.16); }
+  .bs-dir.down.on { color: var(--sell-ink); border: 1.5px solid var(--sell); background: rgba(224,73,79,.16); }
+  .bs-dir.flat.on { color: var(--ink); border: 1.5px solid var(--ink-muted); background: var(--surface-2); }
+  .bs-evs { display: flex; flex-wrap: wrap; gap: 3px; flex-basis: 100%; padding-left: 38px; }
+  .bs-ev { font-family: inherit; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 999px; cursor: pointer; background: transparent; color: var(--ink-muted); border: 1px dashed var(--border); white-space: nowrap; }
+  .bs-ev.trend.on { color: var(--cls-day-ink); border: 1px solid var(--cls-day); background: rgba(57,135,229,.14); }
+  .bs-ev.rev.on   { color: var(--warn); border: 1px solid var(--warn); background: rgba(250,178,25,.14); }
+  .bs-prev { font-size: 10px; color: var(--ink-muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .bs-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 2px 9px 4px 9px; font-size: 12px; color: var(--ink-2); }
+  .bs-sum b { color: var(--ink); }
+  .bs-sum .up { color: var(--buy-ink); font-weight: 700; }
+  .bs-sum .down { color: var(--sell-ink); font-weight: 700; }
+  .bs-mixed { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; color: var(--warn); background: var(--warn-soft); white-space: nowrap; }
+  .bs-aligned { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; color: var(--buy-ink); background: rgba(18,161,80,.16); white-space: nowrap; }
+  .bs-against { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; color: #fff; background: var(--sell); white-space: nowrap; }
+  .bs-sub .sc-btn, .bs-entry .sc-btn { font-size: 11px; padding: 0 6px; height: 26px; }
+  .bs-stopinfo { padding: 2px 11px; font-size: 12px; color: var(--ink-2); }
+  .bs-stopinfo.warn { color: var(--warn); font-weight: 700; }
+  .bs-note { margin: 2px 11px 4px 9px; font-size: 12px; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .bs-alerts { margin: 4px 0 8px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .bs-alerts summary { cursor: pointer; padding: 6px 8px; font-size: 12.5px; font-weight: 700; }
+  .bs-arow { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 4px 8px; border-top: 1px solid var(--border); font-size: 12px; }
+  .bs-arow .sw-res { padding: 2px 10px; }
+  .bs-tag { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap; }
   .sw-tab.active[data-sw-cls="scalp"] { color: var(--cls-scalp-ink); }
   .sw-tab.active[data-sw-cls="day"]   { color: var(--cls-day-ink); }
   .sw-tab.active[data-sw-cls="swing"] { color: var(--cls-swing-ink); }
@@ -1422,6 +1457,47 @@
   </section>
   </div>
 
+  <!-- ============ 🧭 目線（S125: 上位足の目線で取捨選択する新しいやり方。👀📒📚 とは別に、このタブの中で 検討→入った→結果→分析 が完結する） ============ -->
+  <div class="tab-panel" id="tabPanel-bias">
+  <section class="card">
+    <h2>🧭 目線で選ぶ</h2>
+    <div class="sc-seg" id="bsSeg" role="tablist">
+      <button type="button" class="sc-seg-btn" data-bs-pane="watch" role="tab">検討中<b class="sc-seg-n" id="bsSegWatchN"></b></button>
+      <button type="button" class="sc-seg-btn" data-bs-pane="open" role="tab">保有中<b class="sc-seg-n" id="bsSegOpenN"></b></button>
+      <button type="button" class="sc-seg-btn" data-bs-pane="done" role="tab">済み</button>
+      <button type="button" class="sc-seg-btn" data-bs-pane="stats" role="tab">🔬分析</button>
+    </div>
+    <div id="bsPaneWatch">
+    <details class="trend-help sw-help">
+      <summary>📖 使い方</summary>
+      <div class="trend-help-body">
+        <strong>流れ</strong>：4時間足・1時間足のアラートで検討 → 週足・日足・8時間足（1時間足のアラートなら4時間足も）の目線を確認 → 目線がばらつくときは上位足の根拠が強ければ入る → 5分足・15分足のアラートか裁量で引きつけて入る → 2:1・3:1・4:1 の3分割。損切りは1時間足・4時間足の目線で置く。<br>
+        <strong>カードを作る</strong>：下の「🔔 鳴っている4H・1Hアラート」の ＋ で作るか、「＋ 通貨を手で追加」で作ります。同じ通貨の前回のカードから、週足（7日以内）・日足（24時間以内）の目線を引き継ぎます（「前回」の印。違えば直してください）。<br>
+        <strong>足ごとの目線</strong>：▲上／▼下／−横ばい をタップ（もう一度で解除）。その向きの根拠をチップでタップします。<strong>流れ</strong>（ダウ・MAの上下・MAの傾き・ヒドゥン）は今の向きが続く根拠、<strong>反転</strong>（ライン反発・RCI天井底・ダイバー・ローソク足）は向きが変わる根拠です。<br>
+        <strong>総合</strong>：上の足ほど重く数えます（週3・日2・8H 1.5・4H 1）。向きが食い違うと「⚠ばらつき」が出るので、<strong>どの足に従ったか</strong>をタップします。<br>
+        <strong>その他</strong>：2:1までに上位足のラインがあるか、通貨の強弱が合うか、指標の前後か。<br>
+        <strong>入った</strong>：エントリー足（5分／15分）・きっかけ（5分アラート／15分アラート／裁量で引きつけ）・約定価格・<strong>損切り価格</strong>・損切りの根拠を入れます。損切り幅が1時間足のATRの何倍かを出し、浅いと⚠を出します（ATRは📍ネックライン分析のデータから）。<br>
+        <strong>見送り</strong>：入らなかったものも、その目線のまま「済み」に残ります。
+      </div>
+    </details>
+    <div class="list-toolbar">
+      <select class="sc-pair sw-add" id="bsAddTf" aria-label="アラートの時間足">
+        <option value="4H">4時間足</option><option value="1H">1時間足</option>
+      </select>
+      <select class="sc-pair sw-add" id="bsAdd" aria-label="通貨を手で追加"></select>
+    </div>
+    <div id="bsAlerts"></div>
+    <div id="bsWatch"></div>
+    </div>
+    <div id="bsPaneOpen" hidden><div id="bsOpen"></div></div>
+    <div id="bsPaneDone" hidden>
+      <div class="sw-tabs" id="bsDoneTabs"></div>
+      <div id="bsDone"></div>
+    </div>
+    <div id="bsPaneStats" hidden><div class="basis-rr" id="bsStats"></div></div>
+  </section>
+  </div>
+
   <!-- ============ ⚙ 設定（CSV入出力） ============ -->
   <section class="card tab-panel" id="tabPanel-settings">
     <h2>⚙ 設定</h2>
@@ -1513,6 +1589,9 @@
 <nav class="tab-bar" id="tabBar">
   <button class="tab-btn" type="button" data-tab="watch">
     <span class="tab-icon">👀</span><span class="tab-label">監視</span>
+  </button>
+  <button class="tab-btn" type="button" data-tab="bias">
+    <span class="tab-icon">🧭</span><span class="tab-label">目線</span>
   </button>
   <button class="tab-btn" type="button" data-tab="record">
     <span class="tab-icon">📒</span><span class="tab-label">記録</span>
@@ -2574,7 +2653,9 @@ function isTrendWatch(t) { return !!t && t.kind === 'trendwatch'; }
 function isWatchLog(t) { return !!t && t.kind === 'watchlog'; }
 /* S119: 📋候補（kind:'candidate'）も📚・CSVには混ぜない */
 function isCandidate(t) { return !!t && t.kind === 'candidate'; }
-function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t) && !isWatchLog(t) && !isCandidate(t)); }
+/* S125: 🧭目線タブの記録（検討・入った・結果を1件で持つ）。📚・CSV・📒 には混ぜない */
+function isBias(t) { return !!t && t.kind === 'bias'; }
+function mainTrades() { return loadTrades().filter(t => !isScalpTrade(t) && !isScalpWatch(t) && !isTrendWatch(t) && !isWatchLog(t) && !isCandidate(t) && !isBias(t)); }
 /* S109: 種類（スキャ／デイ／スイング）フィルター。種類の無い旧記録は上位足の時間足から決める（tradeCls） */
 const CLS_FILTER_KEY = 'mochipoyo_cls_filter';
 let clsFilterRv = 'all';
@@ -5318,14 +5399,15 @@ function wlStatText(st) {
   return '<span class="n">' + st.n + '件</span><span class="rr' + (st.avg > 0.001 ? ' pos' : st.avg < -0.001 ? ' neg' : '') + '">勝率' + Math.round(st.rate * 100) + '%・1回 ' + fmtR(st.avg) + '（計 ' + fmtR(st.sum) + '）</span>';
 }
 /* 1つの局面と、2つの局面の組み合わせから、平均から大きく外れたもの（件数 WL_MIN 以上）を負け・勝ちそれぞれ上位3つ */
-function wlPatterns(rows) {
+function wlPatterns(rows, order) {
+  const ord = order || WL_ORDER;   // S125: 🧭目線タブは局面の並びが違う
   const groups = {};
   const add = (key, x) => { (groups[key] ||= []).push(x); };
   /* 全部の記録が同じ値の局面（例：全部 ☀デイ）は何も分けないので組み合わせに使わない */
   const cnt = {};
-  rows.forEach(x => WL_ORDER.forEach(k => { if (k in x.f) cnt[k + '|' + x.f[k]] = (cnt[k + '|' + x.f[k]] || 0) + 1; }));
+  rows.forEach(x => ord.forEach(k => { if (k in x.f) cnt[k + '|' + x.f[k]] = (cnt[k + '|' + x.f[k]] || 0) + 1; }));
   rows.forEach(x => {
-    const ks = WL_ORDER.filter(k => k in x.f && k !== '通貨' && k !== '曜日' && cnt[k + '|' + x.f[k]] < rows.length);
+    const ks = ord.filter(k => k in x.f && k !== '通貨' && k !== '曜日' && cnt[k + '|' + x.f[k]] < rows.length);
     ks.forEach((a, i) => {
       add(a + '：' + x.f[a], x);
       ks.slice(i + 1).forEach(b => add(a + '：' + x.f[a] + ' × ' + b + '：' + x.f[b], x));
@@ -5524,12 +5606,579 @@ document.getElementById('scalpList').addEventListener('click', e => {
 /* S106: 📍 ネックラインゾーンを読み込む（起動時と、画面に戻ったとき10分おき） */
 fetchZones(true);
 
+/* ============ S125: 🧭 目線タブ（上位足の目線で取捨選択する新しいやり方） ============
+   ユーザーのやり方：4H・1Hのアラートで検討 → 週足・日足・8H（1Hアラートなら4Hも）の目線を確認 → ばらつくときは上位足の根拠が強ければ入る
+   → 5分・15分のアラートか裁量で引きつけて入る → 2:1・3:1・4:1 の3分割。損切りは1H・4Hの目線で置き、浅くしすぎない。
+   ユーザー要望「今までの記録ツールの形は残したまま、新しいタブで」なので👀📒📚には混ぜず、このタブの中で 検討→入った→結果→分析 が完結する。
+   trades に kind:'bias' の1件で持つ（status: 'watch'|'open'|'closed'|'skip'）。同期・墓標はそのまま使い、mainTrades() からは除外。
+   価格・結果の項目名は📒の記録と同じ（entryPrice/stopPrice/tp2Price…/direction/resultTag）なので applyResult()・tradeR() をそのまま使う。 */
+const BIAS_TFS = [
+  { k: 'W',  label: '週足', w: 3 },
+  { k: 'D',  label: '日足', w: 2 },
+  { k: '8H', label: '8H',   w: 1.5 },
+  { k: '4H', label: '4H',   w: 1 },   // 1時間足のアラートのときだけ
+];
+const BIAS_TF_BY = Object.fromEntries(BIAS_TFS.map(x => [x.k, x]));
+/* 根拠。trend＝今の向きが続く根拠、rev＝向きが変わる根拠（同じ足で混ざると目線がぶれるので分けて記録する） */
+const BIAS_EV = [
+  { k: 'dow',     g: 'trend', label: 'ダウ' },
+  { k: 'ma',      g: 'trend', label: 'MA上下' },
+  { k: 'maSlope', g: 'trend', label: 'MA傾き' },
+  { k: 'hidden',  g: 'trend', label: 'ヒドゥン' },
+  { k: 'line',    g: 'rev',   label: 'ライン反発' },
+  { k: 'rci',     g: 'rev',   label: 'RCI天底' },
+  { k: 'div',     g: 'rev',   label: 'ダイバー' },
+  { k: 'candle',  g: 'rev',   label: 'ピンバー包み' },
+];
+const BIAS_EV_BY = Object.fromEntries(BIAS_EV.map(x => [x.k, x]));
+const BIAS_TRIGGERS = [{ k: 'a5', label: '5分アラート' }, { k: 'a15', label: '15分アラート' }, { k: 'manual', label: '裁量で引きつけ' }];
+const BIAS_TRIGGER_BY = Object.fromEntries(BIAS_TRIGGERS.map(x => [x.k, x.label]));
+const BIAS_STOP_BASIS = ['1H高安', '4H高安', 'ネックの外', 'その他'];
+const BIAS_ENTRY_TFS = ['5分足', '15分足'];
+const BIAS_SHALLOW_ATR = 1.0;   // 損切り幅が1時間足の ATR のこれ未満なら「浅いかも」
+const BIAS_NEAR_ATR1H = 1.0;    // ⚠️ tools/zones/zones.mjs の PARAMS.nearAtr1h と同じ値（zones.json の nearUnit ＝ 1H ATR × これ）
+const BIAS_DIR_MARK = { up: '▲', down: '▼', flat: '−' };
+const BIAS_KEEP_H = { W: 7 * 24, D: 24 };   // 同じ通貨の前回のカードから引き継ぐ目線（足ごとの有効時間）
+const biasRows = t => BIAS_TFS.filter(x => x.k !== '4H' || t.tf === '1H');
+const biasRow = (t, k) => (t.bias || {})[k] || {};
+/* 1時間足の ATR（📍ネックライン分析の zones.json から。無ければ 0） */
+function pairAtr1h(pair) {
+  const p = zonesDoc && zonesDoc.pairs && zonesDoc.pairs[pair];
+  return p && p.nearUnit > 0 ? p.nearUnit / BIAS_NEAR_ATR1H : 0;
+}
+/* 総合：上の足ほど重く数える。売買方向（side）に対して順の足・逆の足（横ばいも逆に数える） */
+function biasSummary(t) {
+  const want = t.side === 'long' ? 'up' : t.side === 'short' ? 'down' : '';
+  let up = 0, down = 0, set = 0;
+  const opp = [], withs = [];
+  biasRows(t).forEach(x => {
+    const d = biasRow(t, x.k).dir;
+    if (!d) return;
+    set++;
+    if (d === 'up') up += x.w; else if (d === 'down') down += x.w;
+    if (want) (d === want ? withs : opp).push(x.k);
+  });
+  const mixed = want ? opp.length > 0 && withs.length > 0 : up > 0 && down > 0;
+  return { up, down, set, want, opp, withs, mixed };
+}
+/* 🔬分析の「目線のそろい方」 */
+function biasAlign(t) {
+  const s = biasSummary(t);
+  if (!s.set) return '未記録';
+  if (!s.want) return s.mixed ? 'ばらつき' : 'そろい';
+  if (!s.opp.length) return 'すべて順';
+  if (!s.withs.length) return 'すべて逆';
+  const f = BIAS_TF_BY[t.follow];
+  if (!f) return 'ばらつき・従う足なし';
+  const maxOpp = Math.max(...s.opp.map(k => BIAS_TF_BY[k].w));
+  return s.withs.includes(t.follow) && f.w > maxOpp ? 'ばらつき・上位足に従った' : 'ばらつき・下位足に従った';
+}
+const BIAS_WL_ORDER = ['目線のそろい方', '従った足', 'アラート足', '方向', 'きっかけ', 'エントリー足', '損切りの根拠', '損切りの深さ', '2:1まで', '通貨の強弱', '指標'];
+function biasFactors(t) {
+  const a = t.stopAtr;
+  return {
+    '目線のそろい方': biasAlign(t),
+    '従った足': BIAS_TF_BY[t.follow] ? BIAS_TF_BY[t.follow].label : 'なし',
+    'アラート足': t.tf || '',
+    '方向': t.direction === 'long' ? '買い' : '売り',
+    'きっかけ': BIAS_TRIGGER_BY[t.trigger] || '未記録',
+    'エントリー足': t.entryTf || '未記録',
+    '損切りの根拠': t.stopBasis || '未記録',
+    '損切りの深さ': typeof a === 'number' && a > 0 ? (a < 1 ? 'ATR 1倍未満' : a < 2 ? 'ATR 1〜2倍' : 'ATR 2倍以上') : '不明',
+    '2:1まで': t.room === 'clear' ? 'ラインなし' : t.room === 'blocked' ? 'ラインあり' : '未確認',
+    '通貨の強弱': t.ccy === 'ok' ? '合う' : t.ccy === 'ng' ? '合わない' : '未確認',
+    '指標': t.event ? '指標前後' : 'なし',
+  };
+}
+/* 入った欄の下に出す 損切り・2:1・3:1・4:1 と、損切り幅が1H ATR の何倍か */
+function biasEntryPreview(pair, st) {
+  if (!String(st.entry || '').trim() || !String(st.stop || '').trim()) return { text: '', warn: false };
+  const c = rrCalc({ entry: st.entry, stop: st.stop });
+  if (c.error) return { text: '⚠ ' + c.error, warn: true };
+  if (st.dir && c.dir !== st.dir) return { text: '⚠ 損切り価格が売買方向と合いません', warn: true };
+  const atr = pairAtr1h(pair);
+  const k = atr ? c.r / atr : 0;
+  return { text: '2:1 ' + c.tp2 + '　3:1 ' + c.tp3 + '　4:1 ' + c.tp4 + (atr ? '　損切り幅＝1H ATR×' + k.toFixed(1) + (k < BIAS_SHALLOW_ATR ? '　⚠浅いかも' : '') : ''),
+           warn: !!atr && k < BIAS_SHALLOW_ATR };
+}
+
+function makeBias() {
+  const els = {
+    watch: document.getElementById('bsWatch'), open: document.getElementById('bsOpen'), done: document.getElementById('bsDone'),
+    alerts: document.getElementById('bsAlerts'), stats: document.getElementById('bsStats'), doneTabs: document.getElementById('bsDoneTabs'),
+    add: document.getElementById('bsAdd'), addTf: document.getElementById('bsAddTf'),
+  };
+  const panel = document.getElementById('tabPanel-bias');
+  const PANE_KEY = 'mochipoyo_bias_pane';
+  const DONE_KEY = 'mochipoyo_bias_done';
+  const PANES = { watch: 'bsPaneWatch', open: 'bsPaneOpen', done: 'bsPaneDone', stats: 'bsPaneStats' };
+  let pane = 'watch', doneFilter = 'all';
+  try { if (PANES[localStorage.getItem(PANE_KEY)]) pane = localStorage.getItem(PANE_KEY); } catch (e) { /* noop */ }
+  try { doneFilter = localStorage.getItem(DONE_KEY) || 'all'; } catch (e) { /* noop */ }
+  const entryState = {};
+  const noteOpen = new Set();
+  const expanded = new Set();   // 保有中・済みのカードで目線の表を開いているもの
+  const rEdit = new Set();
+  const tabBadge = document.createElement('b');
+  tabBadge.className = 'tab-badge';
+  document.querySelector('.tab-btn[data-tab="bias"]').appendChild(tabBadge);
+  const items = () => loadTrades().filter(isBias);
+  const px = v => v == null || v === '' ? '' : zoneCopyHtml(v);
+  const btn = (attr, v, on, label, cls, title) =>
+    '<button type="button" class="' + (cls || 'sc-btn') + (on ? ' on' : '') + '" ' + attr + '="' + esc(v) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + label + '</button>';
+
+  /* ---- 目線の表 ---- */
+  const gridHtml = t => {
+    const s = biasSummary(t);
+    return '<div class="bs-grid">' + biasRows(t).map(x => {
+      const r = biasRow(t, x.k);
+      const rel = r.dir && s.want ? (r.dir === s.want ? ' with' : ' opp') : '';
+      return '<div class="bs-row' + rel + '" data-bs-tf="' + x.k + '">' +
+        '<span class="bs-tf">' + x.label + '</span>' +
+        ['up', 'down', 'flat'].map(d => btn('data-bs-dir', d, r.dir === d, BIAS_DIR_MARK[d], 'bs-dir ' + d, { up: '上目線', down: '下目線', flat: '横ばい' }[d])).join('') +
+        (r.prev ? '<span class="bs-prev" title="同じ通貨の前回のカードから引き継いだ目線">前回</span>' : '') +
+        '<div class="bs-evs">' + BIAS_EV.map(e => btn('data-bs-ev', e.k, (r.ev || []).includes(e.k), e.label, 'bs-ev ' + e.g,
+          (e.g === 'trend' ? '流れ（向きが続く）の根拠' : '反転（向きが変わる）の根拠'))).join('') + '</div>' +
+      '</div>';
+    }).join('') + '</div>' + sumHtml(t, true);
+  };
+  const sumHtml = (t, editable) => {
+    const s = biasSummary(t);
+    if (!s.set) return '<div class="bs-sum">総合：目線を選ぶと出ます</div>';
+    const badge = !s.want ? '' : !s.opp.length ? '<span class="bs-aligned">✅そろい</span>'
+      : !s.withs.length ? '<span class="bs-against">✖すべて逆</span>' : '<span class="bs-mixed">⚠ばらつき</span>';
+    return '<div class="bs-sum"><b>総合</b><span class="up">▲' + s.up + '</span>：<span class="down">▼' + s.down + '</span>' + badge +
+      (s.mixed && editable ? '<span class="sw-lab">従う足</span>' + biasRows(t).filter(x => biasRow(t, x.k).dir).map(x =>
+        btn('data-bs-follow', x.k, t.follow === x.k, x.label, 'sc-btn')).join('')
+        : t.follow && s.mixed ? '<span>従う足：<b>' + BIAS_TF_BY[t.follow].label + '</b></span>' : '') +
+      '</div>';
+  };
+  /* 保有中・済みのカードでは1行に縮める（「目線」で表を開く） */
+  const lineHtml = t => '<div class="bs-sum">' + biasRows(t).map(x => {
+    const d = biasRow(t, x.k).dir;
+    return d ? '<span class="' + (d === 'flat' ? '' : d) + '">' + x.label + BIAS_DIR_MARK[d] + '</span>' : '';
+  }).join(' ') + (t.follow ? '<span>→ 従う：<b>' + BIAS_TF_BY[t.follow].label + '</b></span>' : '') + '<span class="bs-tag">' + esc(biasAlign(t)) + '</span></div>';
+  const subHtml = t => '<div class="trend-tf bs-sub">' +
+    '<span class="sw-lab">2:1まで</span>' + btn('data-bs-room', 'clear', t.room === 'clear', 'ラインなし', 'sc-btn ok', '2:1 の手前に上位足のラインが無い') +
+      btn('data-bs-room', 'blocked', t.room === 'blocked', 'ラインあり', 'sc-btn ng', '2:1 の手前に週足・日足などのラインがある') +
+    '<span class="sw-lab">通貨の強弱</span>' + btn('data-bs-ccy', 'ok', t.ccy === 'ok', '合う', 'sc-btn ok') + btn('data-bs-ccy', 'ng', t.ccy === 'ng', '合わない', 'sc-btn ng') +
+    btn('data-bs-event', '1', !!t.event, '⚠指標前後', 'sc-btn warn', '経済指標の前後') +
+    '</div>';
+  const headHtml = t => {
+    const opened = t.status === 'open' || t.status === 'closed';
+    return '<div class="trend-head">' +
+      '<span class="sw-pair" data-copy="' + esc(t.pair) + '" title="タップで通貨名をコピー">' + esc(t.pair) + '</span>' +
+      '<span class="sw-tfchip" title="アラートの時間足">' + esc(t.tf) + '</span>' +
+      (opened
+        ? '<span class="sw-dir ' + (t.direction === 'long' ? 'up' : 'down') + '">' + (t.direction === 'long' ? '▲買' : '▼売') + '</span>' +
+          '<span class="sw-tfchip">' + esc(t.entryTf || '') + '</span>'
+        : '<span class="sw-sidepick">' + btn('data-bs-side', 'long', t.side === 'long', '▲買', 'sw-dir-btn up') + btn('data-bs-side', 'short', t.side === 'short', '▼売', 'sw-dir-btn down') + '</span>') +
+      '<span class="spacer"></span>' +
+      (opened ? '<span class="pos-time">' + esc(fmtDatetime(t.datetime)) + '</span>'
+        : t.alertAt ? '<span class="sw-pend-age age-new" title="' + esc(fmtDatetime(t.alertAt)) + ' にアラート">⏰' + watchElapsed(t.alertAt) + '</span>' : '') +
+      '</div>';
+  };
+  const noteHtml = t => noteOpen.has(t.id)
+    ? '<div class="trend-tf"><input type="text" class="sc-note" data-bs-note maxlength="300" placeholder="メモ（欄を離れると保存）" value="' + esc(t.notes || '') + '" enterkeyhint="done"></div>'
+    : t.notes ? '<div class="bs-note">' + esc(t.notes) + '</div>' : '';
+  const entryHtml = (t, st) => {
+    const pv = biasEntryPreview(t.pair, st);
+    return '<div class="sw-entry bs-entry">' +
+      '<div class="trend-tf"><span class="sw-lab">エントリー足</span>' + BIAS_ENTRY_TFS.map(o => btn('data-bs-pick-tf', o, st.tf === o, o)).join('') +
+        '<span class="sw-lab">方向</span>' + btn('data-bs-pick-dir', 'long', st.dir === 'long', '▲買') + btn('data-bs-pick-dir', 'short', st.dir === 'short', '▼売') + '</div>' +
+      '<div class="trend-tf"><span class="sw-lab">きっかけ</span>' + BIAS_TRIGGERS.map(o => btn('data-bs-pick-trigger', o.k, st.trigger === o.k, o.label)).join('') + '</div>' +
+      '<div class="trend-tf">' +
+        '<label class="sw-in"><span>約定価格</span><input type="text" inputmode="decimal" autocomplete="off" data-bs-in="entry" value="' + esc(st.entry) + '"></label>' +
+        '<label class="sw-in"><span>損切り価格</span><input type="text" inputmode="decimal" autocomplete="off" data-bs-in="stop" value="' + esc(st.stop) + '"></label>' +
+      '</div>' +
+      '<div class="trend-tf"><span class="sw-lab">損切りの根拠</span>' + BIAS_STOP_BASIS.map(o => btn('data-bs-pick-basis', o, st.basis === o, o)).join('') + '</div>' +
+      '<div class="bs-stopinfo' + (pv.warn ? ' warn' : '') + '" data-bs-preview>' + esc(pv.text) + '</div>' +
+      '<div class="trend-tf"><label class="sw-in"><span>エントリー日時<small>任意・後から記録するとき</small></span><input type="datetime-local" data-bs-in="at" value="' + esc(st.at || '') + '"></label></div>' +
+      '<div class="trend-tf"><button type="button" class="btn-primary sw-go" data-bs-go>記録する</button><button type="button" class="btn-ghost" data-bs-cancel>やめる</button></div>' +
+    '</div>';
+  };
+  const levelsHtml = t => '<div class="pos-prices">入 ' + px(t.entryPrice) + ' ・損切 ' + px(t.stopPrice) + ' ・2:1 ' + px(t.tp2Price) + ' ・3:1 ' + px(t.tp3Price) + ' ・4:1 ' + px(t.tp4Price) + '</div>' +
+    '<div class="bs-stopinfo' + (typeof t.stopAtr === 'number' && t.stopAtr < BIAS_SHALLOW_ATR ? ' warn' : '') + '">' +
+      [BIAS_TRIGGER_BY[t.trigger], t.stopBasis ? '損切り：' + t.stopBasis : '', typeof t.stopAtr === 'number' ? '1H ATR×' + t.stopAtr.toFixed(1) : ''].filter(Boolean).map(esc).join('・') + '</div>';
+
+  const cardHtml = t => {
+    const st = entryState[t.id];
+    const isWatch = t.status === 'watch';
+    const tag = t.resultTag;
+    const r = tradeR(t);
+    let body = '';
+    if (isWatch) {
+      body = gridHtml(t) + subHtml(t) + noteHtml(t) +
+        '<div class="trend-tf">' +
+          '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-bs-note-open title="メモ">📝</button>' +
+          '<button type="button" class="tclear" data-bs-del title="カードを消す（記録に残しません）">🗑</button>' +
+          '<span class="spacer"></span>' +
+          '<button type="button" class="sw-res skip" data-bs-skip title="入らない（目線つきで「済み」に残す）">見送り</button>' +
+          '<button type="button" class="sw-res in' + (st ? ' on' : '') + '" data-bs-in-open>入った</button>' +
+        '</div>' + (st ? entryHtml(t, st) : '');
+    } else {
+      const ex = expanded.has(t.id);
+      body = (ex ? gridHtml(t) + subHtml(t) : lineHtml(t)) +
+        (t.status !== 'skip' ? levelsHtml(t) : '') + noteHtml(t);
+      if (t.status === 'open') {
+        body += '<div class="trend-tf">' +
+          '<button type="button" class="sw-res win" data-bs-res="tp2" title="2:1で利確した（残り2つは建値に移した）">🎯 2:1利確</button>' +
+          '<button type="button" class="sw-res loss" data-bs-res="stop">✖ 損切</button>' +
+          '<button type="button" class="sw-res skip" data-bs-res="be" title="2:1に届く前に建値で終わった">＝ 建値</button>' +
+          '<span class="spacer"></span>' +
+          '<button type="button" class="tgoto' + (ex ? ' on' : '') + '" data-bs-expand title="目線の表を開く">目線</button>' +
+          '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-bs-note-open title="メモ">📝</button>' +
+          '<button type="button" class="tclear" data-bs-del title="削除">🗑</button></div>';
+      } else {
+        body += '<div class="trend-tf">' +
+          (t.status === 'skip' ? '<span class="bs-tag">見送り</span>'
+            : '<span class="badge result-tag">' + esc(RESULT_TAG_LABELS[tag] || tag || '') + '</span>' +
+              (['reg', 'big', 'max'].includes(tag) ? ['reg', 'big', 'max'].map(k => btn('data-bs-tag', k, tag === k, RESULT_TAG_LABELS[k], 'sc-btn',
+                ({ reg: '2:1まで', big: '3:1まで', max: '4:1まで' })[k])).join('') : '')) +
+          '<span class="spacer"></span>' +
+          (t.status === 'closed' ? '<button type="button" class="tgoto pos-r' + (r == null ? '' : r > 0 ? ' pos' : r < 0 ? ' neg' : '') + (typeof t.rManual === 'number' ? ' manual' : '') +
+            '" data-bs-r title="この記録のR（3枚同量・2:1の後は建値の前提で自動。タップで直す）">' + fmtR(r) + '</button>' : '') +
+          '<button type="button" class="tgoto' + (ex ? ' on' : '') + '" data-bs-expand title="目線の表を開く">目線</button>' +
+          '<button type="button" class="tgoto' + (t.notes ? ' on' : '') + '" data-bs-note-open title="メモ">📝</button>' +
+          '<button type="button" class="tgoto" data-bs-reopen title="' + (t.status === 'skip' ? '検討中に戻す' : '保有中に戻す') + '">↩</button>' +
+          '<button type="button" class="tclear" data-bs-del title="削除">🗑</button></div>' +
+          (rEdit.has(t.id) ? '<div class="trend-tf"><label class="sw-in"><span>R<small>空で自動に戻す</small></span><input type="text" inputmode="decimal" autocomplete="off" data-bs-r-in value="' +
+            esc(typeof t.rManual === 'number' ? String(t.rManual) : '') + '"></label><button type="button" class="btn-primary sw-go" data-bs-r-save>保存</button></div>' : '') +
+          (tag === 'stoploss' ? '<div class="trend-tf pos-loss"><span class="sw-lab">負けた理由<small>任意</small></span>' +
+            LOSS_REASONS.map(x => btn('data-bs-loss', x, t.lossReason === x, esc(x))).join('') + '</div>' : '');
+      }
+    }
+    return '<div class="trend-item sc-card bs-item tf-' + esc(t.tf) + '" data-bs="' + esc(t.id) + '">' + headHtml(t) + body + '</div>';
+  };
+
+  /* 👀監視に来ている 4H・1H のアラートのうち、まだ検討カードにしていないもの */
+  const pendingAlerts = all => {
+    const made = new Set(all.map(t => t.pair + '|' + t.tf + '|' + (t.alertAt || '')));
+    const out = [];
+    loadTrades().filter(t => isScalpWatch(t) || isTrendWatch(t)).forEach(w => ['4H', '1H'].forEach(tf => {
+      const at = (w.alerts || {})[tf];
+      if (!at || made.has(w.pair + '|' + tf + '|' + at)) return;
+      made.add(w.pair + '|' + tf + '|' + at);
+      out.push({ pair: w.pair, tf, at, side: (w.alertSide || {})[tf] || '', price: Number((w.alertPrice || {})[tf]) || 0 });
+    }));
+    return out.sort((a, b) => b.at.localeCompare(a.at));
+  };
+  const alertsHtml = list => !list.length ? '' :
+    '<details class="bs-alerts" open><summary>🔔 鳴っている4H・1Hアラート（' + list.length + '）</summary>' + list.map((a, i) =>
+      '<div class="bs-arow"><span class="ld-pair">' + esc(a.pair) + '</span><span class="sw-tfchip">' + a.tf + '</span>' +
+      (a.side ? '<span class="sw-dir ' + (a.side === 'long' ? 'up' : 'down') + '">' + (a.side === 'long' ? '▲買' : '▼売') + '</span>' : '') +
+      '<span class="ld-time">⏰' + watchElapsed(a.at) + '</span><span class="spacer"></span>' +
+      '<button type="button" class="sw-res in" data-bs-from="' + i + '">＋ 検討</button></div>').join('') + '</details>';
+  let alertList = [];
+
+  let pendingRender = false;
+  const render = () => {
+    /* 価格やメモを打っている最中に同期で描き直すと入力が飛ぶので、欄を離れるまで待つ */
+    if (panel.contains(document.activeElement) && document.activeElement.matches('input')) { pendingRender = true; return; }
+    pendingRender = false;
+    const all = items();
+    const watch = all.filter(t => t.status === 'watch').sort((a, b) => (b.alertAt || b.createdAt || '').localeCompare(a.alertAt || a.createdAt || ''));
+    const open = all.filter(t => t.status === 'open').sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+    const done = all.filter(t => t.status === 'closed' || t.status === 'skip')
+      .sort((a, b) => (b.closedAt || b.updatedAt || '').localeCompare(a.closedAt || a.updatedAt || ''));
+    document.getElementById('bsSegWatchN').textContent = watch.length ? String(watch.length) : '';
+    document.getElementById('bsSegOpenN').textContent = open.length ? String(open.length) : '';
+    tabBadge.textContent = open.length ? String(open.length) : '';
+    alertList = pendingAlerts(all);
+    els.alerts.innerHTML = alertsHtml(alertList);
+    els.watch.innerHTML = watch.length ? watch.map(cardHtml).join('') : '<div class="empty-state">検討中のカードはありません。上の 🔔 の ＋検討 か「＋ 通貨を手で追加」で作ります。</div>';
+    els.open.innerHTML = open.length ? open.map(cardHtml).join('') : '<div class="empty-state">保有中の記録はありません。検討中のカードで「入った」を押すとここに入ります。</div>';
+    const DF = [{ k: 'all', label: 'すべて' }, { k: 'win', label: '勝ち' }, { k: 'loss', label: '負け' }, { k: 'skip', label: '見送り' }];
+    const dOf = t => t.status === 'skip' ? 'skip' : (tradeR(t) || 0) > 0 ? 'win' : (tradeR(t) || 0) < 0 ? 'loss' : 'be';
+    els.doneTabs.innerHTML = DF.map(f => '<button type="button" class="sw-tab' + (f.k === doneFilter ? ' active' : '') + '" data-bs-df="' + f.k + '">' + f.label +
+      '<b>' + done.filter(t => f.k === 'all' || dOf(t) === f.k).length + '</b></button>').join('');
+    const shown = done.filter(t => doneFilter === 'all' || dOf(t) === doneFilter).slice(0, 30);
+    els.done.innerHTML = shown.length ? shown.map(cardHtml).join('') : '<div class="empty-state">まだありません。</div>';
+    const has = new Set(watch.map(t => t.pair + '|' + t.tf));
+    const tf = els.addTf.value === '1H' ? '1H' : '4H';
+    els.add.innerHTML = '<option value="">＋ 通貨を手で追加</option>' + MV_PAIR_GROUPS.map(g =>
+      '<optgroup label="' + esc(g.label) + '">' + g.pairs.filter(p => !has.has(p + '|' + tf)).map(p =>
+        '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('') + '</optgroup>').join('');
+    renderStats(all);
+  };
+
+  /* ---- 🔬分析 ---- */
+  const renderStats = all => {
+    const rows = all.filter(t => t.status === 'closed').map(t => ({ id: t.id, t, r: tradeR(t), f: biasFactors(t) })).filter(x => x.r != null);
+    const skips = all.filter(t => t.status === 'skip');
+    let html = '<h3>🔬 目線の検証</h3><div class="section-note">このタブで決済した記録を R で数えます（📒と同じ：損切 −1R／建値 0／REG +0.67R／BIG +1.67R／MAX +3R）。' +
+      WL_MIN + '件未満の局面は傾向に出しません。見送り ' + skips.length + '件。</div>';
+    if (!rows.length) { els.stats.innerHTML = html + '<div class="empty-state">まだ決済した記録がありません。保有中で 2:1利確／損切／建値 を付けるとここに入ります。</div>'; return; }
+    const row = (name, list, few) => { const st = wlStat(list); return '<div class="row' + (few && st.n < WL_MIN ? ' wl-few-row' : '') + '"><span class="name">' + name + '</span>' + wlStatText(st) + '</div>'; };
+    html += '<div class="row wl-all"><span class="name">全体</span>' + wlStatText(wlStat(rows)) + '</div>';
+    const pt = wlPatterns(rows, BIAS_WL_ORDER);
+    const patHtml = g => '<div class="row"><span class="name">' + esc(g.k) + (g.st.n < 10 ? ' <small class="wl-few">参考</small>' : '') + '</span>' + wlStatText(g.st) + '</div>';
+    html += '<div class="ld-sub">⚠ 負けやすい局面</div>' + (pt.worst.length ? pt.worst.map(patHtml).join('') : '<div class="section-note">まだ見つかりません（同じ局面が ' + WL_MIN + '件以上たまると出ます）。</div>') +
+      '<div class="ld-sub">✅ 勝ちやすい局面</div>' + (pt.best.length ? pt.best.map(patHtml).join('') : '<div class="section-note">まだ見つかりません。</div>');
+    /* 足ごとの向き（売買方向に対して順・逆・横ばい） */
+    html += '<div class="ld-sub">足ごとの向き</div>' + BIAS_TFS.map(x => {
+      const rel = t => { const d = biasRow(t, x.k).dir; const want = t.direction === 'long' ? 'up' : 'down'; return !d ? '' : d === 'flat' ? '横ばい' : d === want ? '順' : '逆'; };
+      return ['順', '逆', '横ばい'].map(k => { const l = rows.filter(r => rel(r.t) === k); return l.length ? row(x.label + 'が' + k, l, true) : ''; }).join('');
+    }).join('');
+    /* 根拠ごと（その足でその根拠を付けた記録） */
+    const evRows = [];
+    BIAS_TFS.forEach(x => BIAS_EV.forEach(e => {
+      const l = rows.filter(r => (biasRow(r.t, x.k).ev || []).includes(e.k));
+      if (l.length) evRows.push({ name: x.label + '：' + e.label + (e.g === 'trend' ? '（流れ）' : '（反転）'), l, st: wlStat(l) });
+    }));
+    html += '<details class="wl-factor"><summary>根拠ごと（1回あたりの R が高い順）</summary>' + (evRows.length
+      ? evRows.sort((a, b) => b.st.avg - a.st.avg).map(e => row(esc(e.name), e.l, true)).join('') : '<div class="section-note">根拠を付けた記録がまだありません。</div>') + '</details>';
+    html += BIAS_WL_ORDER.map(k => {
+      const by = {};
+      rows.forEach(x => (by[x.f[k]] ||= []).push(x));
+      const ents = Object.entries(by).map(([v, list]) => ({ v, list, st: wlStat(list) })).sort((a, b) => a.st.avg - b.st.avg);
+      const worst = ents.find(e => e.st.n >= WL_MIN && e.st.avg < 0);
+      return '<details class="wl-factor"><summary>' + esc(k) + (worst ? ' <small class="wl-warn">⚠ ' + esc(worst.v) + ' ' + fmtR(worst.st.avg) + '</small>' : '') + '</summary>' +
+        ents.map(e => row(esc(e.v), e.list, true)).join('') + '</details>';
+    }).join('');
+    const loss = rows.filter(x => x.r < 0);
+    const reasons = {};
+    loss.forEach(x => { if (x.t.lossReason) reasons[x.t.lossReason] = (reasons[x.t.lossReason] || 0) + 1; });
+    if (Object.keys(reasons).length) html += '<div class="ld-sub">負けた理由</div>' + Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      '<div class="row"><span class="name">' + esc(k) + '</span><span class="n">' + n + '件</span><span class="rr">' + Math.round(n * 100 / loss.length) + '%</span></div>').join('');
+    els.stats.innerHTML = html;
+  };
+
+  /* ---- 書き込み ---- */
+  const save = (id, fn) => {
+    const trades = loadTrades();
+    const t = trades.find(x => x.id === id);
+    if (!t) return false;
+    const err = fn(t);
+    if (err) { showToast('⚠ ' + err); return false; }
+    t.updatedAt = new Date().toISOString();
+    return saveTrades(trades);
+  };
+  const create = (pair, tf, side, at, price) => {
+    const trades = loadTrades();
+    const now = new Date().toISOString();
+    /* 同じ通貨の前回のカードから、週足・日足の目線を引き継ぐ（足ごとに有効時間あり） */
+    const prev = trades.filter(x => isBias(x) && x.pair === pair).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))[0];
+    const bias = {};
+    if (prev) Object.entries(BIAS_KEEP_H).forEach(([k, h]) => {
+      const r = (prev.bias || {})[k];
+      if (r && r.dir && Date.now() - Date.parse(prev.createdAt) < h * 3600000) bias[k] = { dir: r.dir, ev: (r.ev || []).slice(), prev: true };
+    });
+    const t = { id: mvGenId('bs'), kind: 'bias', status: 'watch', pair, tf, side: side || '', alertAt: at || '', alertPrice: price || 0,
+                bias, follow: '', room: '', ccy: '', event: false, notes: '', tradeType: defaultTradeType(), createdAt: now, updatedAt: now };
+    trades.push(t);
+    if (!saveTrades(trades)) return;
+    setPane('watch');
+    render();
+    showToast('🧭 ' + pair + '（' + tf + '）の検討カードを作りました');
+  };
+  const setPane = name => {
+    pane = PANES[name] ? name : 'watch';
+    try { localStorage.setItem(PANE_KEY, pane); } catch (e) { /* noop */ }
+    Object.entries(PANES).forEach(([k, id]) => { document.getElementById(id).hidden = k !== pane; });
+    document.querySelectorAll('#bsSeg [data-bs-pane]').forEach(b => b.classList.toggle('active', b.dataset.bsPane === pane));
+  };
+  document.getElementById('bsSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-bs-pane]');
+    if (b) { setPane(b.dataset.bsPane); render(); }
+  });
+  els.addTf.addEventListener('change', render);
+  els.add.addEventListener('change', () => { if (els.add.value) create(els.add.value, els.addTf.value === '1H' ? '1H' : '4H', '', '', 0); });
+  els.alerts.addEventListener('click', e => {
+    const b = e.target.closest('[data-bs-from]');
+    const a = b && alertList[Number(b.dataset.bsFrom)];
+    if (a) create(a.pair, a.tf, a.side, a.at, a.price);
+  });
+  els.doneTabs.addEventListener('click', e => {
+    const b = e.target.closest('[data-bs-df]');
+    if (!b) return;
+    doneFilter = b.dataset.bsDf;
+    try { localStorage.setItem(DONE_KEY, doneFilter); } catch (err) { /* noop */ }
+    render();
+  });
+
+  const onClick = e => {
+    const card = e.target.closest('[data-bs]');
+    if (!card) return;
+    const id = card.dataset.bs;
+    const st = entryState[id];
+    if (e.target.closest('button')) blurActive();   // iOS は入力欄のフォーカスが外れず描き直しが保留されるので
+    const tfRow = e.target.closest('[data-bs-tf]');
+    const dirB = e.target.closest('[data-bs-dir]');
+    if (dirB && tfRow) {
+      const k = tfRow.dataset.bsTf, d = dirB.dataset.bsDir;
+      if (save(id, t => {
+        const r = Object.assign({ ev: [] }, (t.bias || {})[k]);
+        r.dir = r.dir === d ? '' : d;
+        delete r.prev;
+        t.bias = Object.assign({}, t.bias, { [k]: r });
+        if (!biasSummary(t).mixed) t.follow = '';
+      })) render();
+      return;
+    }
+    const evB = e.target.closest('[data-bs-ev]');
+    if (evB && tfRow) {
+      const k = tfRow.dataset.bsTf, v = evB.dataset.bsEv;
+      if (save(id, t => {
+        const r = Object.assign({ dir: '', ev: [] }, (t.bias || {})[k]);
+        r.ev = (r.ev || []).includes(v) ? r.ev.filter(x => x !== v) : (r.ev || []).concat(v);
+        delete r.prev;
+        t.bias = Object.assign({}, t.bias, { [k]: r });
+      })) render();
+      return;
+    }
+    const fo = e.target.closest('[data-bs-follow]');
+    if (fo) { if (save(id, t => { t.follow = t.follow === fo.dataset.bsFollow ? '' : fo.dataset.bsFollow; })) render(); return; }
+    const sd = e.target.closest('[data-bs-side]');
+    if (sd) { if (save(id, t => { t.side = t.side === sd.dataset.bsSide ? '' : sd.dataset.bsSide; })) render(); return; }
+    const rm = e.target.closest('[data-bs-room]');
+    if (rm) { if (save(id, t => { t.room = t.room === rm.dataset.bsRoom ? '' : rm.dataset.bsRoom; })) render(); return; }
+    const cc = e.target.closest('[data-bs-ccy]');
+    if (cc) { if (save(id, t => { t.ccy = t.ccy === cc.dataset.bsCcy ? '' : cc.dataset.bsCcy; })) render(); return; }
+    if (e.target.closest('[data-bs-event]')) { if (save(id, t => { t.event = !t.event; })) render(); return; }
+    if (e.target.closest('[data-bs-expand]')) { expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(); return; }
+    if (e.target.closest('[data-bs-note-open]')) {
+      if (noteOpen.has(id)) { const inp = card.querySelector('[data-bs-note]'); if (inp) inp.blur(); return; }
+      noteOpen.add(id);
+      render();
+      const inp = panel.querySelector('[data-bs="' + id + '"] [data-bs-note]');
+      if (inp) inp.focus();
+      return;
+    }
+    if (e.target.closest('[data-bs-del]')) {
+      const t = loadTrades().find(x => x.id === id);
+      if (t && t.status === 'watch') {
+        delete entryState[id];
+        markDeleted('trades', id);
+        saveTrades(loadTrades().filter(x => x.id !== id));
+        render();
+        return;
+      }
+      pendingDeleteId = id;
+      document.getElementById('deleteModalText').textContent = t ? t.pair + ' の記録を削除しますか？この操作は取り消せません。' : 'この記録を削除しますか？この操作は取り消せません。';
+      deleteModal.classList.add('show');
+      return;
+    }
+    if (e.target.closest('[data-bs-skip]')) {
+      blurActive();
+      if (save(id, t => { t.status = 'skip'; t.closedAt = new Date().toISOString(); })) { delete entryState[id]; render(); showToast('見送りました（「済み」に目線つきで残ります）'); }
+      return;
+    }
+    if (e.target.closest('[data-bs-reopen]')) {
+      if (save(id, t => {
+        if (t.status === 'skip') { t.status = 'watch'; t.closedAt = ''; }
+        else { t.status = 'open'; t.resultTag = ''; t.exitResult = ''; t.closedAt = ''; t.autoFill = ''; }
+      })) render();
+      return;
+    }
+    if (e.target.closest('[data-bs-in-open]')) {
+      if (st) { delete entryState[id]; render(); return; }
+      const t = loadTrades().find(x => x.id === id);
+      if (!t) return;
+      const pref = lastEntryPrefs();
+      entryState[id] = { tf: pref.bs_tf || BIAS_ENTRY_TFS[0], dir: t.side || '', trigger: pref.bs_trigger || '', basis: pref.bs_basis || '', entry: '', stop: '', at: '' };
+      render();
+      const inp = panel.querySelector('[data-bs="' + id + '"] [data-bs-in="entry"]');
+      if (inp) inp.focus();
+      return;
+    }
+    const pk = e.target.closest('[data-bs-pick-tf], [data-bs-pick-dir], [data-bs-pick-trigger], [data-bs-pick-basis]');
+    if (pk && st) {
+      const name = pk.hasAttribute('data-bs-pick-tf') ? 'tf' : pk.hasAttribute('data-bs-pick-dir') ? 'dir' : pk.hasAttribute('data-bs-pick-trigger') ? 'trigger' : 'basis';
+      const v = pk.getAttribute('data-bs-pick-' + name);
+      st[name] = (name === 'trigger' || name === 'basis') && st[name] === v ? '' : v;
+      render();
+      return;
+    }
+    if (e.target.closest('[data-bs-cancel]')) { delete entryState[id]; render(); return; }
+    if (e.target.closest('[data-bs-go]')) {
+      blurActive();
+      if (!st) return;
+      if (!st.tf) { showToast('⚠ エントリー足を選んでください'); return; }
+      if (!st.dir) { showToast('⚠ 売買方向（▲買／▼売）を選んでください'); return; }
+      if (!st.trigger) { showToast('⚠ きっかけ（5分アラート／15分アラート／裁量）を選んでください'); return; }
+      if (parsePrice(st.entry) == null) { showToast('⚠ 約定価格を入れてください'); return; }
+      if (parsePrice(st.stop) == null) { showToast('⚠ 損切り価格を入れてください'); return; }
+      if (st.at && entryAtError(st.at)) { showToast('⚠ ' + entryAtError(st.at)); return; }
+      const c = rrCalc({ entry: st.entry, stop: st.stop });
+      if (c.error) { showToast('⚠ ' + c.error); return; }
+      if (c.dir !== st.dir) { showToast('⚠ 損切り価格が売買方向と合いません'); return; }
+      const atr = pairAtr1h(card.querySelector('.sw-pair').dataset.copy);
+      const now = new Date();
+      if (save(id, t => {
+        Object.assign(t, {
+          status: 'open', entryTf: st.tf, trigger: st.trigger, stopBasis: st.basis, direction: st.dir, side: t.side || st.dir,
+          entryPrice: parsePrice(st.entry), stopPrice: c.stop, tp2Price: c.tp2, tp3Price: c.tp3, tp4Price: c.tp4, priceDec: c.dec,
+          stopAtr: atr ? Math.round(c.r / atr * 100) / 100 : null,
+          datetime: st.at || toDatetimeLocalValue(now), entryAtManual: !!st.at, entryAtIso: st.at ? new Date(st.at).toISOString() : '',
+          enteredAt: now.toISOString(), resultTag: '', exitResult: '', closedAt: '',
+        });
+      })) {
+        saveEntryPrefs(Object.assign(lastEntryPrefs(), { bs_tf: st.tf, bs_trigger: st.trigger, bs_basis: st.basis }));
+        delete entryState[id];
+        setPane('open');
+        render();
+        showToast('🧭 記録しました：保有中に入りました');
+      }
+      return;
+    }
+    const res = e.target.closest('[data-bs-res]');
+    if (res) { if (save(id, t => applyResult(t, res.dataset.bsRes, ''))) { render(); showToast('記録しました'); } return; }
+    const tg = e.target.closest('[data-bs-tag]');
+    if (tg) { if (save(id, t => { t.resultTag = tg.dataset.bsTag; t.exitResult = POS_TAG_RR[tg.dataset.bsTag]; })) render(); return; }
+    const lr = e.target.closest('[data-bs-loss]');
+    if (lr) { if (save(id, t => { t.lossReason = t.lossReason === lr.dataset.bsLoss ? '' : lr.dataset.bsLoss; })) render(); return; }
+    if (e.target.closest('[data-bs-r]')) { rEdit.has(id) ? rEdit.delete(id) : rEdit.add(id); render(); return; }
+    if (e.target.closest('[data-bs-r-save]')) {
+      blurActive();
+      const v = card.querySelector('[data-bs-r-in]').value.trim().replace('＋', '+').replace(/[−ー]/, '-');
+      if (v && !Number.isFinite(Number(v))) { showToast('⚠ R は数字で入れてください（例 0.5、-1）'); return; }
+      if (save(id, t => { if (v) t.rManual = Number(v); else delete t.rManual; })) { rEdit.delete(id); render(); }
+    }
+  };
+  [els.watch, els.open, els.done].forEach(el => el.addEventListener('click', onClick));
+  /* 📝 を押したとき、先にフォーカスが外れて閉じ→開き直す、とならないようにする */
+  panel.addEventListener('mousedown', e => {
+    const b = e.target.closest('[data-bs-note-open]');
+    if (b && b.closest('[data-bs]').querySelector('[data-bs-note]')) e.preventDefault();
+  });
+  const syncIn = el => {
+    const card = el.closest('[data-bs]');
+    const st = card && entryState[card.dataset.bs];
+    if (!st) return;
+    st[el.dataset.bsIn] = el.value;
+    const pv = card.querySelector('[data-bs-preview]');
+    if (pv) { const p = biasEntryPreview(card.querySelector('.sw-pair').dataset.copy, st); pv.textContent = p.text; pv.classList.toggle('warn', p.warn); }
+  };
+  panel.addEventListener('input', e => { if (e.target.matches('[data-bs-in]')) syncIn(e.target); });
+  panel.addEventListener('change', e => { if (e.target.matches('[data-bs-in]')) syncIn(e.target); });
+  panel.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-bs-note]')) e.target.blur(); });
+  panel.addEventListener('focusout', e => {
+    if (e.target.matches('[data-bs-note]')) {
+      const id = e.target.closest('[data-bs]').dataset.bs;
+      const v = e.target.value;
+      noteOpen.delete(id);
+      save(id, t => { t.notes = v.trim(); });
+      setTimeout(render, 0);
+    } else if (pendingRender) {
+      setTimeout(render, 0);
+    }
+  });
+  setInterval(() => { if (!document.hidden && !panel.contains(document.activeElement)) render(); }, 60000);
+  zonesListeners.push(() => render());
+  setPane(pane);
+  render();
+  return { render };
+}
+const biasBoard = makeBias();
+
 /* ============ タブ切替 ============ */
 const TAB_KEY = 'mochipoyo_active_tab';
 const tabBar = document.getElementById('tabBar');
 const tabButtons = Array.from(tabBar.querySelectorAll('.tab-btn'));
 const tabPanels = {
   watch:    document.getElementById('tabPanel-watch'),
+  bias:     document.getElementById('tabPanel-bias'),
   record:   document.getElementById('tabPanel-record'),
   review:   document.getElementById('tabPanel-review'),
   settings: document.getElementById('tabPanel-settings'),
@@ -5593,7 +6242,7 @@ document.querySelectorAll('#reviewClsFilter [data-cls]').forEach(b => b.classLis
 
 /* ============ 初期描画 ============ */
 /* renderMarket() が内部で syncFormFromMarket() を呼ぶため、フォームもここで同期される。 */
-function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); renderAlertLedger(); renderWinLoss(); candidates.render(); }
+function renderAll() { renderStats(); renderList(); renderMarket(); renderLegacyScalp(); watchBoard.render(); positions.render(); skipList.render(); renderSkipStats(); renderAlertLedger(); renderWinLoss(); candidates.render(); biasBoard.render(); }
 document.querySelectorAll('#reviewTypeFilter').forEach(el => {
   el.querySelectorAll('.type-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === typeFilter);

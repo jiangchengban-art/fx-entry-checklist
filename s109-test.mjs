@@ -64,7 +64,7 @@ await page.evaluate(([a, b, c, d, e]) => {
 ]);
 await page.reload();
 await page.waitForSelector('#tabBar');
-check('下部タブは4つ（監視/記録/振り返り/設定）', await page.locator('#tabBar .tab-btn').count() === 4
+check('下部タブは5つ（監視/目線/記録/振り返り/設定。S125で🧭目線を追加）', await page.locator('#tabBar .tab-btn').count() === 5
   && await page.locator('#tabBar .tab-btn[data-tab="watch"]').count() === 1 && await page.locator('#tabBar .tab-btn[data-tab="record"]').count() === 1);
 check('既定は👀監視', await page.$eval('#tabPanel-watch', el => el.classList.contains('active')));
 const pairs = () => page.$$eval('#swList [data-sw] .sw-pair', els => els.map(e => e.textContent));
